@@ -1,16 +1,13 @@
-// ============================================================
 // ENDPOINT TO IMPORT LAW DOCUMENTS INTO THE DATABASE
-// File location in your project:
-//   src/app/api/documents/import/route.ts
-// ============================================================
+// File location: src/app/api/documents/import/route.ts
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
-    // STEP 1: Check that the user is logged in and is an admin
     const session = await auth();
 
     if (!session || !session.user) {
@@ -27,11 +24,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // STEP 2: Read the JSON coming from the import tool
     const data = await req.json();
     const { name, short_description, law_number, categories, published, sections } = data;
 
-    // STEP 3: Make sure the JSON has the required fields
     if (!name || !sections || !Array.isArray(sections)) {
       return NextResponse.json(
         { error: "Invalid JSON format. 'name' and 'sections' are required." },
@@ -39,8 +34,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // STEP 4: Create the main document (the law itself) in the database
-    const document = await db.document.create({
+    const document = await prisma.document.create({
       data: {
         name,
         short_description: short_description || "",
@@ -50,14 +44,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Counters for the final summary
     let totalSections = 0;
     let totalChapters = 0;
     let totalArticles = 0;
 
-    // STEP 5: Save each Title/Section of the law (Título I, Título II, etc.)
     for (const sectionData of sections) {
-      const section = await db.section.create({
+      const section = await prisma.section.create({
         data: {
           title: sectionData.title,
           documentId: document.id,
@@ -65,9 +57,8 @@ export async function POST(req: NextRequest) {
       });
       totalSections++;
 
-      // STEP 6: Save each Chapter inside the Section
       for (const chapterData of sectionData.chapters || []) {
-        const chapter = await db.chapter.create({
+        const chapter = await prisma.chapter.create({
           data: {
             title: chapterData.title,
             sectionId: section.id,
@@ -75,9 +66,8 @@ export async function POST(req: NextRequest) {
         });
         totalChapters++;
 
-        // STEP 7: Save each Article inside the Chapter
         for (const articleData of chapterData.articles || []) {
-          await db.article.create({
+          await prisma.article.create({
             data: {
               articleNumber: articleData.articleNumber,
               content: articleData.content || "",
@@ -90,7 +80,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // STEP 8: Return a summary of everything that was saved
     return NextResponse.json({
       success: true,
       message: `Law "${name}" was imported successfully.`,
