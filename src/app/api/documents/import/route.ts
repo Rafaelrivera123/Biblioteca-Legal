@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
