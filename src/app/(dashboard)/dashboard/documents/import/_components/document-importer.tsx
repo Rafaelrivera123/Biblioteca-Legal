@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { SubmitButton } from "@/components/ui/submit-button";
 
 // Types
 interface Article {
@@ -270,9 +269,9 @@ export default function DocumentImporter() {
         >
           Upload Another
         </Button>
-        <SubmitButton isLoading={step === "saving"} onClick={handleSave} className="w-fit">
-          Save to Database
-        </SubmitButton>
+        <Button onClick={handleSave} disabled={step === "saving"} className="w-fit bg-primary text-white hover:bg-primary/90">
+          {step === "saving" ? "Saving..." : "Save to Database"}
+        </Button>
       </div>
     </div>
   );
