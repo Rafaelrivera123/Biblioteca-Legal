@@ -50,6 +50,56 @@ function getArticleNumber(text: string): number {
   return match ? parseInt(match[0]) : 0;
 }
 
+// Extract list formats directly from the docx ZIP using JSZip (already a mammoth dependency)
+async function extractListFormats(arrayBuffer: ArrayBuffer): Promise<Map<number, string>> {
+  const formats = new Map<number, string>();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const numberingFile = zip.file("word/numbering.xml");
+    if (!numberingFile) return formats;
+    const xml = await numberingFile.async("string");
+    const xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
+    const abstractNums = xmlDoc.querySelectorAll("abstractNum");
+    let idx = 0;
+    abstractNums.forEach((abstractNum) => {
+      // Get ilvl=0 level format
+      const levels = abstractNum.querySelectorAll("lvl");
+      levels.forEach((lvl) => {
+        const ilvlAttr = lvl.getAttribute("w:ilvl");
+        if (ilvlAttr === "0") {
+          const numFmt = lvl.querySelector("numFmt");
+          const fmt = numFmt?.getAttribute("w:val") || "decimal";
+          formats.set(idx, fmt);
+          idx++;
+        }
+      });
+    });
+  } catch {
+    // If JSZip not available, return empty map
+  }
+  return formats;
+}
+
+// Apply list types to ol elements based on extracted formats
+function applyListTypes(htmlContent: string, listFormats: Map<number, string>): string {
+  if (listFormats.size === 0) return htmlContent;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, "text/html");
+  const lists = doc.querySelectorAll("ol");
+  let listIndex = 0;
+  lists.forEach((ol) => {
+    const format = listFormats.get(listIndex % listFormats.size) || "decimal";
+    if (format === "lowerLetter") ol.setAttribute("type", "a");
+    else if (format === "upperLetter") ol.setAttribute("type", "A");
+    else if (format === "lowerRoman") ol.setAttribute("type", "i");
+    else if (format === "upperRoman") ol.setAttribute("type", "I");
+    listIndex++;
+  });
+  return doc.body.innerHTML;
+}
+
 function parseDocument(htmlContent: string): Section[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
@@ -118,7 +168,9 @@ function parseDocument(htmlContent: string): Section[] {
     } else if (articleNumber > 0) {
       if (tagName === "ol") {
         const items = el.querySelectorAll("li");
-        let olHtml = "<ol>"; let olPlain = ""; let idx = 1;
+        const olType = el.getAttribute("type") || "";
+        const olTypeAttr = olType ? ` type="${olType}"` : "";
+        let olHtml = `<ol${olTypeAttr}>`; let olPlain = ""; let idx = 1;
         items.forEach((li) => { olHtml += `<li>${li.innerHTML}</li>`; olPlain += `${idx}. ${li.textContent?.trim()}\n`; idx++; });
         olHtml += "</ol>";
         currentContentHtml.push(olHtml); currentContentPlain.push(olPlain);
@@ -157,13 +209,25 @@ export default function DocumentImporter() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mammoth = await import("mammoth") as any;
       const arrayBuffer = await file.arrayBuffer();
+
+      // Extract list formats from docx numbering.xml
+      const listFormats = await extractListFormats(arrayBuffer);
+
+      // Convert to HTML
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-      const sections = parseDocument(htmlResult.value);
+
+      // Apply correct list types (a, A, i, I, or decimal)
+      const fixedHtml = applyListTypes(htmlResult.value, listFormats);
+
+      const sections = parseDocument(fixedHtml);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
       setParsed({ name, short_description: "", law_number: "", categoryIds: [], sections });
       setStep("preview");
       toast.success(`Document processed: ${sections.length} sections found.`);
-    } catch { toast.error("Error processing document. Please try again."); }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error processing document. Please try again.");
+    }
     finally { setIsLoading(false); }
   }, []);
 
@@ -224,7 +288,6 @@ export default function DocumentImporter() {
 
   return (
     <div className="space-y-6">
-      {/* Metadata */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-4">
         <h2 className="font-semibold text-[20px] text-primary">Document Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -241,20 +304,14 @@ export default function DocumentImporter() {
           <label className="text-sm font-medium text-gray-700 block mb-1">Short Description</label>
           <Textarea value={parsed?.short_description ?? ""} onChange={(e) => setParsed((p) => p ? { ...p, short_description: e.target.value } : p)} placeholder="Brief description of the law..." className="min-h-[80px] resize-none" />
         </div>
-
-        {/* Category selector */}
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-2">Categories</label>
           <div className="flex flex-wrap gap-2">
             {categories?.map((cat) => {
               const selected = parsed?.categoryIds.includes(cat.id);
               return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => toggleCategory(cat.id)}
-                  className={`px-4 py-2 rounded-full text-[13px] font-medium border transition-colors ${selected ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-300 hover:border-primary"}`}
-                >
+                <button key={cat.id} type="button" onClick={() => toggleCategory(cat.id)}
+                  className={`px-4 py-2 rounded-full text-[13px] font-medium border transition-colors ${selected ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-300 hover:border-primary"}`}>
                   {cat.name}
                 </button>
               );
@@ -266,7 +323,6 @@ export default function DocumentImporter() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[{ label: "Sections", value: parsed?.sections.length ?? 0 }, { label: "Chapters", value: totalChapters }, { label: "Articles", value: totalArticles }].map((s) => (
           <div key={s.label} className="bg-white p-6 border border-black/20 rounded-[8px] text-center">
@@ -276,7 +332,6 @@ export default function DocumentImporter() {
         ))}
       </div>
 
-      {/* Structure Preview */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-3">
         <h2 className="font-semibold text-[20px] text-primary">Structure Preview</h2>
         <div className="max-h-[400px] overflow-y-auto space-y-2">
@@ -307,7 +362,6 @@ export default function DocumentImporter() {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button variant="outline" className="text-primary hover:text-primary/80" onClick={() => { setParsed(null); setStep("upload"); }}>
           Upload Another
