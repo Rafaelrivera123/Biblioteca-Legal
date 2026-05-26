@@ -4,25 +4,16 @@ import * as z from "zod";
 export const documentFormSchema = z.object({
   name: z
     .string()
-    .min(2, {
-      message: "Document name must be at least 2 characters.",
-    })
-    .max(100, {
-      message: "Document name must not exceed 100 characters.",
-    }),
-  categoryIds: z.array(z.string()).min(1, "Please select a category."),
+    .min(2, { message: "Document name must be at least 2 characters." })
+    .max(100, { message: "Document name must not exceed 100 characters." }),
+  categoryIds: z.array(z.string()).optional().default([]),
   short_description: z
     .string()
-    .min(126, {
-      message: "Description must be in 126 characters.",
-    })
-    .max(145, {
-      message: "Description must not exceed 145 characters.",
-    }),
-  law_number: z.string(),
-  publishedDate: z.date({
-    required_error: "Please select a published date.",
-  }),
+    .max(145, { message: "Description must not exceed 145 characters." })
+    .optional()
+    .default(""),
+  law_number: z.string().optional().default(""),
+  publishedDate: z.date().optional(),
 });
 
 export type DocumentFormSchemaType = z.infer<typeof documentFormSchema>;
@@ -41,32 +32,19 @@ export type DocumentsApiResponse = {
 
 export const sectionTitleSchema = z.object({
   name: z.string().min(1),
-  documentId: z.string().min(1, {
-    message: "Document ID is required.",
-  }),
+  documentId: z.string().min(1, { message: "Document ID is required." }),
 });
-
 export type SectionTitleSchemaType = z.infer<typeof sectionTitleSchema>;
 
 export const chapterTitleSchema = z.object({
   title: z.string().min(1),
-  sectionId: z.string().min(1, {
-    message: "Document ID is required.",
-  }),
+  sectionId: z.string().min(1, { message: "Document ID is required." }),
 });
-
 export type ChapterTitleSchemaType = z.infer<typeof chapterTitleSchema>;
 
 export const articleSchema = z.object({
-  content: z.string().min(1, {
-    message: "Content is required.",
-  }),
-  articleNumber: z.number({
-    message: "Article number is required",
-  }),
-  chapterId: z.string().min(1, {
-    message: "Document ID is required.",
-  }),
+  content: z.string().min(1, { message: "Content is required." }),
+  articleNumber: z.number({ message: "Article number is required" }),
+  chapterId: z.string().min(1, { message: "Document ID is required." }),
 });
-
 export type articleSchemaType = z.infer<typeof articleSchema>;
