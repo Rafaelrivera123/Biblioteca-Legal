@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-// Types
 interface Article {
   articleNumber: number;
   content: string;
@@ -28,7 +27,6 @@ interface ParsedDocument {
   sections: Section[];
 }
 
-// Parser function
 function parseDocumentText(text: string): Section[] {
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
   const sections: Section[] = [];
@@ -36,10 +34,13 @@ function parseDocumentText(text: string): Section[] {
   let currentChapter: Chapter | null = null;
   let currentContent: string[] = [];
   let articleNumber = 0;
+  let lawStarted = false; // Only start parsing after first Libro/Título
 
+  const isBook    = (l: string) => /^libro\s+/i.test(l);
   const isSection = (l: string) => /^título\s+/i.test(l);
   const isChapter = (l: string) => /^capítulo\s+/i.test(l);
-  const isArticle = (l: string) => /^artículo\s+\d+/i.test(l);
+  // Match "Artículo 1" exactly — number on its own line, no extra text
+  const isArticle = (l: string) => /^artículo\s+\d+\s*$/i.test(l);
 
   function flushArticle() {
     if (articleNumber > 0 && currentChapter) {
@@ -56,10 +57,31 @@ function parseDocumentText(text: string): Section[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (isSection(line)) {
+
+    // Wait for first Libro or Título before capturing anything
+    if (!lawStarted) {
+      if (isBook(line) || isSection(line)) {
+        lawStarted = true;
+      } else {
+        continue;
+      }
+    }
+
+    if (isBook(line)) {
+      // Libro acts as a top-level grouping — create new section
       flushArticle();
       currentSection = { title: line, chapters: [] };
       sections.push(currentSection);
+      currentChapter = null;
+    } else if (isSection(line)) {
+      flushArticle();
+      if (!currentSection) {
+        currentSection = { title: line, chapters: [] };
+        sections.push(currentSection);
+      } else {
+        // Append título to current section title or create sub-section
+        currentSection.title = `${currentSection.title} | ${line}`;
+      }
       currentChapter = null;
     } else if (isChapter(line)) {
       flushArticle();
@@ -269,7 +291,11 @@ export default function DocumentImporter() {
         >
           Upload Another
         </Button>
-        <Button onClick={handleSave} disabled={step === "saving"} className="w-fit bg-primary text-white hover:bg-primary/90">
+        <Button
+          onClick={handleSave}
+          disabled={step === "saving"}
+          className="w-fit bg-primary text-white hover:bg-primary/90"
+        >
           {step === "saving" ? "Saving..." : "Save to Database"}
         </Button>
       </div>
