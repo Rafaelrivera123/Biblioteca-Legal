@@ -1,5 +1,3 @@
-// ENDPOINT TO IMPORT LAW DOCUMENTS INTO THE DATABASE
-// File location: src/app/api/documents/import/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -8,27 +6,26 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please log in first." },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
     if (session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Access denied. Only admins can import laws." },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Access denied." }, { status: 403 });
     }
 
     const data = await req.json();
-    const { name, short_description, law_number, published, sections } = data;
+    const { name, short_description, law_number, published, sections, categoryIds } = data;
 
     if (!name || !sections || !Array.isArray(sections)) {
-      return NextResponse.json(
-        { error: "Invalid JSON format. 'name' and 'sections' are required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
     }
+
+    // Fetch category names for the selected IDs
+    const categories = categoryIds?.length
+      ? await prisma.category.findMany({
+          where: { id: { in: categoryIds } },
+          select: { id: true, name: true },
+        })
+      : [];
 
     const document = await prisma.document.create({
       data: {
@@ -36,6 +33,12 @@ export async function POST(req: NextRequest) {
         short_description: short_description || "",
         law_number: law_number || "",
         published: published || false,
+        categories: {
+          create: categories.map((cat) => ({
+            categoryId: cat.id,
+            name: cat.name,
+          })),
+        },
       },
     });
 
@@ -45,19 +48,13 @@ export async function POST(req: NextRequest) {
 
     for (const sectionData of sections) {
       const section = await prisma.section.create({
-        data: {
-          title: sectionData.title,
-          documentId: document.id,
-        },
+        data: { title: sectionData.title, documentId: document.id },
       });
       totalSections++;
 
       for (const chapterData of sectionData.chapters || []) {
         const chapter = await prisma.chapter.create({
-          data: {
-            title: chapterData.title,
-            sectionId: section.id,
-          },
+          data: { title: chapterData.title, sectionId: section.id },
         });
         totalChapters++;
 
@@ -79,20 +76,13 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Law "${name}" was imported successfully.`,
       documentId: document.id,
-      summary: {
-        sections: totalSections,
-        chapters: totalChapters,
-        articles: totalArticles,
-      },
+      summary: { sections: totalSections, chapters: totalChapters, articles: totalArticles },
     });
 
   } catch (error: unknown) {
     console.error("Error importing law:", error);
     return NextResponse.json(
-      {
-        error: "Internal server error.",
-        detail: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Internal server error.", detail: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
