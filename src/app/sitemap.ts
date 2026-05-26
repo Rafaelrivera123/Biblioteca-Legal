@@ -6,10 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const documents = await prisma.document.findMany({
-      select: {
-        id: true,
-        updatedAt: true,
-      },
+      select: { id: true, updatedAt: true },
     });
     documentEntries = documents.map((doc) => ({
       url: `${process.env.AUTH_URL}/collections/${doc.id}`,
@@ -17,7 +14,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly" as const,
     }));
   } catch {
-    // If DB is unavailable during build, return empty document list
     documentEntries = [];
   }
 
