@@ -104,7 +104,8 @@ export default function DocumentImporter() {
     }
     setIsLoading(true);
     try {
-      const mammoth = await import("mammoth/mammoth.browser");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mammoth = await import("mammoth") as any;
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       const sections = parseDocumentText(result.value);
@@ -141,7 +142,7 @@ export default function DocumentImporter() {
         setStep("preview");
         return;
       }
-      toast.success(`"${parsed.name}" saved successfully! ${data.summary?.sections} titles, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
+      toast.success(`"${parsed.name}" saved! ${data.summary?.sections} titles, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
       router.push("/dashboard/documents");
     } catch {
       toast.error("Error saving document.");
