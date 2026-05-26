@@ -168,7 +168,6 @@ export default function DocumentImporter() {
 
       // Get both HTML (for lists) and plain text
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-      const textResult = await mammoth.extractRawText({ arrayBuffer });
 
       const sections = parseDocument(htmlResult.value);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
