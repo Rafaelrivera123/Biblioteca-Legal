@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
 
 interface Article {
   articleNumber: number;
@@ -24,10 +25,14 @@ interface ParsedDocument {
   name: string;
   short_description: string;
   law_number: string;
+  categoryIds: string[];
   sections: Section[];
 }
+interface Category {
+  id: string;
+  name: string;
+}
 
-// Detect what type of structural element a line is
 type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
 
 function classifyLine(text: string): LineType {
@@ -60,7 +65,6 @@ function parseDocument(htmlContent: string): Section[] {
 
   function flushArticle() {
     if (articleNumber > 0) {
-      // Find the right chapter to add to
       const targetChapter = currentChapter ?? (() => {
         if (!currentSection) {
           currentSection = { title: "General", chapters: [] };
@@ -71,111 +75,65 @@ function parseDocument(htmlContent: string): Section[] {
         currentChapter = ch;
         return ch;
       })();
-
       const contentHtml = currentContentHtml.join("") || "<p></p>";
       const contentPlain = currentContentPlain.join("\n").trim();
-      targetChapter.articles.push({
-        articleNumber,
-        content: contentHtml,
-        contentPlainText: contentPlain,
-      });
+      targetChapter.articles.push({ articleNumber, content: contentHtml, contentPlainText: contentPlain });
       currentContentHtml = [];
       currentContentPlain = [];
       articleNumber = 0;
     }
   }
 
-  function getOrCreateSection(title: string): Section {
+  function ensureSection(title: string) {
     flushArticle();
-    const s: Section = { title, chapters: [] };
-    sections.push(s);
-    currentSection = s;
+    currentSection = { title, chapters: [] };
+    sections.push(currentSection);
     currentChapter = null;
-    return s;
   }
 
-  function getOrCreateChapter(title: string): Chapter {
+  function ensureChapter(title: string) {
     flushArticle();
-    if (!currentSection) {
-      currentSection = { title: "General", chapters: [] };
-      sections.push(currentSection);
-    }
-    const ch: Chapter = { title, articles: [] };
-    currentSection.chapters.push(ch);
-    currentChapter = ch;
-    return ch;
+    if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
+    currentChapter = { title, articles: [] };
+    currentSection!.chapters.push(currentChapter);
   }
 
   for (const el of blocks) {
     const tagName = el.tagName.toLowerCase();
     const text = el.textContent?.trim() || "";
-
     if (!text && tagName !== "ol" && tagName !== "ul") continue;
-
     const lineType = classifyLine(text);
-
-    // Wait until we find a structural element before starting
     if (!lawStarted) {
-      if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) {
-        lawStarted = true;
-      } else {
-        continue;
-      }
+      if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
+      else continue;
     }
-
-    if (lineType === "libro") {
-      getOrCreateSection(text);
-    } else if (lineType === "titulo") {
-      // Título always creates a new section
-      getOrCreateSection(text);
-    } else if (lineType === "capitulo" || lineType === "seccion") {
-      // Capítulo/Sección creates a new chapter inside current section
-      getOrCreateChapter(text);
-    } else if (lineType === "articulo") {
+    if (lineType === "libro") { ensureSection(text); }
+    else if (lineType === "titulo") { ensureSection(text); }
+    else if (lineType === "capitulo" || lineType === "seccion") { ensureChapter(text); }
+    else if (lineType === "articulo") {
       flushArticle();
-      // Ensure we have a section and chapter
-      if (!currentSection) {
-        currentSection = { title: "General", chapters: [] };
-        sections.push(currentSection);
-      }
-      if (!currentChapter) {
-        currentChapter = { title: "General", articles: [] };
-        currentSection.chapters.push(currentChapter);
-      }
+      if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
+      if (!currentChapter) { currentChapter = { title: "General", articles: [] }; currentSection.chapters.push(currentChapter); }
       articleNumber = getArticleNumber(text);
     } else if (articleNumber > 0) {
-      // Article content — preserve lists
       if (tagName === "ol") {
         const items = el.querySelectorAll("li");
-        let olHtml = "<ol>";
-        let olPlain = "";
-        let idx = 1;
-        items.forEach((li) => {
-          olHtml += `<li>${li.innerHTML}</li>`;
-          olPlain += `${idx}. ${li.textContent?.trim()}\n`;
-          idx++;
-        });
+        let olHtml = "<ol>"; let olPlain = ""; let idx = 1;
+        items.forEach((li) => { olHtml += `<li>${li.innerHTML}</li>`; olPlain += `${idx}. ${li.textContent?.trim()}\n`; idx++; });
         olHtml += "</ol>";
-        currentContentHtml.push(olHtml);
-        currentContentPlain.push(olPlain);
+        currentContentHtml.push(olHtml); currentContentPlain.push(olPlain);
       } else if (tagName === "ul") {
         const items = el.querySelectorAll("li");
-        let ulHtml = "<ul>";
-        let ulPlain = "";
-        items.forEach((li) => {
-          ulHtml += `<li>${li.innerHTML}</li>`;
-          ulPlain += `• ${li.textContent?.trim()}\n`;
-        });
+        let ulHtml = "<ul>"; let ulPlain = "";
+        items.forEach((li) => { ulHtml += `<li>${li.innerHTML}</li>`; ulPlain += `• ${li.textContent?.trim()}\n`; });
         ulHtml += "</ul>";
-        currentContentHtml.push(ulHtml);
-        currentContentPlain.push(ulPlain);
+        currentContentHtml.push(ulHtml); currentContentPlain.push(ulPlain);
       } else if (text) {
         currentContentHtml.push(`<p>${el.innerHTML}</p>`);
         currentContentPlain.push(text);
       }
     }
   }
-
   flushArticle();
   return sections;
 }
@@ -187,11 +145,13 @@ export default function DocumentImporter() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  const { data: categories } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: () => fetch("/api/categories").then((res) => res.json()),
+  });
+
   const processFile = useCallback(async (file: File) => {
-    if (!file.name.endsWith(".docx")) {
-      toast.error("Please upload a .docx file.");
-      return;
-    }
+    if (!file.name.endsWith(".docx")) { toast.error("Please upload a .docx file."); return; }
     setIsLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,19 +160,15 @@ export default function DocumentImporter() {
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
       const sections = parseDocument(htmlResult.value);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
-      setParsed({ name, short_description: "", law_number: "", sections });
+      setParsed({ name, short_description: "", law_number: "", categoryIds: [], sections });
       setStep("preview");
       toast.success(`Document processed: ${sections.length} sections found.`);
-    } catch {
-      toast.error("Error processing document. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    } catch { toast.error("Error processing document. Please try again."); }
+    finally { setIsLoading(false); }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) processFile(file);
   }, [processFile]);
@@ -227,17 +183,18 @@ export default function DocumentImporter() {
         body: JSON.stringify(parsed),
       });
       const data = await response.json();
-      if (!response.ok) {
-        toast.error(data.error || "Error saving document.");
-        setStep("preview");
-        return;
-      }
+      if (!response.ok) { toast.error(data.error || "Error saving document."); setStep("preview"); return; }
       toast.success(`"${parsed.name}" saved! ${data.summary?.sections} sections, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
       router.push("/dashboard/documents");
-    } catch {
-      toast.error("Error saving document.");
-      setStep("preview");
-    }
+    } catch { toast.error("Error saving document."); setStep("preview"); }
+  };
+
+  const toggleCategory = (id: string) => {
+    setParsed((p) => {
+      if (!p) return p;
+      const already = p.categoryIds.includes(id);
+      return { ...p, categoryIds: already ? p.categoryIds.filter((c) => c !== id) : [...p.categoryIds, id] };
+    });
   };
 
   const totalChapters = parsed?.sections.reduce((a, s) => a + s.chapters.length, 0) ?? 0;
@@ -258,13 +215,8 @@ export default function DocumentImporter() {
             {isLoading ? "Processing document..." : "Upload your Word file (.docx)"}
           </p>
           <p className="text-gray-500 text-[14px]">Drag and drop here or click to select</p>
-          <input
-            id="fileInput"
-            type="file"
-            accept=".docx"
-            className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); }}
-          />
+          <input id="fileInput" type="file" accept=".docx" className="hidden"
+            onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); }} />
         </div>
       </div>
     );
@@ -272,43 +224,51 @@ export default function DocumentImporter() {
 
   return (
     <div className="space-y-6">
+      {/* Metadata */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-4">
         <h2 className="font-semibold text-[20px] text-primary">Document Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Document Name *</label>
-            <Input
-              value={parsed?.name ?? ""}
-              onChange={(e) => setParsed((p) => p ? { ...p, name: e.target.value } : p)}
-              placeholder="Law name"
-            />
+            <Input value={parsed?.name ?? ""} onChange={(e) => setParsed((p) => p ? { ...p, name: e.target.value } : p)} placeholder="Law name" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Law Number / Decree</label>
-            <Input
-              value={parsed?.law_number ?? ""}
-              onChange={(e) => setParsed((p) => p ? { ...p, law_number: e.target.value } : p)}
-              placeholder="e.g. Decree 189-1959"
-            />
+            <Input value={parsed?.law_number ?? ""} onChange={(e) => setParsed((p) => p ? { ...p, law_number: e.target.value } : p)} placeholder="e.g. Decree 189-1959" />
           </div>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">Short Description</label>
-          <Textarea
-            value={parsed?.short_description ?? ""}
-            onChange={(e) => setParsed((p) => p ? { ...p, short_description: e.target.value } : p)}
-            placeholder="Brief description of the law..."
-            className="min-h-[80px] resize-none"
-          />
+          <Textarea value={parsed?.short_description ?? ""} onChange={(e) => setParsed((p) => p ? { ...p, short_description: e.target.value } : p)} placeholder="Brief description of the law..." className="min-h-[80px] resize-none" />
+        </div>
+
+        {/* Category selector */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-2">Categories</label>
+          <div className="flex flex-wrap gap-2">
+            {categories?.map((cat) => {
+              const selected = parsed?.categoryIds.includes(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggleCategory(cat.id)}
+                  className={`px-4 py-2 rounded-full text-[13px] font-medium border transition-colors ${selected ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-300 hover:border-primary"}`}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+          {parsed?.categoryIds && parsed.categoryIds.length > 0 && (
+            <p className="text-xs text-gray-500 mt-1">{parsed.categoryIds.length} categor{parsed.categoryIds.length === 1 ? "y" : "ies"} selected</p>
+          )}
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Sections", value: parsed?.sections.length ?? 0 },
-          { label: "Chapters", value: totalChapters },
-          { label: "Articles", value: totalArticles },
-        ].map((s) => (
+        {[{ label: "Sections", value: parsed?.sections.length ?? 0 }, { label: "Chapters", value: totalChapters }, { label: "Articles", value: totalArticles }].map((s) => (
           <div key={s.label} className="bg-white p-6 border border-black/20 rounded-[8px] text-center">
             <div className="text-[36px] font-semibold text-primary">{s.value}</div>
             <div className="text-gray-500 text-[14px]">{s.label}</div>
@@ -316,6 +276,7 @@ export default function DocumentImporter() {
         ))}
       </div>
 
+      {/* Structure Preview */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-3">
         <h2 className="font-semibold text-[20px] text-primary">Structure Preview</h2>
         <div className="max-h-[400px] overflow-y-auto space-y-2">
@@ -339,28 +300,19 @@ export default function DocumentImporter() {
                 </div>
               ))}
               {section.chapters.length > 3 && (
-                <div className="px-4 py-1 text-[12px] text-gray-400">
-                  +{section.chapters.length - 3} more chapters...
-                </div>
+                <div className="px-4 py-1 text-[12px] text-gray-400">+{section.chapters.length - 3} more chapters...</div>
               )}
             </div>
           ))}
         </div>
       </div>
 
+      {/* Actions */}
       <div className="flex justify-end gap-3">
-        <Button
-          variant="outline"
-          className="text-primary hover:text-primary/80"
-          onClick={() => { setParsed(null); setStep("upload"); }}
-        >
+        <Button variant="outline" className="text-primary hover:text-primary/80" onClick={() => { setParsed(null); setStep("upload"); }}>
           Upload Another
         </Button>
-        <Button
-          onClick={handleSave}
-          disabled={step === "saving"}
-          className="w-fit bg-primary text-white hover:bg-primary/90"
-        >
+        <Button onClick={handleSave} disabled={step === "saving"} className="w-fit bg-primary text-white hover:bg-primary/90">
           {step === "saving" ? "Saving..." : "Save to Database"}
         </Button>
       </div>
