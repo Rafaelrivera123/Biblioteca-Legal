@@ -9,7 +9,7 @@ async function getHNLPrice(usdAmount: number): Promise<string> {
   try {
     const res = await fetch(
       "https://api.exchangerate-api.com/v4/latest/USD",
-      { next: { revalidate: 86400 } } // Cache 24 hours
+      { next: { revalidate: 86400 } }
     );
     const data = await res.json();
     const rate = data.rates?.HNL ?? 24.7;
@@ -47,6 +47,7 @@ const Page = async () => {
         subscription={currentSubscription?.subscription}
         sub_type={currentSubscription?.type as "user" | "company"}
         price={formattedAmount}
+        isLoggedin={isLoggedin}
       />
       {!isLoggedin && <CTA />}
     </div>
