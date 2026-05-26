@@ -3,6 +3,7 @@ import CTA from "@/components/shared/sections/cta";
 import HeaderSection from "@/components/shared/sections/header";
 import { getCurrentUserSubscription } from "@/helper/subscription";
 import { paddle } from "@/lib/paddle";
+import { prisma } from "@/lib/db";
 import PricingComparison from "./_components/pricing-plan";
 
 async function getHNLPrice(usdAmount: number): Promise<string> {
@@ -24,6 +25,19 @@ const Page = async () => {
   const cu = await auth();
   const isLoggedin = !!cu;
   const currentSubscription = await getCurrentUserSubscription();
+
+  let paddleCustomerId = "";
+  if (cu?.user?.id) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: cu.user.id },
+        select: { paddleCustomerId: true },
+      });
+      paddleCustomerId = user?.paddleCustomerId ?? "";
+    } catch {
+      paddleCustomerId = "";
+    }
+  }
 
   let usdAmount = 5.99;
   try {
@@ -48,6 +62,7 @@ const Page = async () => {
         sub_type={currentSubscription?.type as "user" | "company"}
         price={formattedAmount}
         isLoggedin={isLoggedin}
+        paddleCustomerId={paddleCustomerId}
       />
       {!isLoggedin && <CTA />}
     </div>
