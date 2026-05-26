@@ -27,7 +27,7 @@ interface ParsedDocument {
   sections: Section[];
 }
 
-function parseDocument(htmlContent: string, plainText: string): Section[] {
+function parseDocument(htmlContent: string): Section[] {
   // Use a DOM parser to extract text with list formatting preserved
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
@@ -170,7 +170,7 @@ export default function DocumentImporter() {
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
       const textResult = await mammoth.extractRawText({ arrayBuffer });
 
-      const sections = parseDocument(htmlResult.value, textResult.value);
+      const sections = parseDocument(htmlResult.value);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
       setParsed({ name, short_description: "", law_number: "", sections });
       setStep("preview");
