@@ -27,71 +27,77 @@ interface ParsedDocument {
   sections: Section[];
 }
 
-function parseDocumentText(text: string): Section[] {
-  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+function parseDocument(htmlContent: string, plainText: string): Section[] {
+  // Use a DOM parser to extract text with list formatting preserved
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, "text/html");
+
+  // Get all block elements in order
+  const blocks = doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul");
+
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let currentChapter: Chapter | null = null;
-  let currentContent: string[] = [];
+  let currentContentHtml: string[] = [];
+  let currentContentPlain: string[] = [];
   let articleNumber = 0;
-  let lawStarted = false; // Only start parsing after first Libro/Título
+  let lawStarted = false;
 
-  const isBook    = (l: string) => /^libro\s+/i.test(l);
-  const isSection = (l: string) => /^título\s+/i.test(l);
-  const isChapter = (l: string) => /^capítulo\s+/i.test(l);
-  // Match "Artículo 1" exactly — number on its own line, no extra text
-  const isArticle = (l: string) => /^artículo\s+\d+\s*$/i.test(l);
+  const isBook    = (t: string) => /^libro\s+/i.test(t.trim());
+  const isSection = (t: string) => /^título\s+/i.test(t.trim());
+  const isChapter = (t: string) => /^capítulo\s+/i.test(t.trim());
+  const isArticle = (t: string) => /^artículo\s+\d+\s*$/i.test(t.trim());
 
   function flushArticle() {
     if (articleNumber > 0 && currentChapter) {
-      const content = currentContent.join("\n").trim();
+      const contentHtml = currentContentHtml.join("");
+      const contentPlain = currentContentPlain.join("\n").trim();
       currentChapter.articles.push({
         articleNumber,
-        content: `<p>${content.replace(/\n/g, "</p><p>")}</p>`,
-        contentPlainText: content,
+        content: contentHtml,
+        contentPlainText: contentPlain,
       });
-      currentContent = [];
+      currentContentHtml = [];
+      currentContentPlain = [];
       articleNumber = 0;
     }
   }
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  blocks.forEach((el) => {
+    const tagName = el.tagName.toLowerCase();
+    const text = el.textContent?.trim() || "";
 
-    // Wait for first Libro or Título before capturing anything
     if (!lawStarted) {
-      if (isBook(line) || isSection(line)) {
+      if (isBook(text) || isSection(text)) {
         lawStarted = true;
       } else {
-        continue;
+        return;
       }
     }
 
-    if (isBook(line)) {
-      // Libro acts as a top-level grouping — create new section
+    if (isBook(text)) {
       flushArticle();
-      currentSection = { title: line, chapters: [] };
+      currentSection = { title: text, chapters: [] };
       sections.push(currentSection);
       currentChapter = null;
-    } else if (isSection(line)) {
+    } else if (isSection(text)) {
       flushArticle();
       if (!currentSection) {
-        currentSection = { title: line, chapters: [] };
+        currentSection = { title: text, chapters: [] };
         sections.push(currentSection);
       } else {
-        // Append título to current section title or create sub-section
-        currentSection.title = `${currentSection.title} | ${line}`;
+        currentSection.title = `${currentSection.title} | ${text}`;
       }
       currentChapter = null;
-    } else if (isChapter(line)) {
+    } else if (isChapter(text)) {
       flushArticle();
       if (!currentSection) {
         currentSection = { title: "General", chapters: [] };
         sections.push(currentSection);
       }
-      currentChapter = { title: line, articles: [] };
+      currentChapter = { title: text, articles: [] };
       currentSection.chapters.push(currentChapter);
-    } else if (isArticle(line)) {
+    } else if (isArticle(text)) {
       flushArticle();
       if (!currentSection) {
         currentSection = { title: "General", chapters: [] };
@@ -101,12 +107,43 @@ function parseDocumentText(text: string): Section[] {
         currentChapter = { title: "General", articles: [] };
         currentSection.chapters.push(currentChapter);
       }
-      const match = line.match(/\d+/);
+      const match = text.match(/\d+/);
       articleNumber = match ? parseInt(match[0]) : 0;
     } else if (articleNumber > 0) {
-      currentContent.push(line);
+      // Preserve HTML for lists
+      if (tagName === "ol") {
+        const items = el.querySelectorAll("li");
+        let olHtml = "<ol>";
+        let olPlain = "";
+        let idx = 1;
+        items.forEach((li) => {
+          olHtml += `<li>${li.innerHTML}</li>`;
+          olPlain += `${idx}. ${li.textContent?.trim()}\n`;
+          idx++;
+        });
+        olHtml += "</ol>";
+        currentContentHtml.push(olHtml);
+        currentContentPlain.push(olPlain);
+      } else if (tagName === "ul") {
+        const items = el.querySelectorAll("li");
+        let ulHtml = "<ul>";
+        let ulPlain = "";
+        items.forEach((li) => {
+          ulHtml += `<li>${li.innerHTML}</li>`;
+          ulPlain += `• ${li.textContent?.trim()}\n`;
+        });
+        ulHtml += "</ul>";
+        currentContentHtml.push(ulHtml);
+        currentContentPlain.push(ulPlain);
+      } else {
+        if (text) {
+          currentContentHtml.push(`<p>${el.innerHTML}</p>`);
+          currentContentPlain.push(text);
+        }
+      }
     }
-  }
+  });
+
   flushArticle();
   return sections;
 }
@@ -128,8 +165,12 @@ export default function DocumentImporter() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mammoth = await import("mammoth") as any;
       const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      const sections = parseDocumentText(result.value);
+
+      // Get both HTML (for lists) and plain text
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      const textResult = await mammoth.extractRawText({ arrayBuffer });
+
+      const sections = parseDocument(htmlResult.value, textResult.value);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
       setParsed({ name, short_description: "", law_number: "", sections });
       setStep("preview");
@@ -203,7 +244,6 @@ export default function DocumentImporter() {
 
   return (
     <div className="space-y-6">
-      {/* Metadata */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-4">
         <h2 className="font-semibold text-[20px] text-primary">Document Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -235,7 +275,6 @@ export default function DocumentImporter() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Titles", value: parsed?.sections.length ?? 0 },
@@ -249,7 +288,6 @@ export default function DocumentImporter() {
         ))}
       </div>
 
-      {/* Structure Preview */}
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-3">
         <h2 className="font-semibold text-[20px] text-primary">Structure Preview</h2>
         <div className="max-h-[400px] overflow-y-auto space-y-2">
@@ -282,7 +320,6 @@ export default function DocumentImporter() {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button
           variant="outline"
