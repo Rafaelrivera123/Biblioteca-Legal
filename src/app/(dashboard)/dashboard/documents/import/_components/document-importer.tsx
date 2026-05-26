@@ -8,31 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 
-interface Article {
-  articleNumber: number;
-  content: string;
-  contentPlainText: string;
-}
-interface Chapter {
-  title: string;
-  articles: Article[];
-}
-interface Section {
-  title: string;
-  chapters: Chapter[];
-}
-interface ParsedDocument {
-  name: string;
-  short_description: string;
-  law_number: string;
-  categoryIds: string[];
-  sections: Section[];
-}
-interface Category {
-  id: string;
-  name: string;
-}
-
+interface Article { articleNumber: number; content: string; contentPlainText: string; }
+interface Chapter { title: string; articles: Article[]; }
+interface Section { title: string; chapters: Chapter[]; }
+interface ParsedDocument { name: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
+interface Category { id: string; name: string; }
 type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
 
 function classifyLine(text: string): LineType {
@@ -50,53 +30,117 @@ function getArticleNumber(text: string): number {
   return match ? parseInt(match[0]) : 0;
 }
 
-// Extract list formats directly from the docx ZIP using JSZip (already a mammoth dependency)
-async function extractListFormats(arrayBuffer: ArrayBuffer): Promise<Map<number, string>> {
-  const formats = new Map<number, string>();
+// Build a map of numId -> list type from the docx numbering.xml
+async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(arrayBuffer);
     const numberingFile = zip.file("word/numbering.xml");
-    if (!numberingFile) return formats;
+    if (!numberingFile) return map;
     const xml = await numberingFile.async("string");
-    const xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
-    const abstractNums = xmlDoc.querySelectorAll("abstractNum");
-    let idx = 0;
-    abstractNums.forEach((abstractNum) => {
-      // Get ilvl=0 level format
-      const levels = abstractNum.querySelectorAll("lvl");
-      levels.forEach((lvl) => {
-        const ilvlAttr = lvl.getAttribute("w:ilvl");
-        if (ilvlAttr === "0") {
+    const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
+
+    // Build abstractNumId -> format map
+    const abstractFormatMap = new Map<string, string>();
+    xmlDoc.querySelectorAll("abstractNum").forEach((abstractNum) => {
+      const abId = abstractNum.getAttribute("w:abstractNumId") || "";
+      abstractNum.querySelectorAll("lvl").forEach((lvl) => {
+        if (lvl.getAttribute("w:ilvl") === "0") {
           const numFmt = lvl.querySelector("numFmt");
           const fmt = numFmt?.getAttribute("w:val") || "decimal";
-          formats.set(idx, fmt);
-          idx++;
+          abstractFormatMap.set(abId, fmt);
         }
       });
     });
+
+    // Build numId -> format map
+    xmlDoc.querySelectorAll("num").forEach((num) => {
+      const numId = num.getAttribute("w:numId") || "";
+      const absRef = num.querySelector("abstractNumId");
+      const abId = absRef?.getAttribute("w:val") || "";
+      const fmt = abstractFormatMap.get(abId) || "decimal";
+      map.set(numId, fmt);
+    });
   } catch {
-    // If JSZip not available, return empty map
+    // JSZip not available or parse error — return empty map
   }
-  return formats;
+  return map;
 }
 
-// Apply list types to ol elements based on extracted formats
-function applyListTypes(htmlContent: string, listFormats: Map<number, string>): string {
-  if (listFormats.size === 0) return htmlContent;
+function formatToHtmlType(fmt: string): string {
+  if (fmt === "lowerLetter") return "a";
+  if (fmt === "upperLetter") return "A";
+  if (fmt === "lowerRoman") return "i";
+  if (fmt === "upperRoman") return "I";
+  return ""; // decimal — no type attr needed
+}
+
+// Custom mammoth conversion that injects type attributes based on numId
+async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<string, string>): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mammoth = await import("mammoth") as any;
+
+  // Use mammoth's raw conversion with style map
+  // We add data-numid to each list paragraph so we can map it later
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer },
+    {
+      styleMap: [
+        "p[style-name='List Paragraph'] => p.list-paragraph",
+      ],
+      // Transform list items to include numId info
+      transformDocument: (element: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        return element;
+      }
+    }
+  );
+
+  // Now post-process: use the numbering XML info
+  // Since mammoth groups consecutive list paragraphs into <ol>, 
+  // we need to re-parse and check which paragraphs had which numId
+  // For this we extract the numIds in order from the docx
+  const numIdsInOrder: string[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const docFile = zip.file("word/document.xml");
+    if (docFile) {
+      const xml = await docFile.async("string");
+      const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
+      const paras = xmlDoc.querySelectorAll("p");
+      paras.forEach((para) => {
+        const numId = para.querySelector("numId");
+        if (numId) {
+          const val = numId.getAttribute("w:val");
+          if (val && val !== "0") {
+            // Only add if different from the last (group consecutive same-numId paras)
+            if (numIdsInOrder.length === 0 || numIdsInOrder[numIdsInOrder.length - 1] !== val) {
+              numIdsInOrder.push(val);
+            }
+          }
+        }
+      });
+    }
+  } catch {
+    // ignore
+  }
+
+  // Now apply type attributes to each <ol> in the HTML
   const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlContent, "text/html");
+  const doc = parser.parseFromString(result.value, "text/html");
   const lists = doc.querySelectorAll("ol");
-  let listIndex = 0;
-  lists.forEach((ol) => {
-    const format = listFormats.get(listIndex % listFormats.size) || "decimal";
-    if (format === "lowerLetter") ol.setAttribute("type", "a");
-    else if (format === "upperLetter") ol.setAttribute("type", "A");
-    else if (format === "lowerRoman") ol.setAttribute("type", "i");
-    else if (format === "upperRoman") ol.setAttribute("type", "I");
-    listIndex++;
+  lists.forEach((ol, idx) => {
+    const numId = numIdsInOrder[idx];
+    if (numId) {
+      const fmt = numIdFormatMap.get(numId) || "decimal";
+      const htmlType = formatToHtmlType(fmt);
+      if (htmlType) ol.setAttribute("type", htmlType);
+    }
   });
+
   return doc.body.innerHTML;
 }
 
@@ -104,7 +148,6 @@ function parseDocument(htmlContent: string): Section[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
   const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul"));
-
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let currentChapter: Chapter | null = null;
@@ -116,21 +159,18 @@ function parseDocument(htmlContent: string): Section[] {
   function flushArticle() {
     if (articleNumber > 0) {
       const targetChapter = currentChapter ?? (() => {
-        if (!currentSection) {
-          currentSection = { title: "General", chapters: [] };
-          sections.push(currentSection);
-        }
+        if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
         const ch = { title: "General", articles: [] };
         currentSection!.chapters.push(ch);
         currentChapter = ch;
         return ch;
       })();
-      const contentHtml = currentContentHtml.join("") || "<p></p>";
-      const contentPlain = currentContentPlain.join("\n").trim();
-      targetChapter.articles.push({ articleNumber, content: contentHtml, contentPlainText: contentPlain });
-      currentContentHtml = [];
-      currentContentPlain = [];
-      articleNumber = 0;
+      targetChapter.articles.push({
+        articleNumber,
+        content: currentContentHtml.join("") || "<p></p>",
+        contentPlainText: currentContentPlain.join("\n").trim(),
+      });
+      currentContentHtml = []; currentContentPlain = []; articleNumber = 0;
     }
   }
 
@@ -157,8 +197,7 @@ function parseDocument(htmlContent: string): Section[] {
       if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
       else continue;
     }
-    if (lineType === "libro") { ensureSection(text); }
-    else if (lineType === "titulo") { ensureSection(text); }
+    if (lineType === "libro" || lineType === "titulo") { ensureSection(text); }
     else if (lineType === "capitulo" || lineType === "seccion") { ensureChapter(text); }
     else if (lineType === "articulo") {
       flushArticle();
@@ -206,19 +245,9 @@ export default function DocumentImporter() {
     if (!file.name.endsWith(".docx")) { toast.error("Please upload a .docx file."); return; }
     setIsLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mammoth = await import("mammoth") as any;
       const arrayBuffer = await file.arrayBuffer();
-
-      // Extract list formats from docx numbering.xml
-      const listFormats = await extractListFormats(arrayBuffer);
-
-      // Convert to HTML
-      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-
-      // Apply correct list types (a, A, i, I, or decimal)
-      const fixedHtml = applyListTypes(htmlResult.value, listFormats);
-
+      const numIdFormatMap = await buildNumIdFormatMap(arrayBuffer);
+      const fixedHtml = await convertDocxToHtml(arrayBuffer, numIdFormatMap);
       const sections = parseDocument(fixedHtml);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
       setParsed({ name, short_description: "", law_number: "", categoryIds: [], sections });
@@ -227,8 +256,7 @@ export default function DocumentImporter() {
     } catch (e) {
       console.error(e);
       toast.error("Error processing document. Please try again.");
-    }
-    finally { setIsLoading(false); }
+    } finally { setIsLoading(false); }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
