@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { registeruser } from "@/actions/auth/registration";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition } from "react";
@@ -29,25 +30,16 @@ export default function RegistrationForm() {
 
   function onSubmit(values: RegistrationSchemaType) {
     startTransition(async () => {
-      try {
-        const response = await fetch("/api/account/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
-        });
+      // Pass empty string as paddleCustomerId since registration is now free
+      const result = await registeruser(values, "");
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          toast.error(data.error || "Error al crear la cuenta.");
-          return;
-        }
-
-        toast.success("Cuenta creada exitosamente. Por favor inicia sesión.");
-        router.push("/login");
-      } catch {
-        toast.error("Ocurrió un error. Por favor intenta de nuevo.");
+      if (!result.success) {
+        toast.error(result.message || "Error al crear la cuenta.");
+        return;
       }
+
+      toast.success("¡Cuenta creada exitosamente! Por favor inicia sesión.");
+      router.push("/login");
     });
   }
 
@@ -192,4 +184,3 @@ export default function RegistrationForm() {
     </Form>
   );
 }
-
