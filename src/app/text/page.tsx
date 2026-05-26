@@ -1,6 +1,4 @@
-// pages/test-editor.tsx or inside any component
 "use client";
-
 import RichTextEditor from "@/components/shared/sections/RichTextEditor";
 import { useState } from "react";
 
@@ -8,7 +6,6 @@ const TestEditor = () => {
   const [content, setContent] = useState(
     "<p>Hello <strong>world</strong>!</p>"
   );
-
   return (
     <div className="max-w-2xl mx-auto mt-10">
       <RichTextEditor content={content} onChange={setContent} />
@@ -17,5 +14,4 @@ const TestEditor = () => {
     </div>
   );
 };
-
 export default TestEditor;
