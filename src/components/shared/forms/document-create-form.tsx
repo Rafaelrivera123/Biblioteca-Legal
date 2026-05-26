@@ -55,11 +55,10 @@ export function DocumentCreateForm({ initialData }: Props) {
     queryFn: () => fetch("/api/categories").then((res) => res.json()),
   });
 
-  // Initialize the form with react-hook-form and Zod resolver
   const form = useForm<DocumentFormSchemaType>({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
-      categoryIds: initialData?.categories.map((item) => item.id) ?? [],
+      categoryIds: [],
       short_description: initialData?.short_description ?? "",
       name: initialData?.name ?? "",
       law_number: initialData?.law_number ?? "",
@@ -67,7 +66,6 @@ export function DocumentCreateForm({ initialData }: Props) {
     },
   });
 
-  // Handle form submission
   function handleSubmit(data: DocumentFormSchemaType) {
     startTransition(() => {
       if (initialData) {
@@ -76,8 +74,6 @@ export function DocumentCreateForm({ initialData }: Props) {
             toast.error(res.message);
             return;
           }
-
-          // handle succees
           queryClient.invalidateQueries({ queryKey: ["documents"] });
           toast.success(res.message);
           router.back();
@@ -88,8 +84,6 @@ export function DocumentCreateForm({ initialData }: Props) {
             toast.error(res.message);
             return;
           }
-
-          // handle succees
           queryClient.invalidateQueries({ queryKey: ["documents"] });
           toast.success(res.message);
           router.back();
@@ -107,7 +101,6 @@ export function DocumentCreateForm({ initialData }: Props) {
         className="space-y-6 bg-white p-[30px] border-[1px] border-black/20 rounded-[8px]"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Document Name Field */}
           <FormField
             control={form.control}
             name="name"
@@ -131,7 +124,6 @@ export function DocumentCreateForm({ initialData }: Props) {
             )}
           />
 
-          {/* Category Field */}
           <FormField
             control={form.control}
             name="categoryIds"
@@ -151,7 +143,7 @@ export function DocumentCreateForm({ initialData }: Props) {
                       return match ? match.name : id;
                     }}
                   >
-                    <MultiSelectorTrigger className="border border-input  ">
+                    <MultiSelectorTrigger className="border border-input">
                       <MultiSelectorInput placeholder="Select category" />
                     </MultiSelectorTrigger>
                     <MultiSelectorContent>
@@ -176,7 +168,6 @@ export function DocumentCreateForm({ initialData }: Props) {
           />
         </div>
 
-        {/* Description Field */}
         <FormField
           control={form.control}
           name="short_description"
@@ -207,7 +198,6 @@ export function DocumentCreateForm({ initialData }: Props) {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Reference Number Field */}
           <FormField
             control={form.control}
             name="law_number"
@@ -231,7 +221,6 @@ export function DocumentCreateForm({ initialData }: Props) {
             )}
           />
 
-          {/* Published Date Field */}
           <FormField
             control={form.control}
             name="publishedDate"
@@ -264,11 +253,6 @@ export function DocumentCreateForm({ initialData }: Props) {
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      // disabled={(date) => {
-                      //   const today = new Date();
-                      //   today.setHours(0, 0, 0, 0); // Strip time to compare only date part
-                      //   return date < today;
-                      // }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -282,7 +266,6 @@ export function DocumentCreateForm({ initialData }: Props) {
           />
         </div>
 
-        {/* Action Buttons */}
         <div className="flex justify-end space-x-3 pt-4">
           <Button
             type="button"
