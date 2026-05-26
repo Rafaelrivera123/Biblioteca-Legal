@@ -1,7 +1,5 @@
 // ENDPOINT TO IMPORT LAW DOCUMENTS INTO THE DATABASE
 // File location: src/app/api/documents/import/route.ts
-
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -9,14 +7,12 @@ import { prisma } from "@/lib/db";
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
-
     if (!session || !session.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in first." },
         { status: 401 }
       );
     }
-
     if (session.user.role !== "admin") {
       return NextResponse.json(
         { error: "Access denied. Only admins can import laws." },
@@ -25,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json();
-    const { name, short_description, law_number, categories, published, sections } = data;
+    const { name, short_description, law_number, published, sections } = data;
 
     if (!name || !sections || !Array.isArray(sections)) {
       return NextResponse.json(
@@ -39,7 +35,6 @@ export async function POST(req: NextRequest) {
         name,
         short_description: short_description || "",
         law_number: law_number || "",
-        categories: categories || [],
         published: published || false,
       },
     });
