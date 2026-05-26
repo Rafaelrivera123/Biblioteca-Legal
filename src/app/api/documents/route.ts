@@ -1,19 +1,14 @@
-import { prisma } from "@/lib/db"; // adjust path based on your setup
+import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
-// Force dynamic rendering
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-
-    // Pagination
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * pageSize;
-
-    // Search
     const query = searchParams.get("search")?.toLowerCase() || "";
     const category = searchParams.get("category") || undefined;
 
@@ -24,49 +19,30 @@ export async function GET(req: NextRequest) {
       whereClause.OR = [
         { name: { contains: query, mode: "insensitive" as const } },
         { law_number: { contains: query, mode: "insensitive" as const } },
-        {
-          sections: {
-            some: {
-              title: { contains: query, mode: "insensitive" as const },
-            },
-          },
-        },
-        {
-          sections: {
-            some: {
-              chapters: {
-                some: {
-                  title: { contains: query, mode: "insensitive" as const },
-                },
-              },
-            },
-          },
-        },
+        { sections: { some: { title: { contains: query, mode: "insensitive" as const } } } },
+        { sections: { some: { chapters: { some: { title: { contains: query, mode: "insensitive" as const } } } } } },
       ];
     }
 
     if (category && category !== "all") {
-      whereClause.categories = {
-        some: {
-          id: category,
-        },
-      };
+      whereClause.categories = { some: { categoryId: category } };
     }
 
-    // Fetch total count
     const totalCount = await prisma.document.count({ where: whereClause });
 
-    // Fetch paginated documents
     const documents = await prisma.document.findMany({
       where: whereClause,
       skip,
       take: pageSize,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      include: {
+        categories: true,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Successfully retrieve ",
+      message: "Successfully retrieved documents",
       data: documents,
       meta: {
         page,
