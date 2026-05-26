@@ -27,13 +27,28 @@ interface ParsedDocument {
   sections: Section[];
 }
 
+// Detect what type of structural element a line is
+type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
+
+function classifyLine(text: string): LineType {
+  const t = text.trim();
+  if (/^libro\s+/i.test(t)) return "libro";
+  if (/^título\s+|^titulo\s+/i.test(t)) return "titulo";
+  if (/^capítulo\s+|^capitulo\s+/i.test(t)) return "capitulo";
+  if (/^sección\s+|^seccion\s+/i.test(t)) return "seccion";
+  if (/^artículo\s+\d+|^articulo\s+\d+/i.test(t)) return "articulo";
+  return "content";
+}
+
+function getArticleNumber(text: string): number {
+  const match = text.match(/\d+/);
+  return match ? parseInt(match[0]) : 0;
+}
+
 function parseDocument(htmlContent: string): Section[] {
-  // Use a DOM parser to extract text with list formatting preserved
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
-
-  // Get all block elements in order
-  const blocks = doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul");
+  const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul"));
 
   const sections: Section[] = [];
   let currentSection: Section | null = null;
@@ -43,16 +58,23 @@ function parseDocument(htmlContent: string): Section[] {
   let articleNumber = 0;
   let lawStarted = false;
 
-  const isBook    = (t: string) => /^libro\s+/i.test(t.trim());
-  const isSection = (t: string) => /^título\s+/i.test(t.trim());
-  const isChapter = (t: string) => /^capítulo\s+/i.test(t.trim());
-  const isArticle = (t: string) => /^artículo\s+\d+\s*$/i.test(t.trim());
-
   function flushArticle() {
-    if (articleNumber > 0 && currentChapter) {
-      const contentHtml = currentContentHtml.join("");
+    if (articleNumber > 0) {
+      // Find the right chapter to add to
+      const targetChapter = currentChapter ?? (() => {
+        if (!currentSection) {
+          currentSection = { title: "General", chapters: [] };
+          sections.push(currentSection);
+        }
+        const ch = { title: "General", articles: [] };
+        currentSection!.chapters.push(ch);
+        currentChapter = ch;
+        return ch;
+      })();
+
+      const contentHtml = currentContentHtml.join("") || "<p></p>";
       const contentPlain = currentContentPlain.join("\n").trim();
-      currentChapter.articles.push({
+      targetChapter.articles.push({
         articleNumber,
         content: contentHtml,
         contentPlainText: contentPlain,
@@ -63,42 +85,55 @@ function parseDocument(htmlContent: string): Section[] {
     }
   }
 
-  blocks.forEach((el) => {
+  function getOrCreateSection(title: string): Section {
+    flushArticle();
+    const s: Section = { title, chapters: [] };
+    sections.push(s);
+    currentSection = s;
+    currentChapter = null;
+    return s;
+  }
+
+  function getOrCreateChapter(title: string): Chapter {
+    flushArticle();
+    if (!currentSection) {
+      currentSection = { title: "General", chapters: [] };
+      sections.push(currentSection);
+    }
+    const ch: Chapter = { title, articles: [] };
+    currentSection.chapters.push(ch);
+    currentChapter = ch;
+    return ch;
+  }
+
+  for (const el of blocks) {
     const tagName = el.tagName.toLowerCase();
     const text = el.textContent?.trim() || "";
 
+    if (!text && tagName !== "ol" && tagName !== "ul") continue;
+
+    const lineType = classifyLine(text);
+
+    // Wait until we find a structural element before starting
     if (!lawStarted) {
-      if (isBook(text) || isSection(text)) {
+      if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) {
         lawStarted = true;
       } else {
-        return;
+        continue;
       }
     }
 
-    if (isBook(text)) {
+    if (lineType === "libro") {
+      getOrCreateSection(text);
+    } else if (lineType === "titulo") {
+      // Título always creates a new section
+      getOrCreateSection(text);
+    } else if (lineType === "capitulo" || lineType === "seccion") {
+      // Capítulo/Sección creates a new chapter inside current section
+      getOrCreateChapter(text);
+    } else if (lineType === "articulo") {
       flushArticle();
-      currentSection = { title: text, chapters: [] };
-      sections.push(currentSection);
-      currentChapter = null;
-    } else if (isSection(text)) {
-      flushArticle();
-      if (!currentSection) {
-        currentSection = { title: text, chapters: [] };
-        sections.push(currentSection);
-      } else {
-        currentSection.title = `${currentSection.title} | ${text}`;
-      }
-      currentChapter = null;
-    } else if (isChapter(text)) {
-      flushArticle();
-      if (!currentSection) {
-        currentSection = { title: "General", chapters: [] };
-        sections.push(currentSection);
-      }
-      currentChapter = { title: text, articles: [] };
-      currentSection.chapters.push(currentChapter);
-    } else if (isArticle(text)) {
-      flushArticle();
+      // Ensure we have a section and chapter
       if (!currentSection) {
         currentSection = { title: "General", chapters: [] };
         sections.push(currentSection);
@@ -107,10 +142,9 @@ function parseDocument(htmlContent: string): Section[] {
         currentChapter = { title: "General", articles: [] };
         currentSection.chapters.push(currentChapter);
       }
-      const match = text.match(/\d+/);
-      articleNumber = match ? parseInt(match[0]) : 0;
+      articleNumber = getArticleNumber(text);
     } else if (articleNumber > 0) {
-      // Preserve HTML for lists
+      // Article content — preserve lists
       if (tagName === "ol") {
         const items = el.querySelectorAll("li");
         let olHtml = "<ol>";
@@ -135,14 +169,12 @@ function parseDocument(htmlContent: string): Section[] {
         ulHtml += "</ul>";
         currentContentHtml.push(ulHtml);
         currentContentPlain.push(ulPlain);
-      } else {
-        if (text) {
-          currentContentHtml.push(`<p>${el.innerHTML}</p>`);
-          currentContentPlain.push(text);
-        }
+      } else if (text) {
+        currentContentHtml.push(`<p>${el.innerHTML}</p>`);
+        currentContentPlain.push(text);
       }
     }
-  });
+  }
 
   flushArticle();
   return sections;
@@ -165,15 +197,12 @@ export default function DocumentImporter() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mammoth = await import("mammoth") as any;
       const arrayBuffer = await file.arrayBuffer();
-
-      // Get both HTML (for lists) and plain text
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-
       const sections = parseDocument(htmlResult.value);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
       setParsed({ name, short_description: "", law_number: "", sections });
       setStep("preview");
-      toast.success("Document processed successfully!");
+      toast.success(`Document processed: ${sections.length} sections found.`);
     } catch {
       toast.error("Error processing document. Please try again.");
     } finally {
@@ -203,7 +232,7 @@ export default function DocumentImporter() {
         setStep("preview");
         return;
       }
-      toast.success(`"${parsed.name}" saved! ${data.summary?.sections} titles, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
+      toast.success(`"${parsed.name}" saved! ${data.summary?.sections} sections, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
       router.push("/dashboard/documents");
     } catch {
       toast.error("Error saving document.");
@@ -276,7 +305,7 @@ export default function DocumentImporter() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Titles", value: parsed?.sections.length ?? 0 },
+          { label: "Sections", value: parsed?.sections.length ?? 0 },
           { label: "Chapters", value: totalChapters },
           { label: "Articles", value: totalArticles },
         ].map((s) => (
@@ -294,26 +323,26 @@ export default function DocumentImporter() {
             <div key={si} className="border border-black/10 rounded-[6px] overflow-hidden">
               <div className="bg-primary/5 px-4 py-2 font-semibold text-primary text-[14px] flex justify-between">
                 <span>{section.title}</span>
-                <span className="text-gray-400 font-normal">{section.chapters.length} chapters</span>
+                <span className="text-gray-400 font-normal">{section.chapters.length} cap.</span>
               </div>
-              {section.chapters.map((chapter, ci) => (
+              {section.chapters.slice(0, 3).map((chapter, ci) => (
                 <div key={ci} className="px-4 py-2 border-t border-black/5">
                   <div className="flex justify-between text-[13px]">
                     <span className="text-gray-700">{chapter.title}</span>
-                    <span className="text-gray-400">{chapter.articles.length} articles</span>
+                    <span className="text-gray-400">{chapter.articles.length} arts.</span>
                   </div>
-                  {chapter.articles.slice(0, 2).map((article, ai) => (
+                  {chapter.articles.slice(0, 1).map((article, ai) => (
                     <div key={ai} className="ml-4 mt-1 text-[12px] text-gray-500 truncate">
                       Art. {article.articleNumber} — {article.contentPlainText.slice(0, 80)}...
                     </div>
                   ))}
-                  {chapter.articles.length > 2 && (
-                    <div className="ml-4 mt-1 text-[12px] text-gray-400">
-                      +{chapter.articles.length - 2} more articles...
-                    </div>
-                  )}
                 </div>
               ))}
+              {section.chapters.length > 3 && (
+                <div className="px-4 py-1 text-[12px] text-gray-400">
+                  +{section.chapters.length - 3} more chapters...
+                </div>
+              )}
             </div>
           ))}
         </div>
