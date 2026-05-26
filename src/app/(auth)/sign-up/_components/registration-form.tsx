@@ -12,79 +12,44 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { paddleCustomerCreate } from "@/helper/subscription";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { initializePaddle, Paddle } from "@paddle/paddle-js";
-import { useEffect, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-
-const priceId = process.env.NEXT_PUBLIC_PRICE_ID;
-if (!priceId) {
-  throw new Error("Price ID is not defined in environment variables.");
-}
+import { useRouter } from "next/navigation";
 
 export default function RegistrationForm() {
-  const [isRedirecting, setRedirecting] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [paddle, setPaddle] = useState<Paddle>();
+  const router = useRouter();
 
   const form = useForm<RegistrationSchemaType>({
     resolver: zodResolver(registrationSchema),
   });
 
   function onSubmit(values: RegistrationSchemaType) {
-    if (!paddle) {
-      toast.warning("Paddle no está inicializado");
-      return;
-    }
-
     startTransition(async () => {
-      const customerId = await paddleCustomerCreate({
-        email: values.email,
-        first_name: values.first_name,
-        last_name: values.last_name,
-      });
-
-      if (customerId && priceId) {
-        paddle.Checkout.open({
-          items: [
-            {
-              priceId: process.env.NEXT_PUBLIC_PRICE_ID!,
-              quantity: 1,
-            },
-          ],
-          customer: {
-            id: customerId,
-          },
-          customData: {
-            user: values,
-          },
-
-          settings: {
-            successUrl: `https://bibliotecalegalhn.com/login`,
-          },
+      try {
+        const response = await fetch("/api/account/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
         });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          toast.error(data.error || "Error al crear la cuenta.");
+          return;
+        }
+
+        toast.success("Cuenta creada exitosamente. Por favor inicia sesión.");
+        router.push("/login");
+      } catch {
+        toast.error("Ocurrió un error. Por favor intenta de nuevo.");
       }
     });
   }
-
-  useEffect(() => {
-    return () => {
-      setRedirecting(false);
-    };
-  }, []);
-
-  useEffect(() => {
-    initializePaddle({
-      environment: "production",
-      token: process.env.NEXT_PUBLIC_PADDLE_TOKEN!,
-      debug: true,
-    }).then((paddle) => setPaddle(paddle));
-  }, []);
-
-  const isLoading = isPending || isRedirecting;
 
   return (
     <Form {...form}>
@@ -108,7 +73,6 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="last_name"
@@ -122,7 +86,6 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="email"
@@ -140,7 +103,6 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
-
         <h1 className="text-black font-semibold text-[20px] leading-[120%] pt-[30px]">
           Seguridad de la cuenta
         </h1>
@@ -161,7 +123,6 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="confirmPassword"
@@ -178,12 +139,10 @@ export default function RegistrationForm() {
             </FormItem>
           )}
         />
-
         <div className="space-y-3 pt-[20px]">
           <p className="text-black font-medium text-[12px] md:text-[14px] mb-[20px]">
             Al crear una cuenta, aceptas nuestros Términos de servicio y
-            Política de privacidad. Procesaremos tus datos personales de acuerdo
-            con nuestra Política de privacidad.
+            Política de privacidad.
           </p>
           <FormField
             control={form.control}
@@ -227,9 +186,10 @@ export default function RegistrationForm() {
           />
         </div>
         <div className="pt-[30px]">
-          <SubmitButton isLoading={isLoading}>Registrarse</SubmitButton>
+          <SubmitButton isLoading={isPending}>Registrarse</SubmitButton>
         </div>
       </form>
     </Form>
   );
 }
+
