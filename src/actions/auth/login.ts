@@ -1,10 +1,13 @@
 "use server";
-
 import { signIn } from "@/auth";
 import { prisma } from "@/lib/db";
 import { loginFormSchema, LoginFormValues } from "@/schemas/auth";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+
+// Admin emails that never have device restrictions
+const UNLIMITED_EMAILS = ["rafariveras10@gmail.com"];
+const MAX_DEVICES = 2;
 
 interface Props {
   data: LoginFormValues;
@@ -14,68 +17,55 @@ interface Props {
 
 export async function loginAction({ data, userAgent, ipAddress }: Props) {
   const { success, data: parsedData, error } = loginFormSchema.safeParse(data);
-
   const deviceId = cookies().get("device_id")?.value || crypto.randomUUID();
 
   if (!success) {
-    return {
-      success: false,
-      message: error.message,
-    };
+    return { success: false, message: error.message };
   }
 
   // 1. Check if the user exists
   const user = await prisma.user.findFirst({
-    where: {
-      email: parsedData.email,
-    },
+    where: { email: parsedData.email },
   });
 
   if (!user) {
-    return {
-      success: false,
-      message: "User not found.",
-    };
+    return { success: false, message: "User not found." };
   }
 
   // 2. Check if email is verified
   if (!user.emailVerified) {
     return {
       success: false,
-      message:
-        "Your email is not verified. Please check your inbox to verify your email before logging in.",
+      message: "Your email is not verified. Please check your inbox to verify your email before logging in.",
     };
   }
 
   // 3. Validate password
-  const isPasswordValid = await bcrypt.compare(
-    parsedData.password,
-    user.password
-  );
-
+  const isPasswordValid = await bcrypt.compare(parsedData.password, user.password);
   if (!isPasswordValid) {
-    return {
-      success: false,
-      message: "Incorrect password.",
-    };
+    return { success: false, message: "Incorrect password." };
   }
+
+  // 4. Handle device management
+  const isUnlimited = UNLIMITED_EMAILS.includes(parsedData.email);
 
   const userDevices = await prisma.device.findMany({
     where: { userId: user.id },
+    orderBy: { createdAt: "asc" }, // oldest first
   });
 
   const isKnownDevice = userDevices.some((d) => d.deviceId === deviceId);
 
-  // Enforce maximum of 2 devices
-  if (!isKnownDevice && userDevices.length >= 2) {
-    return {
-      success: false,
-      message: "You can only log in from up to 2 devices.",
-    };
-  }
-
-  // Register new device if unknown
   if (!isKnownDevice) {
+    if (!isUnlimited && userDevices.length >= MAX_DEVICES) {
+      // Remove the oldest device to make room for the new one
+      const oldestDevice = userDevices[0];
+      await prisma.device.delete({
+        where: { id: oldestDevice.id },
+      });
+    }
+
+    // Register new device
     try {
       await prisma.device.create({
         data: {
@@ -86,7 +76,6 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
         },
       });
 
-      // Set persistent device_id cookie
       cookies().set("device_id", deviceId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -106,7 +95,6 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
       redirect: false,
     });
 
-    // 6. Handle "Remember me" cookies
     await manejarCookiesRecordarme(
       !!data.rememberMe,
       data.rememberMe ? data.email : undefined,
@@ -118,7 +106,7 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
       message: "Login successful.",
       role: user.role,
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("Sign-in error:", error);
     return {
@@ -128,13 +116,6 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
   }
 }
 
-/**
- * Acción del servidor reutilizable para manejar las cookies de "Recordarme".
- *
- * @param {boolean} recordarme - Si el usuario desea ser recordado.
- * @param {string | undefined} email - Correo a guardar en la cookie (opcional si se va a eliminar).
- * @param {string | undefined} password - Contraseña a guardar en la cookie (opcional si se va a eliminar).
- */
 export async function manejarCookiesRecordarme(
   recordarme: boolean,
   email?: string,
@@ -146,16 +127,8 @@ export async function manejarCookiesRecordarme(
   };
 
   if (recordarme && email && password) {
-    cookies().set({
-      name: "rememberMeEmail",
-      value: email,
-      ...opcionesCookie,
-    });
-    cookies().set({
-      name: "rememberMePassword",
-      value: password,
-      ...opcionesCookie,
-    });
+    cookies().set({ name: "rememberMeEmail", value: email, ...opcionesCookie });
+    cookies().set({ name: "rememberMePassword", value: password, ...opcionesCookie });
   } else {
     cookies().delete("rememberMeEmail");
     cookies().delete("rememberMePassword");
