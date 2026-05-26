@@ -19,9 +19,10 @@ interface Props {
   sub_type: "user" | "company";
   price: string;
   isLoggedin: boolean;
+  paddleCustomerId?: string;
 }
 
-export default function PricingComparison({ subscription, price, isLoggedin }: Props) {
+export default function PricingComparison({ subscription, price, isLoggedin, paddleCustomerId }: Props) {
   const router = useRouter();
   const [paddle, setPaddle] = useState<Paddle>();
 
@@ -74,6 +75,7 @@ export default function PricingComparison({ subscription, price, isLoggedin }: P
     if (paddle) {
       paddle.Checkout.open({
         items: [{ priceId: process.env.NEXT_PUBLIC_PRICE_ID!, quantity: 1 }],
+        customer: paddleCustomerId ? { id: paddleCustomerId } : undefined,
         settings: {
           successUrl: `https://bibliotecalegalhn.com/collections`,
         },
