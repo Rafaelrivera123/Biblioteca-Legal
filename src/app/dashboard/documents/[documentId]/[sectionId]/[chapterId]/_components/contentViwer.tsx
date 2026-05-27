@@ -19,12 +19,20 @@ const ContentViewer = ({ content }: Props) => {
       li: [],
       br: [],
       span: ["style"],
+      table: ["border", "cellpadding", "cellspacing", "width"],
+      thead: [],
+      tbody: [],
+      tfoot: [],
+      tr: [],
+      td: ["colspan", "rowspan", "width", "align", "valign"],
+      th: ["colspan", "rowspan", "width", "align", "valign"],
+      caption: [],
     },
   });
 
   return (
     <div
-      className="text-[14px] leading-[200%] space-y-2 
+      className="text-[14px] leading-[200%] space-y-2
         [&_ol]:pl-8 [&_ol]:my-2 [&_ol]:space-y-1
         [&_ol[type='a']]:list-[lower-alpha]
         [&_ol[type='A']]:list-[upper-alpha]
@@ -32,7 +40,11 @@ const ContentViewer = ({ content }: Props) => {
         [&_ol[type='I']]:list-[upper-roman]
         [&_ol:not([type])]:list-decimal
         [&_ul]:list-disc [&_ul]:pl-8 [&_ul]:my-2 [&_ul]:space-y-1
-        [&_li]:leading-[180%] [&_li]:pl-1"
+        [&_li]:leading-[180%] [&_li]:pl-1
+        [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-[13px]
+        [&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium [&_th]:bg-muted
+        [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
+        [&_tr:nth-child(even)_td]:bg-muted/30"
       dangerouslySetInnerHTML={{
         __html: cleanHTML,
       }}
