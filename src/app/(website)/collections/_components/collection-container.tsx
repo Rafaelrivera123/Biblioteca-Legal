@@ -1,5 +1,4 @@
 "use client";
-
 import DocumentCard from "@/components/shared/cards/document-card";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import useDebounce from "@/hooks/useDebounce";
@@ -7,22 +6,20 @@ import { DocumentsApiResponse } from "@/schemas/document";
 import useCollectionSearchStore from "@/store/collections";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
+import MostViewedArticles from "./most-viewed-articles";
 
 const CollectionContainer = () => {
   const { query, page, setPage, category } = useCollectionSearchStore();
-
   const searchQuery = useDebounce(query, 500);
-
   const { data, isLoading, isError, error } = useQuery<DocumentsApiResponse>({
     queryKey: ["documents", searchQuery, page, category],
     queryFn: () =>
       fetch(
-        `/api/documents?search=${searchQuery}&category=${category}&limit=12 &page=${page}`
+        `/api/documents?search=${searchQuery}&category=${category}&limit=12&page=${page}`
       ).then((res) => res.json()),
   });
 
   let content;
-
   if (isLoading) {
     content = (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10 animate-pulse">
@@ -77,8 +74,11 @@ const CollectionContainer = () => {
   }
 
   return (
-    <div className="w-full space-y-6 container ">
+    <div className="w-full space-y-6 container">
       {content}
+
+      {/* Artículos más vistos — solo visible cuando el filtro es "Todos" */}
+      {category === "all" && <MostViewedArticles />}
 
       <div className="py-[100px]">
         {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
