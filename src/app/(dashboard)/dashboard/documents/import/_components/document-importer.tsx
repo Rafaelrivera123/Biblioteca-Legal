@@ -7,14 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
-
 interface Article { articleNumber: number; content: string; contentPlainText: string; }
 interface Chapter { title: string; articles: Article[]; }
 interface Section { title: string; chapters: Chapter[]; }
 interface ParsedDocument { name: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
 interface Category { id: string; name: string; }
 type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
-
 function classifyLine(text: string): LineType {
   const t = text.trim();
   if (/^libro\s+/i.test(t)) return "libro";
@@ -24,13 +22,10 @@ function classifyLine(text: string): LineType {
   if (/^artículo\s+\d+|^articulo\s+\d+/i.test(t)) return "articulo";
   return "content";
 }
-
 function getArticleNumber(text: string): number {
   const match = text.match(/\d+/);
   return match ? parseInt(match[0]) : 0;
 }
-
-// Build a map of numId -> list type from the docx numbering.xml
 async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
@@ -41,8 +36,6 @@ async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string
     if (!numberingFile) return map;
     const xml = await numberingFile.async("string");
     const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
-
-    // Build abstractNumId -> format map
     const abstractFormatMap = new Map<string, string>();
     xmlDoc.querySelectorAll("abstractNum").forEach((abstractNum) => {
       const abId = abstractNum.getAttribute("w:abstractNumId") || "";
@@ -54,8 +47,6 @@ async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string
         }
       });
     });
-
-    // Build numId -> format map
     xmlDoc.querySelectorAll("num").forEach((num) => {
       const numId = num.getAttribute("w:numId") || "";
       const absRef = num.querySelector("abstractNumId");
@@ -64,43 +55,30 @@ async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string
       map.set(numId, fmt);
     });
   } catch {
-    // JSZip not available or parse error — return empty map
+    // ignore
   }
   return map;
 }
-
 function formatToHtmlType(fmt: string): string {
   if (fmt === "lowerLetter") return "a";
   if (fmt === "upperLetter") return "A";
   if (fmt === "lowerRoman") return "i";
   if (fmt === "upperRoman") return "I";
-  return ""; // decimal — no type attr needed
+  return "";
 }
-
-// Custom mammoth conversion that injects type attributes based on numId
 async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<string, string>): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mammoth = await import("mammoth") as any;
-
-  // Use mammoth's raw conversion with style map
-  // We add data-numid to each list paragraph so we can map it later
   const result = await mammoth.convertToHtml(
     { arrayBuffer },
     {
       styleMap: [
         "p[style-name='List Paragraph'] => p.list-paragraph",
       ],
-      // Transform list items to include numId info
-      transformDocument: (element: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        return element;
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transformDocument: (element: any) => { return element; }
     }
   );
-
-  // Now post-process: use the numbering XML info
-  // Since mammoth groups consecutive list paragraphs into <ol>, 
-  // we need to re-parse and check which paragraphs had which numId
-  // For this we extract the numIds in order from the docx
   const numIdsInOrder: string[] = [];
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -116,7 +94,6 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
         if (numId) {
           const val = numId.getAttribute("w:val");
           if (val && val !== "0") {
-            // Only add if different from the last (group consecutive same-numId paras)
             if (numIdsInOrder.length === 0 || numIdsInOrder[numIdsInOrder.length - 1] !== val) {
               numIdsInOrder.push(val);
             }
@@ -127,8 +104,6 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
   } catch {
     // ignore
   }
-
-  // Now apply type attributes to each <ol> in the HTML
   const parser = new DOMParser();
   const doc = parser.parseFromString(result.value, "text/html");
   const lists = doc.querySelectorAll("ol");
@@ -140,14 +115,15 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
       if (htmlType) ol.setAttribute("type", htmlType);
     }
   });
-
   return doc.body.innerHTML;
 }
-
 function parseDocument(htmlContent: string): Section[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
-  const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul"));
+
+  // ✅ CAMBIO 1: agregado "table" al selector
+  const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul, table"));
+
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let currentChapter: Chapter | null = null;
@@ -155,7 +131,6 @@ function parseDocument(htmlContent: string): Section[] {
   let currentContentPlain: string[] = [];
   let articleNumber = 0;
   let lawStarted = false;
-
   function flushArticle() {
     if (articleNumber > 0) {
       const targetChapter = currentChapter ?? (() => {
@@ -173,25 +148,25 @@ function parseDocument(htmlContent: string): Section[] {
       currentContentHtml = []; currentContentPlain = []; articleNumber = 0;
     }
   }
-
   function ensureSection(title: string) {
     flushArticle();
     currentSection = { title, chapters: [] };
     sections.push(currentSection);
     currentChapter = null;
   }
-
   function ensureChapter(title: string) {
     flushArticle();
     if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
     currentChapter = { title, articles: [] };
     currentSection!.chapters.push(currentChapter);
   }
-
   for (const el of blocks) {
     const tagName = el.tagName.toLowerCase();
     const text = el.textContent?.trim() || "";
-    if (!text && tagName !== "ol" && tagName !== "ul") continue;
+
+    // ✅ CAMBIO 2: "table" también se permite con text vacío (aunque no suele pasar)
+    if (!text && tagName !== "ol" && tagName !== "ul" && tagName !== "table") continue;
+
     const lineType = classifyLine(text);
     if (!lawStarted) {
       if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
@@ -219,6 +194,12 @@ function parseDocument(htmlContent: string): Section[] {
         items.forEach((li) => { ulHtml += `<li>${li.innerHTML}</li>`; ulPlain += `• ${li.textContent?.trim()}\n`; });
         ulHtml += "</ul>";
         currentContentHtml.push(ulHtml); currentContentPlain.push(ulPlain);
+
+      // ✅ CAMBIO 3: manejo de tablas — se preserva el HTML completo
+      } else if (tagName === "table") {
+        currentContentHtml.push(el.outerHTML);
+        currentContentPlain.push(el.textContent?.trim() || "");
+
       } else if (text) {
         currentContentHtml.push(`<p>${el.innerHTML}</p>`);
         currentContentPlain.push(text);
@@ -228,19 +209,16 @@ function parseDocument(htmlContent: string): Section[] {
   flushArticle();
   return sections;
 }
-
 export default function DocumentImporter() {
   const router = useRouter();
   const [step, setStep] = useState<"upload" | "preview" | "saving">("upload");
   const [parsed, setParsed] = useState<ParsedDocument | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: () => fetch("/api/categories").then((res) => res.json()),
   });
-
   const processFile = useCallback(async (file: File) => {
     if (!file.name.endsWith(".docx")) { toast.error("Please upload a .docx file."); return; }
     setIsLoading(true);
@@ -258,13 +236,11 @@ export default function DocumentImporter() {
       toast.error("Error processing document. Please try again.");
     } finally { setIsLoading(false); }
   }, []);
-
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) processFile(file);
   }, [processFile]);
-
   const handleSave = async () => {
     if (!parsed) return;
     setStep("saving");
@@ -280,7 +256,6 @@ export default function DocumentImporter() {
       router.push("/dashboard/documents");
     } catch { toast.error("Error saving document."); setStep("preview"); }
   };
-
   const toggleCategory = (id: string) => {
     setParsed((p) => {
       if (!p) return p;
@@ -288,10 +263,8 @@ export default function DocumentImporter() {
       return { ...p, categoryIds: already ? p.categoryIds.filter((c) => c !== id) : [...p.categoryIds, id] };
     });
   };
-
   const totalChapters = parsed?.sections.reduce((a, s) => a + s.chapters.length, 0) ?? 0;
   const totalArticles = parsed?.sections.reduce((a, s) => s.chapters.reduce((b, c) => b + c.articles.length, 0) + a, 0) ?? 0;
-
   if (step === "upload") {
     return (
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-6">
@@ -313,7 +286,6 @@ export default function DocumentImporter() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-4">
@@ -350,7 +322,6 @@ export default function DocumentImporter() {
           )}
         </div>
       </div>
-
       <div className="grid grid-cols-3 gap-4">
         {[{ label: "Sections", value: parsed?.sections.length ?? 0 }, { label: "Chapters", value: totalChapters }, { label: "Articles", value: totalArticles }].map((s) => (
           <div key={s.label} className="bg-white p-6 border border-black/20 rounded-[8px] text-center">
@@ -359,7 +330,6 @@ export default function DocumentImporter() {
           </div>
         ))}
       </div>
-
       <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-3">
         <h2 className="font-semibold text-[20px] text-primary">Structure Preview</h2>
         <div className="max-h-[400px] overflow-y-auto space-y-2">
@@ -389,7 +359,6 @@ export default function DocumentImporter() {
           ))}
         </div>
       </div>
-
       <div className="flex justify-end gap-3">
         <Button variant="outline" className="text-primary hover:text-primary/80" onClick={() => { setParsed(null); setStep("upload"); }}>
           Upload Another
