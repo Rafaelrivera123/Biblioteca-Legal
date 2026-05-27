@@ -50,6 +50,10 @@ const Page = async () => {
 
   const formattedAmount = await getHNLPrice(usdAmount);
 
+  // ✅ Se pasa el token desde el servidor
+  const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN ?? "";
+  const priceId = process.env.NEXT_PUBLIC_PRICE_ID ?? "";
+
   return (
     <div>
       <HeaderSection
@@ -63,6 +67,8 @@ const Page = async () => {
         price={formattedAmount}
         isLoggedin={isLoggedin}
         paddleCustomerId={paddleCustomerId}
+        paddleToken={paddleToken}
+        priceId={priceId}
       />
       {!isLoggedin && <CTA />}
     </div>
