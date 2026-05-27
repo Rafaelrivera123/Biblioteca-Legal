@@ -35,9 +35,9 @@ const Page = async ({
 
   const articles = await prisma.article.findMany({
     where: { chapterId: params.chapterId },
+    orderBy: { articleNumber: "asc" }, // ✅ fix orden
   });
 
-  // Incrementa viewCount de todos los artículos del capítulo al visitarlo
   if (articles.length > 0) {
     await prisma.article.updateMany({
       where: { chapterId: params.chapterId },
