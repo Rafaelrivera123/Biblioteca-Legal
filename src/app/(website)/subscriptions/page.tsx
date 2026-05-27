@@ -52,7 +52,7 @@ const Page = async () => {
 
   // ✅ Se pasa el token desde el servidor
   const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN ?? "live_1c7d31d29e8a6cba0bb95bc7304";
-  const priceId = process.env.NEXT_PUBLIC_PRICE_ID ?? "";
+  const priceId = process.env.NEXT_PUBLIC_PRICE_ID ?? "pri_01jxccwd2cg20vw1ne8c46f5vd";
 
   return (
     <div>
