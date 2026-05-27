@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-   "postinstall": "prisma generate && prisma db push --accept-data-loss",
+    "postinstall": "prisma generate && prisma db push --accept-data-loss",
     "email": "email dev --dir src/email-templates"
   },
   "dependencies": {
@@ -50,6 +50,7 @@
     "fuse.js": "^7.1.0",
     "js-cookie": "^3.0.5",
     "jsdom": "^26.1.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.511.0",
     "mammoth": "^1.6.0",
     "moment": "^2.30.1",
