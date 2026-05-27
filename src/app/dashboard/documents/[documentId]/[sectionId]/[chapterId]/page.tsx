@@ -14,9 +14,7 @@ const Page = async ({
   const documentId = params.documentId;
 
   const document = await prisma.document.findFirst({
-    where: {
-      id: documentId,
-    },
+    where: { id: documentId },
   });
 
   const section = await prisma.section.findFirst({
@@ -36,10 +34,16 @@ const Page = async ({
   if (!document) notFound();
 
   const articles = await prisma.article.findMany({
-    where: {
-      chapterId: params.chapterId,
-    },
+    where: { chapterId: params.chapterId },
   });
+
+  // Incrementa viewCount de todos los artículos del capítulo al visitarlo
+  if (articles.length > 0) {
+    await prisma.article.updateMany({
+      where: { chapterId: params.chapterId },
+      data: { viewCount: { increment: 1 } },
+    });
+  }
 
   return (
     <div className="space-y-[30px]">
@@ -52,8 +56,9 @@ const Page = async ({
           <p className="font-medium leading-[120%]">
             {document.short_description}
           </p>
-          <p className=" leading-[120%]">
-            Law No. <span className="font-semibold">{document.law_number}</span>
+          <p className="leading-[120%]">
+            Law No.{" "}
+            <span className="font-semibold">{document.law_number}</span>
           </p>
           <p>
             Published:{" "}
@@ -83,7 +88,6 @@ const Page = async ({
           />
         </div>
       </section>
-
       <ArticleContainer
         chapterId={params.chapterId}
         sectionId={params.sectionId}
