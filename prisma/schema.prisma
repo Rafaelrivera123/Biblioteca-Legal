@@ -185,6 +185,7 @@ model Article {
   content          String
   contentPlainText String            @default("")
   articleNumber    Int
+  viewCount        Int               @default(0)
   chapterId        String
   chapter          Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   userMeta         UserArticleMeta[]
