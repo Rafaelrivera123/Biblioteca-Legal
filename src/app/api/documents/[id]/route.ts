@@ -46,7 +46,15 @@ export async function GET(
           documentId: id,
           title: { contains: searchQuery, mode: "insensitive" },
         },
-        include: { chapters: { include: { articles: true } } },
+        include: {
+          chapters: {
+            include: {
+              articles: {
+                orderBy: { articleNumber: "asc" }, // ✅
+              },
+            },
+          },
+        },
         orderBy: { createdAt: "asc" },
       });
 
@@ -61,7 +69,11 @@ export async function GET(
           include: {
             chapters: {
               where: { title: { contains: searchQuery, mode: "insensitive" } },
-              include: { articles: true },
+              include: {
+                articles: {
+                  orderBy: { articleNumber: "asc" }, // ✅
+                },
+              },
             },
           },
           orderBy: { createdAt: "asc" },
@@ -105,6 +117,7 @@ export async function GET(
                       mode: "insensitive",
                     },
                   },
+                  orderBy: { articleNumber: "asc" }, // ✅
                 },
               },
             },
@@ -126,7 +139,15 @@ export async function GET(
     } else {
       sections = await prisma.section.findMany({
         where: { documentId: id },
-        include: { chapters: { include: { articles: true } } },
+        include: {
+          chapters: {
+            include: {
+              articles: {
+                orderBy: { articleNumber: "asc" }, // ✅
+              },
+            },
+          },
+        },
         orderBy: { createdAt: "asc" },
       });
     }
