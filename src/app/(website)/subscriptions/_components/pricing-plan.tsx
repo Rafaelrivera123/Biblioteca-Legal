@@ -23,6 +23,7 @@ interface Props {
   paddleCustomerId?: string;
   paddleToken: string;
   priceId: string;
+  userId: string;
 }
 
 function FeatureItem({
@@ -67,28 +68,19 @@ export default function PricingComparison({
   paddleCustomerId,
   paddleToken,
   priceId,
+  userId,
 }: Props) {
   const router = useRouter();
   const [paddle, setPaddle] = useState<Paddle>();
 
   useEffect(() => {
-    console.log("Token received:", paddleToken);
-    console.log("Price ID received:", priceId);
-    if (!paddleToken) {
-      console.error("Paddle token is empty");
-      return;
-    }
+    if (!paddleToken) return;
     initializePaddle({
       environment: "production",
       token: paddleToken,
     })
-      .then((p) => {
-        console.log("Paddle initialized successfully:", p);
-        setPaddle(p);
-      })
-      .catch((err) => {
-        console.error("Paddle initialization error:", err);
-      });
+      .then((p) => setPaddle(p))
+      .catch((err) => console.error("Paddle initialization error:", err));
   }, [paddleToken]);
 
   const freeFeatures = [
@@ -131,13 +123,11 @@ export default function PricingComparison({
       return;
     }
     if (isSubscribed) return;
-    if (!paddle) {
-      console.error("Paddle not initialized yet");
-      return;
-    }
+    if (!paddle) return;
     paddle.Checkout.open({
       items: [{ priceId: priceId, quantity: 1 }],
       customer: paddleCustomerId ? { id: paddleCustomerId } : undefined,
+      customData: { userId: userId },
       settings: {
         successUrl: `https://www.bibliotecalegalhn.com/collections`,
       },
