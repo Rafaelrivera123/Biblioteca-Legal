@@ -21,8 +21,8 @@ interface Props {
   price: string;
   isLoggedin: boolean;
   paddleCustomerId?: string;
-  paddleToken: string;   // ✅ nuevo prop
-  priceId: string;       // ✅ nuevo prop
+  paddleToken: string;
+  priceId: string;
 }
 
 export default function PricingComparison({
@@ -35,15 +35,26 @@ export default function PricingComparison({
 }: Props) {
   const router = useRouter();
   const [paddle, setPaddle] = useState<Paddle>();
-  
-useEffect(() => {
-  console.log("paddleToken recibido:", paddleToken);
-  if (!paddleToken) return;
-  initializePaddle({
-    environment: "production",
-    token: paddleToken,
-  }).then((p) => setPaddle(p));
-}, [paddleToken]);
+
+  useEffect(() => {
+    console.log("Token received:", paddleToken);
+    console.log("Price ID received:", priceId);
+    if (!paddleToken) {
+      console.error("Paddle token is empty");
+      return;
+    }
+    initializePaddle({
+      environment: "production",
+      token: paddleToken,
+    })
+      .then((p) => {
+        console.log("Paddle initialized successfully:", p);
+        setPaddle(p);
+      })
+      .catch((err) => {
+        console.error("Paddle initialization error:", err);
+      });
+  }, [paddleToken]);
 
   const freeFeatures = [
     { name: "Acceso ilimitado a documentos", included: true },
@@ -85,22 +96,26 @@ useEffect(() => {
       return;
     }
     if (isSubscribed) return;
-    if (paddle) {
-      paddle.Checkout.open({
-        items: [{ priceId: priceId, quantity: 1 }], // ✅ usa prop
-        customer: paddleCustomerId ? { id: paddleCustomerId } : undefined,
-        settings: {
-          successUrl: `https://www.bibliotecalegalhn.com/collections`,
-        },
-      });
+    if (!paddle) {
+      console.error("Paddle not initialized yet");
+      return;
     }
+    paddle.Checkout.open({
+      items: [{ priceId: priceId, quantity: 1 }],
+      customer: paddleCustomerId ? { id: paddleCustomerId } : undefined,
+      settings: {
+        successUrl: `https://www.bibliotecalegalhn.com/collections`,
+      },
+    });
   };
 
   const personalButtonLabel = !isLoggedin
     ? "Comenzar"
     : isSubscribed
       ? "Suscrito"
-      : "Suscribirse";
+      : !paddle
+        ? "Loading..."
+        : "Suscribirse";
 
   const FeatureItem = ({
     included,
@@ -127,99 +142,5 @@ useEffect(() => {
       )}
       <span
         className={`text-sm ${
-          included
-            ? dark
-              ? "text-white"
-              : "text-primary"
-            : "text-gray-400"
-        }`}
-      >
-        {name}
-      </span>
-    </div>
-  );
-
-  return (
-    <div className="container mx-auto py-[100px]">
-      <div className="flex flex-col md:flex-row justify-center gap-10">
-
-        {/* Plan Gratis */}
-        <Card className="relative bg-white border-2 border-gray-200 w-full md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
-          <CardHeader className="text-start pb-8">
-            <CardTitle className="text-xl font-semibold text-primary mb-2">
-              Plan Gratis
-            </CardTitle>
-            <div className="flex items-baseline justify-start">
-              <span className="text-4xl font-bold text-primary">L0</span>
-              <span className="text-gray-500 ml-1">/mes</span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Button
-              className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-              onClick={() => router.push("/sign-up")}
-            >
-              Registrarse
-            </Button>
-            <div className="space-y-3">
-              {freeFeatures.map((f, i) => (
-                <FeatureItem key={i} included={f.included} name={f.name} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Plan Personal */}
-        <Card className="relative bg-white border-2 border-gray-200 w-full md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
-          <CardHeader className="text-start pb-8">
-            <CardTitle className="text-xl font-semibold text-primary mb-2">
-              Plan Personal
-            </CardTitle>
-            <div className="flex items-baseline justify-start">
-              <span className="text-4xl font-bold text-primary">{price}</span>
-              <span className="text-gray-500 ml-1">/mes</span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Button
-              className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-              disabled={isSubscribed}
-              onClick={handlePersonalClick}
-            >
-              {personalButtonLabel}
-            </Button>
-            <div className="space-y-3">
-              {personalFeatures.map((f, i) => (
-                <FeatureItem key={i} included={f.included} name={f.name} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Plan Empresarial */}
-        <Card className="relative bg-primary border-2 w-full border-black/20 md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
-          <CardHeader className="text-start pb-8">
-            <CardTitle className="text-xl font-semibold text-white mb-2">
-              Plan Empresarial
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <CompanyContactModal
-              trigger={
-                <Button className="w-full bg-white hover:bg-white/80 text-slate-900">
-                  Contáctanos
-                </Button>
-              }
-            />
-            <div className="space-y-3">
-              {empresarialFeatures.map((f, i) => (
-                <FeatureItem key={i} included={f.included} name={f.name} dark />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
-    </div>
-  );
-}
+          included ? (dark ? "text-white" : "text-primary") : "text-gray-400"
+        }`
