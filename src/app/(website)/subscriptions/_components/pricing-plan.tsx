@@ -35,14 +35,15 @@ export default function PricingComparison({
 }: Props) {
   const router = useRouter();
   const [paddle, setPaddle] = useState<Paddle>();
-
-  useEffect(() => {
-    if (!paddleToken) return; // ✅ no inicializar si no hay token
-    initializePaddle({
-      environment: "production",
-      token: paddleToken,
-    }).then((p) => setPaddle(p));
-  }, [paddleToken]);
+  
+useEffect(() => {
+  console.log("paddleToken recibido:", paddleToken);
+  if (!paddleToken) return;
+  initializePaddle({
+    environment: "production",
+    token: paddleToken,
+  }).then((p) => setPaddle(p));
+}, [paddleToken]);
 
   const freeFeatures = [
     { name: "Acceso ilimitado a documentos", included: true },
