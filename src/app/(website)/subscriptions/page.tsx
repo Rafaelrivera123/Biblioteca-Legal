@@ -51,7 +51,7 @@ const Page = async () => {
   const formattedAmount = await getHNLPrice(usdAmount);
 
   // ✅ Se pasa el token desde el servidor
-  const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN ?? "";
+  const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN ?? "live_1c7d31d29e8a6cba0bb95bc7304";
   const priceId = process.env.NEXT_PUBLIC_PRICE_ID ?? "";
 
   return (
