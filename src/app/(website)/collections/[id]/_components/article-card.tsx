@@ -82,4 +82,161 @@ const ArticleCard = ({
           toast.error(res.message);
           return;
         }
-        queryClient.invalidateQueries({ queryKey: ["
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onBookmark = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        isBookmarked: !bookmarked,
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onCommentSubmit = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        comment: comment,
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsCommentOpen(false);
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onCommentDelete = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        comment: "",
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsCommentOpen(false);
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  return (
+    <motion.div
+      ref={cardRef}
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card
+        className={cn(
+          "rounded-lg shadow-sm border transition-colors duration-300 relative",
+          highlightedArticle === data.articleNumber
+            ? getBackgroundClass("highlighted")
+            : getBackgroundClass(selectedColor),
+          isColorPickerOpen && "z-10"
+        )}
+      >
+        <CardHeader>
+          <div className="flex items-center gap-x-2 relative">
+            <Button
+              className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
+              onClick={() => setIsColorPickerOpen(true)}
+              disabled={isLoading || pending || !isLoggedin}
+            >
+              Artículo {data.articleNumber}{" "}
+              {!isLoggedin && <Lock className="ml-1" />}
+            </Button>
+
+            {!isColorPickerOpen && !isCommentOpen && (
+              <div className="flex items-center gap-x-3">
+                {articleMeta?.data?.isBookmarked && (
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="text-primary border-primary/50"
+                    onClick={onBookmark}
+                    disabled={pending || isLoading}
+                  >
+                    <Bookmark className="fill-[#1E2A38]" />
+                  </Button>
+                )}
+                {articleMeta?.data?.comment && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="text-primary border-primary/50"
+                      >
+                        <MessageSquare className="fill-[#1E2A38] hover:scale-100" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-fit">
+                      {articleMeta.data.comment}
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            )}
+
+            <AnimatePresence>
+              {isColorPickerOpen && (
+                <ColorPicker
+                  isBookmarked={bookmarked}
+                  selectedColor={selectedColor}
+                  onColorSelect={(color) => {
+                    setSelectedColor(color);
+                    onColorUpdate(color);
+                  }}
+                  onBookmark={onBookmark}
+                  onOpenComment={() => setIsCommentOpen(true)}
+                />
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isCommentOpen && (
+                <CommentPopover
+                  loading={pending || isLoading}
+                  comment={comment}
+                  setComment={setComment}
+                  onDelete={onCommentDelete}
+                  inputRef={commentInputRef}
+                  onSubmit={onCommentSubmit}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          <ContentViewer content={data.content} />
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
+
+export default memo(ArticleCard);
