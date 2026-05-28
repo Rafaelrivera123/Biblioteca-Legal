@@ -1,65 +1,43 @@
 "use client";
-import { useArticleSearchStore } from "@/store/collections";
-import { Article } from "@prisma/client";
-import { memo, useEffect, useRef, useState } from "react";
-import ArticleCard from "./article-card";
+import { updateArticleMeta } from "@/actions/article-meta/update";
+import ContentViewer from "@/app/dashboard/documents/[documentId]/[sectionId]/[chapterId]/_components/contentViwer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import useOutsideClick from "@/hooks/useOutsideClick";
+import { getBackgroundClass } from "@/lib/colors";
+import { cn } from "@/lib/utils";
+import { Article, UserArticleMeta } from "@prisma/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import { Bookmark, Lock, MessageSquare } from "lucide-react";
+import { memo, useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
+import ColorPicker from "./tool/color-picker";
+import CommentPopover from "./tool/comment-provider";
+import SubscribeModal from "./subscribe-modal";
 
 interface Props {
-  data: Article[];
+  data: Article;
+  index: number;
   isLoggedin: boolean;
   hasSubscription: boolean;
   documentId: string;
+  highlightedArticle?: number | null;
 }
 
-const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
-  const { query } = useArticleSearchStore();
-  const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
-  const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
+interface ApiRes {
+  success: boolean;
+  message: string;
+  data: UserArticleMeta | null;
+}
 
-  useEffect(() => {
-    const searchNumber = parseInt(query.trim(), 10);
-    if (!isNaN(searchNumber)) {
-      const targetIndex = data.findIndex(
-        (article) => article.articleNumber === searchNumber
-      );
-      if (targetIndex !== -1) {
-        const target = articleRefs.current[targetIndex];
-        if (target) {
-          const yOffset = -80;
-          const y =
-            target.getBoundingClientRect().top + window.pageYOffset + yOffset;
-          window.scrollTo({ top: y, behavior: "smooth" });
-          setHighlightedArticle(searchNumber);
-          const timeout = setTimeout(() => {
-            setHighlightedArticle(null);
-          }, 1200);
-          return () => clearTimeout(timeout);
-        }
-      }
-    }
-  }, [query, data]);
-
-  return (
-    <div className="space-y-5">
-      {data?.map((item, i) => (
-        <div
-          key={item.id}
-          ref={(el) => {
-            articleRefs.current[i] = el;
-          }}
-        >
-          <ArticleCard
-            data={item}
-            index={i}
-            isLoggedin={isLoggedin}
-            hasSubscription={hasSubscription}
-            documentId={documentId}
-            highlightedArticle={highlightedArticle}
-          />
-        </div>
-      ))}
-    </div>
-  );
-};
-
-export default memo(ArticleWrapper);
+const ArticleCard = ({
+  data,
+  isLoggedin,
+  hasSubscription,
+  doc
