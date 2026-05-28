@@ -76,14 +76,13 @@ const ArticleCard = ({
     setIsCommentOpen(false);
   });
 
-  const handleArticleButtonClick = () => {
-    if (!isLoggedin) return;
-    if (!hasSubscription) {
-      setShowSubscribeModal(true);
-      return;
-    }
-    setIsColorPickerOpen(true);
-  };
+ const handleArticleButtonClick = () => {
+  if (!isLoggedin || !hasSubscription) {
+    setShowSubscribeModal(true);
+    return;
+  }
+  setIsColorPickerOpen(true);
+};
 
   const onColorUpdate = (color: string) => {
     startTransition(() => {
