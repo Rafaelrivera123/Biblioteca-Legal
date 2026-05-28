@@ -44,7 +44,7 @@ const MostViewedArticles = () => {
     );
   }
 
-  if (!articles || articles.length === 0) return null;
+  if (!articles || !Array.isArray(articles) || articles.length === 0) return null;
 
   return (
     <div className="mt-12">
