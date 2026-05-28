@@ -1,5 +1,7 @@
 import { MetadataRoute } from "next";
 
+const BASE_URL = "https://www.bibliotecalegalhn.com";
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
@@ -7,13 +9,14 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         disallow: [
-          "/account",
-          "/privacy-policy",
-          "/privacy-policy",
-          "/terms-and-condition",
+          "/dashboard/",
+          "/account/",
+          "/sign-in/",
+          "/sign-up/",
+          "/api/",
         ],
       },
     ],
-    sitemap: `${process.env.AUTH_URL}/sitemap.xml`,
+    sitemap: `${BASE_URL}/sitemap.xml`,
   };
 }
