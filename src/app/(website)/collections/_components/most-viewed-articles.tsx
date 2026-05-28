@@ -24,8 +24,8 @@ interface ArticleWithContext {
 const MostViewedArticles = () => {
   const { data: articles, isLoading } = useQuery<ArticleWithContext[]>({
     queryKey: ["most-viewed-articles"],
-    queryFn: () =>
-      fetch("/api/articles/most-viewed").then((r) => r.json()),
+   queryFn: () =>
+  fetch("/api/article/most-viewed").then((r) => r.json()),
   });
 
   if (isLoading) {
