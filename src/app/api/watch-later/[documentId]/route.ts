@@ -29,18 +29,18 @@ export async function GET(
       },
     });
 
-    if (!watchLaterItem) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Item not found in Watch Later list.",
-        }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+if (!watchLaterItem) {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      message: "Item not found in Watch Later list.",
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
     }
+  );
+}
 
     return new Response(
       JSON.stringify({
