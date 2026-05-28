@@ -1,78 +1,261 @@
 "use client";
-import DocumentCard from "@/components/shared/cards/document-card";
-import { PaginationControls } from "@/components/ui/pagination-controls";
-import useDebounce from "@/hooks/useDebounce";
-import { DocumentsApiResponse } from "@/schemas/document";
-import useCollectionSearchStore from "@/store/collections";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
-import MostViewedArticles from "./most-viewed-articles";
+import { updateArticleMeta } from "@/actions/article-meta/update";
+import ContentViewer from "@/app/dashboard/documents/[documentId]/[sectionId]/[chapterId]/_components/contentViwer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import useOutsideClick from "@/hooks/useOutsideClick";
+import { getBackgroundClass } from "@/lib/colors";
+import { cn } from "@/lib/utils";
+import { Article, UserArticleMeta } from "@prisma/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import { Bookmark, Lock, MessageSquare } from "lucide-react";
+import { memo, useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
+import ColorPicker from "./tool/color-picker";
+import CommentPopover from "./tool/comment-provider";
+import SubscribeModal from "./subscribe-modal";
 
-const CollectionContainer = () => {
-  const { query, page, setPage, category } = useCollectionSearchStore();
-  const searchQuery = useDebounce(query, 500);
-  const { data, isLoading, isError, error } = useQuery<DocumentsApiResponse>({
-    queryKey: ["documents", searchQuery, page, category],
+interface Props {
+  data: Article;
+  index: number;
+  isLoggedin: boolean;
+  hasSubscription: boolean;
+  documentId: string;
+  highlightedArticle?: number | null;
+}
+
+interface ApiRes {
+  success: boolean;
+  message: string;
+  data: UserArticleMeta | null;
+}
+
+const ArticleCard = ({
+  data,
+  isLoggedin,
+  hasSubscription,
+  documentId,
+  highlightedArticle,
+}: Props) => {
+  const [pending, startTransition] = useTransition();
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
+  const [comment, setComment] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const queryClient = useQueryClient();
+
+  const { data: articleMeta, isLoading } = useQuery<ApiRes>({
+    queryKey: ["meta", data.id],
     queryFn: () =>
-      fetch(
-        `/api/documents?search=${searchQuery}&category=${category}&limit=12&page=${page}`
-      ).then((res) => res.json()),
+      fetch(`/api/article-meta-data/${data.id}`).then((res) => res.json()),
+    enabled: hasSubscription,
   });
 
-  let content;
-  if (isLoading) {
-    content = (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10 animate-pulse">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[200px] bg-gray-200 rounded-xl dark:bg-gray-800" />
-        ))}
-      </div>
-    );
-  } else if (isError) {
-    content = (
-      <div className="min-h-[300px] flex flex-col items-center justify-center text-red-600 dark:text-red-400 text-center space-y-2">
-        <AlertTriangle size={32} />
-        <p className="text-lg font-medium">Error al cargar los documentos</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {error?.message || "Algo salió mal. Por favor, inténtalo de nuevo más tarde."}
-        </p>
-      </div>
-    );
-  } else if (data?.data?.length === 0) {
-    content = (
-      <div className="min-h-[300px] flex flex-col items-center justify-center text-center space-y-2 text-gray-600 dark:text-gray-400">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2a4 4 0 014-4h5m-7 6h.01M4 6h16M4 10h16M4 14h10" />
-        </svg>
-        <p className="text-lg font-medium">No se encontraron documentos</p>
-        <p className="text-sm">Intenta ajustar tu búsqueda o los filtros.</p>
-      </div>
-    );
-  } else {
-    content = (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10">
-        {data?.data?.map((item) => (
-          <DocumentCard key={item.id} document={item} />
-        ))}
-      </div>
-    );
+  useEffect(() => {
+    if (articleMeta?.success && articleMeta?.data) {
+      setSelectedColor(articleMeta.data.selectedColor!);
+      setComment(articleMeta.data.comment ?? "");
+      setBookmarked(articleMeta.data.isBookmarked);
+    }
+  }, [articleMeta]);
+
+  useOutsideClick(cardRef, () => {
+    setIsColorPickerOpen(false);
+    setIsCommentOpen(false);
+  });
+
+ const handleArticleButtonClick = () => {
+  if (!isLoggedin || !hasSubscription) {
+    setShowSubscribeModal(true);
+    return;
   }
+  setIsColorPickerOpen(true);
+};
+
+  const onColorUpdate = (color: string) => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        selectedColor: color,
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onBookmark = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        isBookmarked: !bookmarked,
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onCommentSubmit = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        comment: comment,
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsCommentOpen(false);
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
+
+  const onCommentDelete = () => {
+    startTransition(() => {
+      updateArticleMeta({
+        articleId: data.id,
+        comment: "",
+        documentId,
+      }).then((res) => {
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        setIsCommentOpen(false);
+        setIsColorPickerOpen(false);
+      });
+    });
+  };
 
   return (
-    <div className="w-full space-y-6 container">
-      {content}
-      {category === "all" && <MostViewedArticles />}
-      <div className="py-[100px]">
-        {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
-          <PaginationControls
-            currentPage={page}
-            totalPages={data.meta.totalPages}
-            onPageChange={(newPage) => setPage(newPage)}
-          />
-        )}
-      </div>
-    </div>
+    <>
+      <SubscribeModal
+        open={showSubscribeModal}
+        onClose={() => setShowSubscribeModal(false)}
+      />
+      <motion.div
+        ref={cardRef}
+        layout
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Card
+          className={cn(
+            "rounded-lg shadow-sm border transition-colors duration-300 relative",
+            highlightedArticle === data.articleNumber
+              ? getBackgroundClass("highlighted")
+              : getBackgroundClass(selectedColor),
+            isColorPickerOpen && "z-10"
+          )}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-x-2 relative">
+              <Button
+                className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
+                onClick={handleArticleButtonClick}
+                disabled={isLoading || pending || !isLoggedin}
+              >
+                Artículo {data.articleNumber}{" "}
+                {!isLoggedin && <Lock className="ml-1" />}
+              </Button>
+
+              {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
+                <div className="flex items-center gap-x-3">
+                  {articleMeta?.data?.isBookmarked && (
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="text-primary border-primary/50"
+                      onClick={onBookmark}
+                      disabled={pending || isLoading}
+                    >
+                      <Bookmark className="fill-[#1E2A38]" />
+                    </Button>
+                  )}
+                  {articleMeta?.data?.comment && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="text-primary border-primary/50"
+                        >
+                          <MessageSquare className="fill-[#1E2A38] hover:scale-100" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-fit">
+                        {articleMeta.data.comment}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              )}
+
+              <AnimatePresence>
+                {isColorPickerOpen && hasSubscription && (
+                  <ColorPicker
+                    isBookmarked={bookmarked}
+                    selectedColor={selectedColor}
+                    onColorSelect={(color) => {
+                      setSelectedColor(color);
+                      onColorUpdate(color);
+                    }}
+                    onBookmark={onBookmark}
+                    onOpenComment={() => setIsCommentOpen(true)}
+                  />
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {isCommentOpen && hasSubscription && (
+                  <CommentPopover
+                    loading={pending || isLoading}
+                    comment={comment}
+                    setComment={setComment}
+                    onDelete={onCommentDelete}
+                    inputRef={commentInputRef}
+                    onSubmit={onCommentSubmit}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <ContentViewer content={data.content} />
+          </CardContent>
+        </Card>
+      </motion.div>
+    </>
   );
 };
 
-export default CollectionContainer;
+export default memo(ArticleCard);
