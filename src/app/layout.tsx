@@ -57,6 +57,10 @@ export async function generateMetadata(): Promise<Metadata> {
         "https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp",
       ],
     },
+    // ✅ Meta tag para verificación de Google AdSense
+    other: {
+      "google-adsense-account": "ca-pub-5685390714020326",
+    },
   };
 }
 
