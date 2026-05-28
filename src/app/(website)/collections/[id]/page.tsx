@@ -18,13 +18,11 @@ export async function generateMetadata(
       ],
     },
   });
-
   if (!document) {
     return {
       title: "Documento no encontrado | Biblioteca Legal HN",
     };
   }
-
   return {
     title: `${document.name} | Biblioteca Legal HN`,
     description: document.short_description
@@ -59,6 +57,29 @@ const Page = async ({ params }: { params: { id: string } }) => {
 
   if (!document) notFound();
 
+  // Check subscription status
+  let hasSubscription = false;
+  if (cu?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: cu.user.id },
+      select: {
+        role: true,
+        userSubscription: {
+          select: { isActive: true, currentPeriodEnd: true },
+        },
+      },
+    });
+
+    if (user?.role === "admin") {
+      hasSubscription = true;
+    } else {
+      hasSubscription = !!(
+        user?.userSubscription?.isActive &&
+        new Date(user.userSubscription.currentPeriodEnd) > new Date()
+      );
+    }
+  }
+
   const sections = await prisma.section.findMany({
     where: { documentId: document.id },
     include: {
@@ -77,6 +98,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
       <ArticleContainer
         documentId={document.id}
         isLoggedin={isLoggedin}
+        hasSubscription={hasSubscription}
         sections={sections}
       />
     </div>
