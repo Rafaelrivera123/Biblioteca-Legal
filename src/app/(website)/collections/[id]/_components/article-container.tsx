@@ -18,10 +18,11 @@ export type FullSectionResponse = Prisma.SectionGetPayload<{
 interface Props {
   documentId: string;
   isLoggedin: boolean;
+  hasSubscription: boolean;
   sections: FullSectionResponse[];
 }
 
-const ArticleContainer = ({ documentId, isLoggedin, sections }: Props) => {
+const ArticleContainer = ({ documentId, isLoggedin, hasSubscription, sections }: Props) => {
   useEffect(() => {
     if (documentId) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -44,6 +45,7 @@ const ArticleContainer = ({ documentId, isLoggedin, sections }: Props) => {
                   <ArticleWrapper
                     data={chapter.articles}
                     isLoggedin={isLoggedin}
+                    hasSubscription={hasSubscription}
                     documentId={documentId}
                   />
                 </div>
