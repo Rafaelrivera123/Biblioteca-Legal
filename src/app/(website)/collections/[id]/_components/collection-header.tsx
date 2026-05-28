@@ -29,9 +29,11 @@ const CollectionHeader = ({ document, hasFullAccess }: Props) => {
   const { setQuery } = useArticleSearchStore();
 
   const { data, isLoading, refetch } = useQuery<apiProps>({
-    queryKey: ["watchlist", document.id],
-    queryFn: () =>
-      fetch(`/api/watch-later/${document.id}`).then((res) => res.json()),
+  queryKey: ["watchlist", document.id],
+  queryFn: () =>
+    fetch(`/api/watch-later/${document.id}`).then((res) => res.json()),
+  enabled: isLoggedin,
+});
   });
 
   const isWatched = data?.success;
