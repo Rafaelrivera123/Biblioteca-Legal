@@ -63,4 +63,17 @@ const CollectionContainer = () => {
       {content}
       {/* TEMPORALMENTE COMENTADO PARA DIAGNOSTICO */}
       {/* {category === "all" && <MostViewedArticles />} */}
-      <div cla
+      <div className="py-[100px]">
+        {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
+          <PaginationControls
+            currentPage={page}
+            totalPages={data.meta.totalPages}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CollectionContainer;
