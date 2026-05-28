@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Article, UserArticleMeta } from "@prisma/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, Lock, MessageSquare } from "lucide-react";
+import { Bookmark, MessageSquare } from "lucide-react";
 import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import ColorPicker from "./tool/color-picker";
@@ -76,13 +76,13 @@ const ArticleCard = ({
     setIsCommentOpen(false);
   });
 
- const handleArticleButtonClick = () => {
-  if (!isLoggedin || !hasSubscription) {
-    setShowSubscribeModal(true);
-    return;
-  }
-  setIsColorPickerOpen(true);
-};
+  const handleArticleButtonClick = () => {
+    if (!isLoggedin || !hasSubscription) {
+      setShowSubscribeModal(true);
+      return;
+    }
+    setIsColorPickerOpen(true);
+  };
 
   const onColorUpdate = (color: string) => {
     startTransition(() => {
@@ -181,10 +181,9 @@ const ArticleCard = ({
               <Button
                 className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
                 onClick={handleArticleButtonClick}
-                disabled={isLoading || pending || !isLoggedin}
+                disabled={isLoading || pending}
               >
-                Artículo {data.articleNumber}{" "}
-                {!isLoggedin && <Lock className="ml-1" />}
+                Artículo {data.articleNumber}
               </Button>
 
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
