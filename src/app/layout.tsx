@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { Poppins, Raleway } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
+import Script from "next/script";
 import "./globals.css";
 
 const raleway = Raleway({
@@ -21,7 +22,6 @@ const poppins = Poppins({
 
 export async function generateMetadata(): Promise<Metadata> {
   const data = await prisma.setting.findFirst();
-
   return {
     title: {
       default: "Biblioteca Legal",
@@ -67,6 +67,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5685390714020326"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className={cn(raleway.className, poppins.variable, "")}>
         <AppProvider>{children}</AppProvider>
         <Toaster richColors position="bottom-right" />
