@@ -61,8 +61,7 @@ const CollectionContainer = () => {
   return (
     <div className="w-full space-y-6 container">
       {content}
-      {/* TEMPORALMENTE COMENTADO PARA DIAGNOSTICO */}
-      {/* {category === "all" && <MostViewedArticles />} */}
+      {category === "all" && <MostViewedArticles />}
       <div className="py-[100px]">
         {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
           <PaginationControls
