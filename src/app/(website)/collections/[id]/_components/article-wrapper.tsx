@@ -7,10 +7,11 @@ import ArticleCard from "./article-card";
 interface Props {
   data: Article[];
   isLoggedin: boolean;
+  hasSubscription: boolean;
   documentId: string;
 }
 
-const ArticleWrapper = ({ data, isLoggedin, documentId }: Props) => {
+const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
   const { query } = useArticleSearchStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -51,6 +52,7 @@ const ArticleWrapper = ({ data, isLoggedin, documentId }: Props) => {
             data={item}
             index={i}
             isLoggedin={isLoggedin}
+            hasSubscription={hasSubscription}
             documentId={documentId}
             highlightedArticle={highlightedArticle}
           />
