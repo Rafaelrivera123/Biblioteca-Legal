@@ -5,16 +5,14 @@ import CollectionHeader from "./_components/collection-header";
 
 export const dynamic = "force-dynamic";
 
-export async function generateStaticParams() {
-  const ids = await prisma.document.findMany({
-    select: { id: true },
-  });
-  return ids;
-}
-
 const Page = async ({ params }: { params: { id: string } }) => {
-  const document = await prisma.document.findUnique({
-    where: { id: params.id },
+  const document = await prisma.document.findFirst({
+    where: {
+      OR: [
+        { slug: params.id },
+        { id: params.id },
+      ],
+    },
   });
 
   if (!document) notFound();
@@ -22,7 +20,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
   return (
     <div>
       <CollectionHeader document={document} hasFullAccess={true} />
-      <ArticleContainer documentId={params.id} isLoggedin={true} />
+      <ArticleContainer documentId={document.id} isLoggedin={true} />
     </div>
   );
 };
