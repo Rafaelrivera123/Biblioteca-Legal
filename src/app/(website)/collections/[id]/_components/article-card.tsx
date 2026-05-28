@@ -19,7 +19,8 @@ import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import ColorPicker from "./tool/color-picker";
 import CommentPopover from "./tool/comment-provider";
-import SubscribeModal from "./subscribe-modal";
+import dynamic from "next/dynamic";
+const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
 
 interface Props {
   data: Article;
