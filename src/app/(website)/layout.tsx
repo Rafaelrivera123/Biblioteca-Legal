@@ -10,7 +10,7 @@ import CookieBanner from "@/components/shared/cookie-banner";
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;
-  if (cu?.user.id) {
+  if (cu?.user?.id) {
     user = await prisma.user.findUnique({
       where: {
         id: cu.user.id,
