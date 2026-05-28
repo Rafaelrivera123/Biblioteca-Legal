@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Document } from "@prisma/client";
 import { Calendar, FileText } from "lucide-react";
 import moment from "moment";
-import "moment/locale/es"; // Import Spanish locale
+import "moment/locale/es";
 import Link from "next/link";
 
 interface Props {
@@ -11,6 +11,10 @@ interface Props {
 }
 
 const DocumentCard = ({ document }: Props) => {
+  const href = document?.slug
+    ? `/collections/${document.slug}`
+    : `/collections/${document?.id}`;
+
   return (
     <div className="w-full flex flex-col justify-between bg-white max-w-[422px] rounded-[8px] border-[1px] p-[20px] border-[#000000]/20">
       <div>
@@ -23,7 +27,6 @@ const DocumentCard = ({ document }: Props) => {
           {document?.short_description}
         </p>
       </div>
-
       <div>
         <div className="mt-[20px] flex items-center gap-x-[13px] text-[#0D99FF]">
           <FileText className="h-5 w-5" />
@@ -36,7 +39,6 @@ const DocumentCard = ({ document }: Props) => {
             {moment(document?.publishedAt).format("D [de] MMMM [de] YYYY")}
           </span>
         </div>
-
         <div className="mt-[20px] flex flex-wrap gap-[10px] font-poppins font-normal">
           {document?.categories.map(({ name, id }) => (
             <Badge className="font-light" key={id}>
@@ -45,10 +47,9 @@ const DocumentCard = ({ document }: Props) => {
           ))}
         </div>
       </div>
-
       {document && (
-        <Button className="w-full mt-[30px] " asChild>
-          <Link className="w-full" href={`/collections/${document.id}`}>
+        <Button className="w-full mt-[30px]" asChild>
+          <Link className="w-full" href={href}>
             Ver documento
           </Link>
         </Button>
