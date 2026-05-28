@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         slug: slug || null,
         short_description: short_description || "",
         law_number: law_number || "",
-        published: published || false,
+        published: published ?? true,
         categories: {
           create: categories.map((cat) => ({
             categoryId: cat.id,
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     let totalSections = 0;
     let totalChapters = 0;
     let totalArticles = 0;
+    let skippedDuplicates = 0;
 
     for (const sectionData of sections) {
       const section = await prisma.section.create({
@@ -58,7 +59,16 @@ export async function POST(req: NextRequest) {
         });
         totalChapters++;
 
+        // Track article numbers per chapter to skip duplicates
+        const seenArticleNumbers = new Set<number>();
+
         for (const articleData of chapterData.articles || []) {
+          if (seenArticleNumbers.has(articleData.articleNumber)) {
+            skippedDuplicates++;
+            continue;
+          }
+          seenArticleNumbers.add(articleData.articleNumber);
+
           await prisma.article.create({
             data: {
               articleNumber: articleData.articleNumber,
@@ -76,7 +86,12 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Law "${name}" was imported successfully.`,
       documentId: document.id,
-      summary: { sections: totalSections, chapters: totalChapters, articles: totalArticles },
+      summary: {
+        sections: totalSections,
+        chapters: totalChapters,
+        articles: totalArticles,
+        skippedDuplicates,
+      },
     });
   } catch (error: unknown) {
     console.error("Error importing law:", error);
