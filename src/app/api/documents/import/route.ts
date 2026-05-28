@@ -13,13 +13,12 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json();
-    const { name, short_description, law_number, published, sections, categoryIds } = data;
+    const { name, slug, short_description, law_number, published, sections, categoryIds } = data;
 
     if (!name || !sections || !Array.isArray(sections)) {
       return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
     }
 
-    // Fetch category names for the selected IDs
     const categories = categoryIds?.length
       ? await prisma.category.findMany({
           where: { id: { in: categoryIds } },
@@ -30,6 +29,7 @@ export async function POST(req: NextRequest) {
     const document = await prisma.document.create({
       data: {
         name,
+        slug: slug || null,
         short_description: short_description || "",
         law_number: law_number || "",
         published: published || false,
@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
       documentId: document.id,
       summary: { sections: totalSections, chapters: totalChapters, articles: totalArticles },
     });
-
   } catch (error: unknown) {
     console.error("Error importing law:", error);
     return NextResponse.json(
