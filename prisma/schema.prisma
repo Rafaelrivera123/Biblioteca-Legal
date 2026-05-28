@@ -134,7 +134,7 @@ model Document {
   slug              String?           @unique
   short_description String
   law_number        String
-  published         Boolean           @default(false)
+  published         Boolean           @default(true)
   articleMeta       UserArticleMeta[]
   watchLists        WatchLists[]
   categories        DocumentCategory[]
