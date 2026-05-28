@@ -1,5 +1,4 @@
 "use client";
-
 import { removeWatchLater, watchLater } from "@/actions/watch-later";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +20,19 @@ interface apiProps {
 interface Props {
   document: Document;
   hasFullAccess: boolean;
+  isLoggedin: boolean;
 }
 
-const CollectionHeader = ({ document, hasFullAccess }: Props) => {
+const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
   const [value, setvalue] = useState("");
   const [pending, startTransition] = useTransition();
   const { setQuery } = useArticleSearchStore();
 
   const { data, isLoading, refetch } = useQuery<apiProps>({
-  queryKey: ["watchlist", document.id],
-  queryFn: () =>
-    fetch(`/api/watch-later/${document.id}`).then((res) => res.json()),
-  enabled: isLoggedin,
-});
+    queryKey: ["watchlist", document.id],
+    queryFn: () =>
+      fetch(`/api/watch-later/${document.id}`).then((res) => res.json()),
+    enabled: isLoggedin,
   });
 
   const isWatched = data?.success;
@@ -46,10 +45,7 @@ const CollectionHeader = ({ document, hasFullAccess }: Props) => {
           if (!res.success) {
             toast.error(res.message);
             return;
-          }
-
-          // handle success
-          else if (res.success) {
+          } else if (res.success) {
             refetch();
           }
         });
@@ -61,8 +57,6 @@ const CollectionHeader = ({ document, hasFullAccess }: Props) => {
             toast.error(res.message);
             return;
           }
-
-          // handle success
           refetch();
         });
       });
@@ -79,22 +73,18 @@ const CollectionHeader = ({ document, hasFullAccess }: Props) => {
   }, [debouncesvalue, setQuery]);
 
   return (
-    <div className=" mt-28 container flex flex-col justify-center items-center gap-y-6">
+    <div className="mt-28 container flex flex-col justify-center items-center gap-y-6">
       <h1 className="font-bold text-[30px] md:text-[35px] lg:text-[40px] leading-[120%] text-center">
         {document.name}
       </h1>
-
       {hasFullAccess && (
         <>
           <Input
             placeholder="Search by article number..."
             className="max-w-[600px] mx-auto"
             value={value}
-            onChange={(e) => {
-              setvalue(e.target.value);
-            }}
+            onChange={(e) => setvalue(e.target.value)}
           />
-
           <Button
             variant="outline"
             className="text-primary hover:text-primary/80"
