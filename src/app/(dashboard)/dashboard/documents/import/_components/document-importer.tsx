@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
+import { generateSlug } from "@/lib/slug";
+
 interface Article { articleNumber: number; content: string; contentPlainText: string; }
 interface Chapter { title: string; articles: Article[]; }
 interface Section { title: string; chapters: Chapter[]; }
-interface ParsedDocument { name: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
+interface ParsedDocument { name: string; slug: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
 interface Category { id: string; name: string; }
 type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
 function classifyLine(text: string): LineType {
@@ -120,10 +122,7 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
 function parseDocument(htmlContent: string): Section[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
-
-  // ✅ CAMBIO 1: agregado "table" al selector
   const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul, table"));
-
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let currentChapter: Chapter | null = null;
@@ -163,10 +162,7 @@ function parseDocument(htmlContent: string): Section[] {
   for (const el of blocks) {
     const tagName = el.tagName.toLowerCase();
     const text = el.textContent?.trim() || "";
-
-    // ✅ CAMBIO 2: "table" también se permite con text vacío (aunque no suele pasar)
     if (!text && tagName !== "ol" && tagName !== "ul" && tagName !== "table") continue;
-
     const lineType = classifyLine(text);
     if (!lawStarted) {
       if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
@@ -194,12 +190,9 @@ function parseDocument(htmlContent: string): Section[] {
         items.forEach((li) => { ulHtml += `<li>${li.innerHTML}</li>`; ulPlain += `• ${li.textContent?.trim()}\n`; });
         ulHtml += "</ul>";
         currentContentHtml.push(ulHtml); currentContentPlain.push(ulPlain);
-
-      // ✅ CAMBIO 3: manejo de tablas — se preserva el HTML completo
       } else if (tagName === "table") {
         currentContentHtml.push(el.outerHTML);
         currentContentPlain.push(el.textContent?.trim() || "");
-
       } else if (text) {
         currentContentHtml.push(`<p>${el.innerHTML}</p>`);
         currentContentPlain.push(text);
@@ -228,7 +221,8 @@ export default function DocumentImporter() {
       const fixedHtml = await convertDocxToHtml(arrayBuffer, numIdFormatMap);
       const sections = parseDocument(fixedHtml);
       const name = file.name.replace(".docx", "").replace(/_/g, " ");
-      setParsed({ name, short_description: "", law_number: "", categoryIds: [], sections });
+      const slug = generateSlug(name);
+      setParsed({ name, slug, short_description: "", law_number: "", categoryIds: [], sections });
       setStep("preview");
       toast.success(`Document processed: ${sections.length} sections found.`);
     } catch (e) {
