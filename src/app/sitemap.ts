@@ -24,8 +24,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.8,
     }));
-  } catch {
+  } catch (error) {
+    console.error("Error generando sitemap:", error);
     documentEntries = [];
+  } finally {
+    await prisma.$disconnect();
   }
 
   return [
