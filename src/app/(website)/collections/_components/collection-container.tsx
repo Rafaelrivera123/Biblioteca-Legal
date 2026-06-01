@@ -6,7 +6,6 @@ import { DocumentsApiResponse } from "@/schemas/document";
 import useCollectionSearchStore from "@/store/collections";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
-import MostViewedArticles from "./most-viewed-articles";
 
 const CollectionContainer = () => {
   const { query, page, setPage, category } = useCollectionSearchStore();
@@ -61,7 +60,6 @@ const CollectionContainer = () => {
   return (
     <div className="w-full space-y-6 container">
       {content}
-      {category === "all" && <MostViewedArticles />}
       <div className="py-[100px]">
         {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
           <PaginationControls
