@@ -1,5 +1,4 @@
 "use client";
-
 import { logoutAction } from "@/actions/auth/logout";
 import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import {
   ListRestart,
   LogOut,
   Settings,
+  ShieldCheck,
   TableOfContents,
   Users,
 } from "lucide-react";
@@ -66,6 +66,12 @@ const routes = [
   },
   {
     id: 8,
+    label: "Validate Laws",
+    icon: ShieldCheck,
+    href: "/dashboard/validate",
+  },
+  {
+    id: 9,
     label: "Settings",
     icon: Settings,
     href: "/dashboard/settings",
@@ -76,7 +82,6 @@ const Sidebar = () => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
-
   const pathname = usePathname();
 
   const onLogout = () => {
@@ -108,7 +113,6 @@ const Sidebar = () => {
               <Image src={logoSrc} alt="logo" fill />
             </div>
           </div>
-
           {/* Navigation Links */}
           <nav className="flex-1 overflow-auto p-3">
             <ul className="space-y-2">
@@ -118,7 +122,6 @@ const Sidebar = () => {
                   route.href === "/dashboard"
                     ? pathname === "/dashboard"
                     : pathname.startsWith(route.href);
-
                 return (
                   <li key={route.id}>
                     <Link
@@ -139,7 +142,6 @@ const Sidebar = () => {
               })}
             </ul>
           </nav>
-
           {/* Logout Button */}
           <div className="border-t p-3">
             <Button
