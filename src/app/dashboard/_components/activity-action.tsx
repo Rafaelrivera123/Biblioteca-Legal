@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { prisma } from "@/lib/db";
 import { BarChart3, FileText, Pipette } from "lucide-react";
-import moment from "moment";
+import moment from "moment-timezone";
 import Link from "next/link";
 
 const ActivityAction = async () => {
@@ -18,6 +18,7 @@ const ActivityAction = async () => {
       last_name: true,
     },
   });
+
   return (
     <div className="mt-6 grid gap-6 md:grid-cols-2">
       {/* Recent Activity */}
@@ -36,14 +37,15 @@ const ActivityAction = async () => {
                 <p className="text-sm text-muted-foreground">
                   <span className="font-medium text-primary">{first_name}</span>{" "}
                   registered a new account —{" "}
-                  {moment(createdAt).format("MMMM D, YYYY [at] h:mm A")}
+                  {moment(createdAt)
+                    .tz("America/Tegucigalpa")
+                    .format("MMMM D, YYYY [at] h:mm A")}
                 </p>
               </li>
             ))}
           </ul>
         </CardContent>
       </Card>
-
       {/* Quick Actions */}
       <Card>
         <CardContent className="p-6">
