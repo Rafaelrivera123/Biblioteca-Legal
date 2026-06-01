@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { prisma } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
@@ -55,12 +57,9 @@ export async function GET() {
             {
               role: "user",
               content: `Eres un experto en legislación hondureña. Fecha de hoy: ${new Date().toLocaleDateString("es-HN", { year: "numeric", month: "long", day: "numeric" })}.
-
 Documento: ${doc.name} (${doc.law_number})
 Última actualización: ${new Date(doc.updatedAt).toLocaleDateString("es-HN")}
-
 Busca si esta ley hondureña ha tenido reformas desde esa fecha hasta hoy.
-
 Devuelve SOLO JSON válido:
 {
   "up_to_date": true | false,
@@ -80,6 +79,7 @@ Devuelve SOLO JSON válido:
         });
 
         const textBlock = message.content.find((b) => b.type === "text");
+
         let result = {
           id: doc.id,
           name: doc.name,
@@ -120,7 +120,6 @@ Devuelve SOLO JSON válido:
         });
       }
 
-      // Esperar 15 segundos entre cada documento para no exceder el rate limit
       await delay(15000);
     }
 
