@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
@@ -28,13 +27,19 @@ export async function GET(req: NextRequest) {
       whereClause.categories = { some: { categoryId: category } };
     }
 
+    // Cuando es "Todos" sin búsqueda activa, ordenar por más vistos
+    const isDefaultView = (!category || category === "all") && !query;
+    const orderBy = isDefaultView
+      ? [{ viewCount: "desc" as const }, { createdAt: "desc" as const }]
+      : [{ createdAt: "desc" as const }, { id: "desc" as const }];
+
     const totalCount = await prisma.document.count({ where: whereClause });
 
     const documents = await prisma.document.findMany({
       where: whereClause,
       skip,
       take: pageSize,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy,
       include: {
         categories: true,
       },
