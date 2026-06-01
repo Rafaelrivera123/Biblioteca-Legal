@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db";
 import { resend } from "@/lib/resend";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
@@ -13,7 +14,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const message = await anthropic.messages.create({
+    // Paso 1: buscar actualizaciones legales en internet
+    const searchMessage = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 4096,
       tools: [
@@ -25,30 +27,134 @@ export async function GET(request: Request) {
       messages: [
         {
           role: "user",
-          content: `Eres un asistente legal especializado en Honduras. 
-          Busca en internet las actualizaciones, reformas o nuevas leyes hondureñas de los últimos 7 días.
+          content: `Busca en internet las actualizaciones, reformas o nuevas leyes hondureñas de los últimos 7 días.
           Busca en el Diario Oficial La Gaceta de Honduras y otras fuentes oficiales.
-          Para cada actualización encontrada incluye:
-          - Nombre de la ley o decreto
-          - Tipo de cambio (nueva ley, reforma, derogación)
-          - Resumen breve de qué cambió
-          - Por qué es importante actualizarla en una biblioteca legal
-          Formatea toda la respuesta final en HTML limpio con estilos inline para que se vea bien en un correo electrónico.
-          Usa colores: fondo #1a1a2e, texto blanco, acentos en #4CAF50.
-          Si no encuentras actualizaciones recientes, indícalo claramente en el HTML.`,
+          Devuelve SOLO un JSON válido con este formato, sin texto adicional:
+          {
+            "updates": [
+              {
+                "law_name": "nombre exacto de la ley",
+                "law_number": "número del decreto o ley si existe",
+                "change_type": "reforma | nueva_ley | derogación",
+                "summary": "resumen de los cambios",
+                "affected_articles": ["artículo 5", "artículo 12"]
+              }
+            ]
+          }
+          Si no hay actualizaciones, devuelve: { "updates": [] }`,
         },
       ],
     });
 
-    const textBlock = message.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("Respuesta inesperada de Claude");
+    const searchTextBlock = searchMessage.content.find(
+      (block) => block.type === "text"
+    );
+    if (!searchTextBlock || searchTextBlock.type !== "text") {
+      throw new Error("Respuesta inesperada de Claude en búsqueda");
+    }
+
+    let updates: any[] = [];
+    try {
+      const clean = searchTextBlock.text
+        .replace(/```json|```/g, "")
+        .trim();
+      const parsed = JSON.parse(clean);
+      updates = parsed.updates || [];
+    } catch {
+      updates = [];
+    }
+
+    // Paso 2: obtener todos los documentos de la BD
+    const documents = await prisma.document.findMany({
+      where: { published: true },
+      select: {
+        id: true,
+        name: true,
+        law_number: true,
+        slug: true,
+        sections: {
+          select: {
+            id: true,
+            title: true,
+            chapters: {
+              select: {
+                id: true,
+                title: true,
+                articles: {
+                  select: {
+                    id: true,
+                    articleNumber: true,
+                    contentPlainText: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Paso 3: comparar actualizaciones con documentos en BD
+    const compareMessage = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: `Eres un asistente legal especializado en Honduras.
+          
+          Tengo estas actualizaciones legales recientes encontradas en internet:
+          ${JSON.stringify(updates, null, 2)}
+          
+          Y estos son los documentos que actualmente tengo en mi biblioteca legal:
+          ${JSON.stringify(
+            documents.map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              law_number: doc.law_number,
+              slug: doc.slug,
+              sections: doc.sections.map((s) => ({
+                title: s.title,
+                chapters: s.chapters.map((c) => ({
+                  title: c.title,
+                  articles: c.articles.map((a) => ({
+                    articleNumber: a.articleNumber,
+                    content: a.contentPlainText.substring(0, 300),
+                  })),
+                })),
+              })),
+            })),
+            null,
+            2
+          )}
+          
+          Analiza y dime exactamente:
+          1. Qué documentos de mi biblioteca necesitan actualizarse y por qué
+          2. Qué artículos específicos dentro de cada documento cambiaron
+          3. Qué leyes nuevas debería agregar que aún no tengo
+          4. Qué leyes fueron derogadas y debería marcar o eliminar
+          
+          Formatea tu respuesta en HTML limpio con estilos inline, con colores: fondo #1a1a2e, texto blanco, acentos en #4CAF50.
+          Sé muy específico con los números de artículos y secciones.
+          Si ningún documento de mi biblioteca se ve afectado, indícalo claramente.`,
+        },
+      ],
+    });
+
+    const compareTextBlock = compareMessage.content.find(
+      (block) => block.type === "text"
+    );
+    if (!compareTextBlock || compareTextBlock.type !== "text") {
+      throw new Error("Respuesta inesperada de Claude en comparación");
     }
 
     await resend.emails.send({
       from: "Biblioteca Legal HN <noreply@bibliotecalegalhn.com>",
       to: "rafariveras10@gmail.com",
-      subject: `📋 Actualizaciones Legales Honduras - ${new Date().toLocaleDateString("es-HN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
+      subject: `📋 Actualizaciones Legales Honduras - ${new Date().toLocaleDateString(
+        "es-HN",
+        { weekday: "long", year: "numeric", month: "long", day: "numeric" }
+      )}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -68,7 +174,12 @@ export async function GET(request: Request) {
                         <h1 style="color:#4CAF50;margin:0;font-size:24px;">📚 Biblioteca Legal HN</h1>
                         <p style="color:#ffffff;margin:8px 0 0;font-size:14px;">Reporte Semanal de Actualizaciones Legales</p>
                         <p style="color:#aaaaaa;margin:4px 0 0;font-size:12px;">
-                          ${new Date().toLocaleDateString("es-HN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                          ${new Date().toLocaleDateString("es-HN", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
                         </p>
                       </td>
                     </tr>
@@ -76,7 +187,7 @@ export async function GET(request: Request) {
                     <!-- Content -->
                     <tr>
                       <td style="padding:30px;color:#ffffff;">
-                        ${textBlock.text}
+                        ${compareTextBlock.text}
                       </td>
                     </tr>
 
@@ -101,7 +212,7 @@ export async function GET(request: Request) {
       `,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, updates_found: updates.length });
   } catch (error) {
     console.error("Error en weekly-update:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
