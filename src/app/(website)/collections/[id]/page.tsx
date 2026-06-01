@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
-
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(
@@ -19,9 +18,7 @@ export async function generateMetadata(
     },
   });
   if (!document) {
-    return {
-      title: "Documento no encontrado | Biblioteca Legal HN",
-    };
+    return { title: "Documento no encontrado | Biblioteca Legal HN" };
   }
   return {
     title: `${document.name} | Biblioteca Legal HN`,
@@ -57,7 +54,12 @@ const Page = async ({ params }: { params: { id: string } }) => {
 
   if (!document) notFound();
 
-  // Check subscription status
+  // Incrementar viewCount cada vez que alguien abre el documento
+  await prisma.document.update({
+    where: { id: document.id },
+    data: { viewCount: { increment: 1 } },
+  });
+
   let hasSubscription = false;
   if (cu?.user?.id) {
     const user = await prisma.user.findUnique({
@@ -69,7 +71,6 @@ const Page = async ({ params }: { params: { id: string } }) => {
         },
       },
     });
-
     if (user?.role === "admin") {
       hasSubscription = true;
     } else {
