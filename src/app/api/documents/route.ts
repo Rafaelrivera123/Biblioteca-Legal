@@ -38,19 +38,19 @@ export async function GET(req: NextRequest) {
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
             OR d.short_description ILIKE ${likeQuery}
-            OR similarity(d.name, ${query}) > 0.1
-            OR similarity(d.law_number, ${query}) > 0.1
-            OR similarity(d.short_description, ${query}) > 0.1
+            OR similarity(d.name, ${query}) > 0.3
+            OR similarity(d.law_number, ${query}) > 0.3
+            OR similarity(d.short_description, ${query}) > 0.3
             OR EXISTS (
               SELECT 1 FROM "Section" s
               WHERE s."documentId" = d.id
-              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.1)
+              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.3)
             )
             OR EXISTS (
               SELECT 1 FROM "Chapter" c
               JOIN "Section" s ON c."sectionId" = s.id
               WHERE s."documentId" = d.id
-              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.1)
+              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.3)
             )
           )
           ${categoryCondition}
@@ -66,19 +66,19 @@ export async function GET(req: NextRequest) {
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
             OR d.short_description ILIKE ${likeQuery}
-            OR similarity(d.name, ${query}) > 0.1
-            OR similarity(d.law_number, ${query}) > 0.1
-            OR similarity(d.short_description, ${query}) > 0.1
+            OR similarity(d.name, ${query}) > 0.3
+            OR similarity(d.law_number, ${query}) > 0.3
+            OR similarity(d.short_description, ${query}) > 0.3
             OR EXISTS (
               SELECT 1 FROM "Section" s
               WHERE s."documentId" = d.id
-              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.1)
+              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.3)
             )
             OR EXISTS (
               SELECT 1 FROM "Chapter" c
               JOIN "Section" s ON c."sectionId" = s.id
               WHERE s."documentId" = d.id
-              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.1)
+              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.3)
             )
           )
           ${categoryCondition}
