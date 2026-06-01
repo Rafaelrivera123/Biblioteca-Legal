@@ -135,6 +135,7 @@ model Document {
   short_description String
   law_number        String
   published         Boolean           @default(true)
+  viewCount         Int               @default(0)
   articleMeta       UserArticleMeta[]
   watchLists        WatchLists[]
   categories        DocumentCategory[]
@@ -277,21 +278,4 @@ model Setting {
   price        Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-}
-
-model Document {
-  id                String            @id @default(cuid())
-  name              String
-  slug              String?           @unique
-  short_description String
-  law_number        String
-  published         Boolean           @default(true)
-  viewCount         Int               @default(0)
-  articleMeta       UserArticleMeta[]
-  watchLists        WatchLists[]
-  categories        DocumentCategory[]
-  sections          Section[]
-  publishedAt       DateTime          @default(now())
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
 }
