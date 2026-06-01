@@ -15,26 +15,33 @@ export async function GET(request: Request) {
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 1024,
+      max_tokens: 4096,
+      tools: [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+        } as any,
+      ],
       messages: [
         {
           role: "user",
           content: `Eres un asistente legal especializado en Honduras. 
-          Busca y lista las actualizaciones, reformas o nuevas leyes hondureñas de los últimos 7 días.
-          Para cada actualización incluye:
+          Busca en internet las actualizaciones, reformas o nuevas leyes hondureñas de los últimos 7 días.
+          Busca en el Diario Oficial La Gaceta de Honduras y otras fuentes oficiales.
+          Para cada actualización encontrada incluye:
           - Nombre de la ley o decreto
           - Tipo de cambio (nueva ley, reforma, derogación)
           - Resumen breve de qué cambió
           - Por qué es importante actualizarla en una biblioteca legal
-          Formatea la respuesta en HTML limpio con estilos inline para que se vea bien en un correo electrónico.
+          Formatea toda la respuesta final en HTML limpio con estilos inline para que se vea bien en un correo electrónico.
           Usa colores: fondo #1a1a2e, texto blanco, acentos en #4CAF50.
-          Si no hay actualizaciones recientes, indícalo claramente.`,
+          Si no encuentras actualizaciones recientes, indícalo claramente en el HTML.`,
         },
       ],
     });
 
-    const content = message.content[0];
-    if (content.type !== "text") {
+    const textBlock = message.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
       throw new Error("Respuesta inesperada de Claude");
     }
 
@@ -69,7 +76,7 @@ export async function GET(request: Request) {
                     <!-- Content -->
                     <tr>
                       <td style="padding:30px;color:#ffffff;">
-                        ${content.text}
+                        ${textBlock.text}
                       </td>
                     </tr>
 
