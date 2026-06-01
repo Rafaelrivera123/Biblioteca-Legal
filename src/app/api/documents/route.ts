@@ -29,29 +29,15 @@ export async function GET(req: NextRequest) {
         SELECT DISTINCT d.id,
           GREATEST(
             similarity(d.name, ${query}),
-            similarity(d.law_number, ${query}),
-            similarity(d.short_description, ${query})
+            similarity(d.law_number, ${query})
           ) AS relevance
         FROM "Document" d
         WHERE d.published = true
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
-            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.3
             OR similarity(d.law_number, ${query}) > 0.3
-            OR similarity(d.short_description, ${query}) > 0.3
-            OR EXISTS (
-              SELECT 1 FROM "Section" s
-              WHERE s."documentId" = d.id
-              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.3)
-            )
-            OR EXISTS (
-              SELECT 1 FROM "Chapter" c
-              JOIN "Section" s ON c."sectionId" = s.id
-              WHERE s."documentId" = d.id
-              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.3)
-            )
           )
           ${categoryCondition}
         ORDER BY relevance DESC
@@ -65,21 +51,8 @@ export async function GET(req: NextRequest) {
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
-            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.3
             OR similarity(d.law_number, ${query}) > 0.3
-            OR similarity(d.short_description, ${query}) > 0.3
-            OR EXISTS (
-              SELECT 1 FROM "Section" s
-              WHERE s."documentId" = d.id
-              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.3)
-            )
-            OR EXISTS (
-              SELECT 1 FROM "Chapter" c
-              JOIN "Section" s ON c."sectionId" = s.id
-              WHERE s."documentId" = d.id
-              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.3)
-            )
           )
           ${categoryCondition}
       `;
