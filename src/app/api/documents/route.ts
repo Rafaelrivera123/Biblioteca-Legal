@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
       whereClause.categories = { some: { categoryId: category } };
     }
 
-    // Cuando es "Todos" sin búsqueda activa, ordenar por más vistos
     const isDefaultView = (!category || category === "all") && !query;
+
     const orderBy = isDefaultView
       ? [{ viewCount: "desc" as const }, { createdAt: "desc" as const }]
       : [{ createdAt: "desc" as const }, { id: "desc" as const }];
@@ -40,9 +40,7 @@ export async function GET(req: NextRequest) {
       skip,
       take: pageSize,
       orderBy,
-      include: {
-        categories: true,
-      },
+      include: { categories: true },
     });
 
     return NextResponse.json({
