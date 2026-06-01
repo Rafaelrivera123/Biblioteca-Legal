@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
@@ -13,58 +14,46 @@ export async function GET(req: NextRequest) {
 
     const isDefaultView = (!category || category === "all") && !query;
 
-    // Con búsqueda activa, usar pg_trgm para búsqueda inteligente
     if (query) {
+      const likeQuery = `%${query}%`;
       const categoryFilter = category && category !== "all" ? category : null;
 
-      const results = await prisma.$queryRaw<{ id: string; relevance: number }[]>`
+      const categoryCondition = categoryFilter
+        ? Prisma.sql`AND EXISTS (
+            SELECT 1 FROM "DocumentCategory" dc
+            WHERE dc."documentId" = d.id AND dc."categoryId" = ${categoryFilter}
+          )`
+        : Prisma.empty;
+
+      const results = await prisma.$queryRaw<{ id: string }[]>`
         SELECT DISTINCT d.id,
           GREATEST(
             similarity(d.name, ${query}),
             similarity(d.law_number, ${query}),
-            similarity(d.short_description, ${query}),
-            COALESCE((
-              SELECT MAX(similarity(s.title, ${query}))
-              FROM "Section" s WHERE s."documentId" = d.id
-            ), 0),
-            COALESCE((
-              SELECT MAX(similarity(c.title, ${query}))
-              FROM "Chapter" c
-              JOIN "Section" s ON c."sectionId" = s.id
-              WHERE s."documentId" = d.id
-            ), 0)
+            similarity(d.short_description, ${query})
           ) AS relevance
         FROM "Document" d
         WHERE d.published = true
           AND (
-            d.name ILIKE ${'%' + query + '%'}
-            OR d.law_number ILIKE ${'%' + query + '%'}
-            OR d.short_description ILIKE ${'%' + query + '%'}
+            d.name ILIKE ${likeQuery}
+            OR d.law_number ILIKE ${likeQuery}
+            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.1
             OR similarity(d.law_number, ${query}) > 0.1
             OR similarity(d.short_description, ${query}) > 0.1
             OR EXISTS (
               SELECT 1 FROM "Section" s
               WHERE s."documentId" = d.id
-              AND (
-                s.title ILIKE ${'%' + query + '%'}
-                OR similarity(s.title, ${query}) > 0.1
-              )
+              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.1)
             )
             OR EXISTS (
               SELECT 1 FROM "Chapter" c
               JOIN "Section" s ON c."sectionId" = s.id
               WHERE s."documentId" = d.id
-              AND (
-                c.title ILIKE ${'%' + query + '%'}
-                OR similarity(c.title, ${query}) > 0.1
-              )
+              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.1)
             )
           )
-          ${categoryFilter ? prisma.$queryRaw`AND EXISTS (
-            SELECT 1 FROM "DocumentCategory" dc
-            WHERE dc."documentId" = d.id AND dc."categoryId" = ${categoryFilter}
-          )` : prisma.$queryRaw``}
+          ${categoryCondition}
         ORDER BY relevance DESC
         LIMIT ${pageSize} OFFSET ${skip}
       `;
@@ -74,27 +63,29 @@ export async function GET(req: NextRequest) {
         FROM "Document" d
         WHERE d.published = true
           AND (
-            d.name ILIKE ${'%' + query + '%'}
-            OR d.law_number ILIKE ${'%' + query + '%'}
-            OR d.short_description ILIKE ${'%' + query + '%'}
+            d.name ILIKE ${likeQuery}
+            OR d.law_number ILIKE ${likeQuery}
+            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.1
             OR similarity(d.law_number, ${query}) > 0.1
             OR similarity(d.short_description, ${query}) > 0.1
             OR EXISTS (
               SELECT 1 FROM "Section" s
               WHERE s."documentId" = d.id
-              AND (s.title ILIKE ${'%' + query + '%'} OR similarity(s.title, ${query}) > 0.1)
+              AND (s.title ILIKE ${likeQuery} OR similarity(s.title, ${query}) > 0.1)
             )
             OR EXISTS (
               SELECT 1 FROM "Chapter" c
               JOIN "Section" s ON c."sectionId" = s.id
               WHERE s."documentId" = d.id
-              AND (c.title ILIKE ${'%' + query + '%'} OR similarity(c.title, ${query}) > 0.1)
+              AND (c.title ILIKE ${likeQuery} OR similarity(c.title, ${query}) > 0.1)
             )
           )
+          ${categoryCondition}
       `;
 
       const orderedIds = results.map((r) => r.id);
+
       const docs = await prisma.document.findMany({
         where: { id: { in: orderedIds } },
         include: { categories: true },
