@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -11,20 +10,20 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * pageSize;
     const query = searchParams.get("search")?.toLowerCase().trim() || "";
     const category = searchParams.get("category") || undefined;
-
+    const isAdmin = searchParams.get("admin") === "true";
     const isDefaultView = (!category || category === "all") && !query;
-
     if (query) {
       const likeQuery = `%${query}%`;
       const categoryFilter = category && category !== "all" ? category : null;
-
       const categoryCondition = categoryFilter
         ? Prisma.sql`AND EXISTS (
             SELECT 1 FROM "DocumentCategory" dc
             WHERE dc."documentId" = d.id AND dc."categoryId" = ${categoryFilter}
           )`
         : Prisma.empty;
-
+      const publishedCondition = isAdmin
+        ? Prisma.empty
+        : Prisma.sql`AND d.published = true`;
       const results = await prisma.$queryRaw<{ id: string }[]>`
         SELECT DISTINCT d.id,
           GREATEST(
@@ -32,7 +31,8 @@ export async function GET(req: NextRequest) {
             similarity(d.law_number, ${query})
           ) AS relevance
         FROM "Document" d
-        WHERE d.published = true
+        WHERE 1=1
+          ${publishedCondition}
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
@@ -43,11 +43,11 @@ export async function GET(req: NextRequest) {
         ORDER BY relevance DESC
         LIMIT ${pageSize} OFFSET ${skip}
       `;
-
       const totalResult = await prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(DISTINCT d.id) as count
         FROM "Document" d
-        WHERE d.published = true
+        WHERE 1=1
+          ${publishedCondition}
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
@@ -56,20 +56,15 @@ export async function GET(req: NextRequest) {
           )
           ${categoryCondition}
       `;
-
       const orderedIds = results.map((r) => r.id);
-
       const docs = await prisma.document.findMany({
         where: { id: { in: orderedIds } },
         include: { categories: true },
       });
-
       const documents = orderedIds
         .map((id) => docs.find((d) => d.id === id))
         .filter(Boolean);
-
       const totalCount = Number(totalResult[0]?.count ?? 0);
-
       return NextResponse.json({
         success: true,
         message: "Successfully retrieved documents",
@@ -82,21 +77,17 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-
-    // Sin búsqueda, usar Prisma normal
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const whereClause: any = { published: true };
-
+    const whereClause: any = {};
+    if (!isAdmin) {
+      whereClause.published = true;
+    }
     if (category && category !== "all") {
       whereClause.categories = { some: { categoryId: category } };
     }
-
     const orderBy = isDefaultView
       ? [{ viewCount: "desc" as const }, { createdAt: "desc" as const }]
       : [{ createdAt: "desc" as const }, { id: "desc" as const }];
-
     const totalCount = await prisma.document.count({ where: whereClause });
-
     const documents = await prisma.document.findMany({
       where: whereClause,
       skip,
@@ -104,7 +95,6 @@ export async function GET(req: NextRequest) {
       orderBy,
       include: { categories: true },
     });
-
     return NextResponse.json({
       success: true,
       message: "Successfully retrieved documents",
