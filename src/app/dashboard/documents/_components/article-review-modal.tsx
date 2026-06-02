@@ -49,7 +49,7 @@ const ArticleReviewModal = ({ documentId, documentName, documentData, open, onCl
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery<{ success: boolean; data: Article[] }>({
+  const { data, isLoading, refetch } = useQuery<{ success: boolean; data: Article[]; categoryIds: string[] }>({
     queryKey: ["articles-review", documentId],
     queryFn: () =>
       fetch(`/api/documents/${documentId}/articles`).then((res) => res.json()),
@@ -57,15 +57,13 @@ const ArticleReviewModal = ({ documentId, documentName, documentData, open, onCl
   });
 
   const articles = data?.data ?? [];
+  const categoryIds = data?.categoryIds ?? [];
 
-  // Detectar saltos reales ignorando artículos con sufijo
   const issues: string[] = [];
   for (let i = 1; i < articles.length; i++) {
     const prev = articles[i - 1];
     const curr = articles[i];
-    // Solo es salto real si el número cambia Y ninguno de los dos tiene sufijo que lo justifique
     if (curr.articleNumber - prev.articleNumber > 1) {
-      // Verificar si hay artículos con sufijo entre ellos que cubran el rango
       const hasSuffixBridge = articles.some(
         (a) => a.articleNumber >= prev.articleNumber &&
                a.articleNumber <= curr.articleNumber &&
@@ -131,7 +129,7 @@ const ArticleReviewModal = ({ documentId, documentName, documentData, open, onCl
             law_number: documentData.law_number,
             published: true,
             sections: parsedSections,
-            categoryIds: [],
+            categoryIds, // categorías originales del documento
           }),
         });
         const result = await response.json();
