@@ -6,13 +6,25 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const document = await prisma.document.findUnique({
+      where: { id: params.id },
+      select: {
+        categories: {
+          select: { categoryId: true },
+        },
+      },
+    });
+
     const sections = await prisma.section.findMany({
       where: { documentId: params.id },
       include: {
         chapters: {
           include: {
             articles: {
-              orderBy: { articleNumber: "asc" },
+              orderBy: [
+                { articleNumber: "asc" },
+                { articleLabel: "asc" },
+              ],
               select: {
                 id: true,
                 articleNumber: true,
@@ -38,9 +50,11 @@ export async function GET(
       )
     );
 
-    return NextResponse.json({ success: true, data: articles });
+    const categoryIds = document?.categories.map((c) => c.categoryId) ?? [];
+
+    return NextResponse.json({ success: true, data: articles, categoryIds });
   } catch (error) {
     console.error("Error fetching articles:", error);
-    return NextResponse.json({ success: false, data: [] }, { status: 500 });
+    return NextResponse.json({ success: false, data: [], categoryIds: [] }, { status: 500 });
   }
 }
