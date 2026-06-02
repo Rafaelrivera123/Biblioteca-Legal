@@ -4,9 +4,10 @@ import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
 import ResponsiveDialog from "@/components/ui/responsive-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Article } from "@prisma/client";
+import { Article, Document } from "@prisma/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Trash } from "lucide-react";
+import { Bookmark, ExternalLink, Trash } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -14,95 +15,63 @@ interface Props {
   articleId: string;
   metaId: string;
   article: Article;
+  document: Document;
 }
 
-// interface ApiProps {
-//   success: boolean;
-//   data: Article;
-//   message?: string;
-// }
-
-const BookmarkCard = ({ articleId, metaId, article }: Props) => {
+const BookmarkCard = ({ articleId, metaId, article, document }: Props) => {
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [contentOpen, setContentOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // const { data, isLoading } = useQuery<ApiProps>({
-  //   queryKey: [`article`, articleId],
-  //   queryFn: () => fetch(`/api/article/${articleId}`).then((res) => res.json()),
-  // });
+  const displayLabel = article.articleLabel ?? String(article.articleNumber);
+  const docHref = `/collections/${document.slug || document.id}`;
 
   const onRemoveBookmark = () => {
     startTransition(() => {
       removeBookmark({ metaId }).then((res) => {
         if (!res.success) {
-          toast.error(res.message || "Failed to remove bookmark");
+          toast.error(res.message || "Error al eliminar el marcador");
           return;
         }
-
-        // handle successful removal
-        toast.success("Bookmark removed successfully");
+        toast.success("Marcador eliminado");
         setOpen(false);
-        queryClient.invalidateQueries({ queryKey: [`markers`] });
-        queryClient.invalidateQueries({ queryKey: [`article`, articleId] });
+        queryClient.invalidateQueries({ queryKey: ["markers"] });
+        queryClient.invalidateQueries({ queryKey: ["article", articleId] });
       });
     });
   };
 
-  // let content;
-
-  // if (isLoading) {
-  //   content = (
-  //     <div className="min-h-[100px] flex items-center justify-center">
-  //       <Loader2 className="animate-spin opacity-70" />;
-  //     </div>
-  //   );
-  // } else if (!data?.success) {
-  //   content = (
-  //     <div className="min-h-[300px] flex items-center justify-center text-red-600 dark:text-red-400 text-center space-y-2">
-  //       <p className="text-lg font-medium">Failed to load article</p>
-  //       <p className="text-sm text-gray-500 dark:text-gray-400">
-  //         {data?.message || "Something went wrong. Please try again later."}
-  //       </p>
-  //     </div>
-  //   );
-  // } else if (!data?.data) {
-  //   content = (
-  //     <div className="min-h-[300px] flex items-center justify-center text-gray-500 dark:text-gray-400">
-  //       No article found.
-  //     </div>
-  //   );
-  // } else {
-  //   content = <ContentViewer content={article.content} />;
-  // }
-
   return (
     <>
       <div
-        className="w-full px-5 shadow-none  h-[45px] md:h-[60px] rounded-[6px] border flex items-center cursor-pointer"
-        onClick={() => {
-          setContentOpen((p) => !p);
-        }}
+        className="w-full px-5 shadow-none h-[45px] md:h-[60px] rounded-[6px] border flex items-center cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => setContentOpen((p) => !p)}
       >
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
-            <Bookmark className="fill-primary h-5 w-5" /> Article
-            <span> {article.articleNumber}</span>
+            <Bookmark className="fill-primary h-5 w-5 shrink-0" />
+            <span className="text-[14px]">Artículo {displayLabel}</span>
           </div>
-          <Button
-            variant="link"
-            className="hover:text-red-500"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(true);
-            }}
-          >
-            <Trash />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link
+              href={docHref}
+              target="_blank"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button variant="link" size="icon" className="text-primary hover:text-primary/80">
+                <ExternalLink size={16} />
+              </Button>
+            </Link>
+            <Button
+              variant="link"
+              className="hover:text-red-500"
+              onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+            >
+              <Trash size={16} />
+            </Button>
+          </div>
         </div>
-
-        {/* <CardContent>{content}</CardContent> */}
       </div>
 
       <AlertModal
@@ -115,11 +84,11 @@ const BookmarkCard = ({ articleId, metaId, article }: Props) => {
       <ResponsiveDialog
         open={contentOpen}
         onOpenChange={(p) => setContentOpen(p)}
-        title={`Article ${article.articleNumber}`}
-        description=""
+        title={`Artículo ${displayLabel}`}
+        description={document.name}
       >
         <ScrollArea className="min-h-[200px] h-auto lg:max-h-[400px]">
-          <ContentViewer content={article.content} />;
+          <ContentViewer content={article.content} />
         </ScrollArea>
       </ResponsiveDialog>
     </>
