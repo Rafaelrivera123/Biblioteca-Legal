@@ -187,6 +187,7 @@ model Article {
   content          String
   contentPlainText String            @default("")
   articleNumber    Int
+  articleLabel     String?
   viewCount        Int               @default(0)
   chapterId        String
   chapter          Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
