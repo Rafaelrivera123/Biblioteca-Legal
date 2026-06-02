@@ -4,8 +4,8 @@ import { Article } from "@prisma/client";
 import { memo, useEffect, useRef, useState } from "react";
 import ArticleCard from "./article-card";
 
-const ADSENSE_CLIENT = "ca-pub-XXXXXXXXXX"; // reemplaza con tu client ID
-const ADSENSE_SLOT = "XXXXXXXXXX"; // reemplaza con tu ad slot ID
+const ADSENSE_CLIENT = "ca-pub-5685390714020326";
+const ADSENSE_SLOT = "6259496363";
 const AD_EVERY_N_ARTICLES = 15;
 
 interface Props {
