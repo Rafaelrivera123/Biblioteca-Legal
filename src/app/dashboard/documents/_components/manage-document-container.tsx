@@ -1,5 +1,4 @@
 "use client";
-
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import useDebounce from "@/hooks/useDebounce";
@@ -8,23 +7,18 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import ManageDocumentCard from "./manage-document-card";
-
 const ManageDocumentContainer = () => {
   const [input, setInput] = useState("");
   const [page, setPage] = useState(1);
-
   const searchQuery = useDebounce(input, 500);
-
   const { data, isLoading, isError, error } = useQuery<DocumentsApiResponse>({
-    queryKey: ["documents", searchQuery, page],
+    queryKey: ["documents-admin", searchQuery, page],
     queryFn: () =>
-      fetch(`/api/documents?search=${searchQuery}&limit=10&page=${page}`).then(
-        (res) => res.json()
-      ),
+      fetch(
+        `/api/documents?search=${searchQuery}&limit=10&page=${page}&admin=true`
+      ).then((res) => res.json()),
   });
-
   let content;
-
   if (isLoading) {
     content = (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10 animate-pulse">
@@ -76,7 +70,6 @@ const ManageDocumentContainer = () => {
       </div>
     );
   }
-
   return (
     <div className="w-full space-y-6">
       <div className="flex justify-end">
@@ -88,7 +81,6 @@ const ManageDocumentContainer = () => {
         />
       </div>
       {content}
-
       <div className="pt-[100px]">
         {data?.meta?.totalPages !== undefined && data.meta.totalPages > 0 && (
           <PaginationControls
@@ -101,5 +93,4 @@ const ManageDocumentContainer = () => {
     </div>
   );
 };
-
 export default ManageDocumentContainer;
