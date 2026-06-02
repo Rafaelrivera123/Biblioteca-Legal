@@ -53,6 +53,23 @@ const ArticleCard = ({
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
 
+  // Bloquear copy/paste para usuarios sin suscripción
+  useEffect(() => {
+    if (hasSubscription) return;
+
+    const blockCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+
+    document.addEventListener("copy", blockCopy);
+    document.addEventListener("cut", blockCopy);
+
+    return () => {
+      document.removeEventListener("copy", blockCopy);
+      document.removeEventListener("cut", blockCopy);
+    };
+  }, [hasSubscription]);
+
   const { data: articleMeta, isLoading } = useQuery<ApiRes>({
     queryKey: ["meta", data?.id ?? ""],
     queryFn: () =>
