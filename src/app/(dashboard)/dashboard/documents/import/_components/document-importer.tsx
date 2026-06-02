@@ -112,22 +112,30 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(result.value, "text/html");
-  const lists = doc.querySelectorAll("ol");
-  lists.forEach((ol, idx) => {
-    const numId = numIdsInOrder[idx];
+  // Solo aplicar tipo a listas de nivel raíz
+  const topLevelLists = Array.from(doc.body.children).filter(
+    (el) => el.tagName.toLowerCase() === "ol" || el.tagName.toLowerCase() === "ul"
+  );
+  let listIdx = 0;
+  for (const ol of topLevelLists) {
+    const numId = numIdsInOrder[listIdx];
     if (numId) {
       const fmt = numIdFormatMap.get(numId) || "decimal";
       const htmlType = formatToHtmlType(fmt);
       if (htmlType) ol.setAttribute("type", htmlType);
     }
-  });
+    listIdx++;
+  }
   return doc.body.innerHTML;
 }
 
 function parseDocument(htmlContent: string): Section[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, "text/html");
-  const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul, table"));
+
+  // CLAVE: solo elementos raíz, no querySelectorAll que penetra dentro de listas anidadas
+  const blocks = Array.from(doc.body.children);
+
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let currentChapter: Chapter | null = null;
@@ -173,15 +181,21 @@ function parseDocument(htmlContent: string): Section[] {
   for (const el of blocks) {
     const tagName = el.tagName.toLowerCase();
     const text = el.textContent?.trim() || "";
+
     if (!text && tagName !== "ol" && tagName !== "ul" && tagName !== "table") continue;
+
     const lineType = classifyLine(text);
+
     if (!lawStarted) {
       if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
       else continue;
     }
-    if (lineType === "libro" || lineType === "titulo") { ensureSection(text); }
-    else if (lineType === "capitulo" || lineType === "seccion") { ensureChapter(text); }
-    else if (lineType === "articulo") {
+
+    if (lineType === "libro" || lineType === "titulo") {
+      ensureSection(text);
+    } else if (lineType === "capitulo" || lineType === "seccion") {
+      ensureChapter(text);
+    } else if (lineType === "articulo") {
       flushArticle();
       if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
       if (!currentChapter) { currentChapter = { title: "General", articles: [] }; currentSection.chapters.push(currentChapter); }
@@ -189,29 +203,17 @@ function parseDocument(htmlContent: string): Section[] {
       articleNumber = info.articleNumber;
       articleLabel = info.articleLabel;
     } else if (articleNumber > 0) {
-      if (tagName === "ol") {
-        const items = el.querySelectorAll("li");
-        const olType = el.getAttribute("type") || "";
-        const olTypeAttr = olType ? ` type="${olType}"` : "";
-        let olHtml = `<ol${olTypeAttr}>`; let olPlain = ""; let idx = 1;
-        items.forEach((li) => { olHtml += `<li>${li.innerHTML}</li>`; olPlain += `${idx}. ${li.textContent?.trim()}\n`; idx++; });
-        olHtml += "</ol>";
-        currentContentHtml.push(olHtml); currentContentPlain.push(olPlain);
-      } else if (tagName === "ul") {
-        const items = el.querySelectorAll("li");
-        let ulHtml = "<ul>"; let ulPlain = "";
-        items.forEach((li) => { ulHtml += `<li>${li.innerHTML}</li>`; ulPlain += `• ${li.textContent?.trim()}\n`; });
-        ulHtml += "</ul>";
-        currentContentHtml.push(ulHtml); currentContentPlain.push(ulPlain);
-      } else if (tagName === "table") {
+      // Usar outerHTML directamente para preservar listas anidadas intactas
+      if (tagName === "ol" || tagName === "ul" || tagName === "table") {
         currentContentHtml.push(el.outerHTML);
-        currentContentPlain.push(el.textContent?.trim() || "");
+        currentContentPlain.push(text);
       } else if (text) {
         currentContentHtml.push(`<p>${el.innerHTML}</p>`);
         currentContentPlain.push(text);
       }
     }
   }
+
   flushArticle();
   return sections;
 }
