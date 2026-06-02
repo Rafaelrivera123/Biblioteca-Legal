@@ -1,10 +1,8 @@
 "use client";
 import xss from "xss";
-
 interface Props {
   content: string;
 }
-
 const ContentViewer = ({ content }: Props) => {
   const cleanHTML = xss(content, {
     whiteList: {
@@ -29,7 +27,6 @@ const ContentViewer = ({ content }: Props) => {
       caption: [],
     },
   });
-
   return (
     <div
       className="text-[14px] leading-[200%] space-y-2
@@ -39,6 +36,8 @@ const ContentViewer = ({ content }: Props) => {
         [&_ol[type='i']]:list-[lower-roman]
         [&_ol[type='I']]:list-[upper-roman]
         [&_ol:not([type])]:list-decimal
+        [&_ol_ol:not([type])]:list-[lower-alpha]
+        [&_ol_ol_ol:not([type])]:list-[lower-roman]
         [&_ul]:list-disc [&_ul]:pl-8 [&_ul]:my-2 [&_ul]:space-y-1
         [&_li]:leading-[180%] [&_li]:pl-1
         [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-[13px]
@@ -51,5 +50,4 @@ const ContentViewer = ({ content }: Props) => {
     />
   );
 };
-
 export default ContentViewer;
