@@ -26,14 +26,12 @@ const DocumentIndex = ({ sections }: Props) => {
       },
       { rootMargin: "-20% 0px -70% 0px", threshold: 0 }
     );
-
     sections.forEach((section) => {
       section.chapters.forEach((chapter) => {
         const el = document.getElementById(`chapter-${chapter.id}`);
         if (el) observer.observe(el);
       });
     });
-
     return () => observer.disconnect();
   }, [sections]);
 
@@ -58,11 +56,16 @@ const DocumentIndex = ({ sections }: Props) => {
 
   return (
     <div className="w-[260px] shrink-0 hidden lg:block">
-      <div className="sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto pr-2 pb-10">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4 px-2">
-          Índice
-        </p>
-        <div className="space-y-1">
+      <div className="sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto pb-10 rounded-xl border border-primary/20 bg-primary shadow-md">
+        {/* Header del índice */}
+        <div className="px-4 py-3 border-b border-white/20">
+          <p className="text-[11px] font-semibold text-white/70 uppercase tracking-widest">
+            Índice
+          </p>
+        </div>
+
+        {/* Lista */}
+        <div className="space-y-0.5 p-2">
           {sections.map((section) => {
             const isExpanded = expandedSections.has(section.id);
             return (
@@ -70,14 +73,14 @@ const DocumentIndex = ({ sections }: Props) => {
                 {/* Sección */}
                 <button
                   onClick={() => toggleSection(section.id)}
-                  className="w-full flex items-center gap-1 px-2 py-1.5 rounded-md text-left hover:bg-gray-100 transition-colors group"
+                  className="w-full flex items-center gap-1.5 px-2 py-2 rounded-md text-left hover:bg-white/10 transition-colors"
                 >
                   {isExpanded ? (
-                    <ChevronDown size={13} className="text-gray-400 shrink-0" />
+                    <ChevronDown size={13} className="text-white/60 shrink-0" />
                   ) : (
-                    <ChevronRight size={13} className="text-gray-400 shrink-0" />
+                    <ChevronRight size={13} className="text-white/60 shrink-0" />
                   )}
-                  <span className="text-[12px] font-semibold text-primary leading-tight">
+                  <span className="text-[12px] font-semibold text-white leading-tight">
                     {section.title}
                   </span>
                 </button>
@@ -94,8 +97,8 @@ const DocumentIndex = ({ sections }: Props) => {
                           className={cn(
                             "w-full text-left px-2 py-1.5 rounded-md transition-all duration-200",
                             isActive
-                              ? "bg-primary/10 text-primary font-semibold text-[13px]"
-                              : "text-gray-500 text-[12px] hover:bg-gray-100 hover:text-primary"
+                              ? "bg-white text-primary font-semibold text-[13px] shadow-sm"
+                              : "text-white/70 text-[12px] hover:bg-white/10 hover:text-white"
                           )}
                         >
                           {chapter.title}
