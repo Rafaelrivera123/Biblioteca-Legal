@@ -16,10 +16,8 @@ function sortArticles(articles: Article[]): Article[] {
     if (a.articleNumber !== b.articleNumber) {
       return a.articleNumber - b.articleNumber;
     }
-    // Mismo número base, ordenar por label
     const labelA = a.articleLabel ?? "";
     const labelB = b.articleLabel ?? "";
-    // Sin label va primero (artículo 29 antes de 29-A)
     if (!labelA && labelB) return -1;
     if (labelA && !labelB) return 1;
     return labelA.localeCompare(labelB);
@@ -27,13 +25,14 @@ function sortArticles(articles: Article[]): Article[] {
 }
 
 const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
-  const { query } = useArticleSearchStore();
+  const { query, setQuery } = useArticleSearchStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const sortedData = sortArticles(data);
 
   useEffect(() => {
+    if (!query) return;
     const searchNumber = parseInt(query.trim(), 10);
     if (!isNaN(searchNumber)) {
       const targetIndex = sortedData.findIndex(
@@ -47,14 +46,16 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
             target.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
           setHighlightedArticle(searchNumber);
-          const timeout = setTimeout(() => {
+
+          // Limpiar query después del scroll para no bloquear el scroll libre
+          setTimeout(() => {
+            setQuery("");
             setHighlightedArticle(null);
-          }, 1200);
-          return () => clearTimeout(timeout);
+          }, 1500);
         }
       }
     }
-  }, [query, sortedData]);
+  }, [query, sortedData, setQuery]);
 
   return (
     <div className="space-y-5">
