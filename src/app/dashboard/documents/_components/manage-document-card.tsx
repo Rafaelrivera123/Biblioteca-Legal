@@ -12,16 +12,16 @@ import {
 import { Document } from "@prisma/client";
 import {
   Calendar,
+  ClipboardList,
   ExternalLink,
   FileText,
   Pencil,
   Settings,
-  ClipboardList,
 } from "lucide-react";
 import moment from "moment";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
-import dynamic from "next/dynamic";
 
 const ArticleReviewModal = dynamic(() => import("./article-review-modal"), { ssr: false });
 
@@ -38,6 +38,12 @@ const ManageDocumentCard = ({ document }: Props) => {
         <ArticleReviewModal
           documentId={document.id}
           documentName={document.name}
+          documentData={{
+            name: document.name,
+            slug: document.slug ?? null,
+            short_description: document.short_description,
+            law_number: document.law_number,
+          }}
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
         />
