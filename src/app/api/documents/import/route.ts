@@ -1,416 +1,92 @@
-"use client";
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useQuery } from "@tanstack/react-query";
-import { generateSlug } from "@/lib/slug";
-
-interface Article { articleNumber: number; articleLabel?: string; content: string; contentPlainText: string; }
-interface Chapter { title: string; articles: Article[]; }
-interface Section { title: string; chapters: Chapter[]; }
-interface ParsedDocument { name: string; slug: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
-interface Category { id: string; name: string; }
-type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
-
-function classifyLine(text: string): LineType {
-  const t = text.trim();
-  if (/^libro\s+/i.test(t)) return "libro";
-  if (/^título\s+|^titulo\s+/i.test(t)) return "titulo";
-  if (/^capítulo\s+|^capitulo\s+/i.test(t)) return "capitulo";
-  if (/^sección\s+|^seccion\s+/i.test(t)) return "seccion";
-  if (/^art[ií]culo\s+\d+[-]?[a-zA-Z]*/i.test(t)) return "articulo";
-  return "content";
-}
-
-function getArticleInfo(text: string): { articleNumber: number; articleLabel: string } {
-  // Matches: "Artículo 29-A", "Artículo 29", "Articulo 29-B", etc.
-  const match = text.match(/art[ií]culo\s+(\d+)(-[a-zA-Z]+)?/i);
-  if (!match) return { articleNumber: 0, articleLabel: "" };
-  const num = parseInt(match[1]);
-  const suffix = match[2] ? match[2].toUpperCase() : "";
-  const label = suffix ? `${num}${suffix}` : String(num);
-  return { articleNumber: num, articleLabel: label };
-}
-
-async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+export async function POST(req: NextRequest) {
   try {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const numberingFile = zip.file("word/numbering.xml");
-    if (!numberingFile) return map;
-    const xml = await numberingFile.async("string");
-    const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
-    const abstractFormatMap = new Map<string, string>();
-    xmlDoc.querySelectorAll("abstractNum").forEach((abstractNum) => {
-      const abId = abstractNum.getAttribute("w:abstractNumId") || "";
-      abstractNum.querySelectorAll("lvl").forEach((lvl) => {
-        if (lvl.getAttribute("w:ilvl") === "0") {
-          const numFmt = lvl.querySelector("numFmt");
-          const fmt = numFmt?.getAttribute("w:val") || "decimal";
-          abstractFormatMap.set(abId, fmt);
-        }
-      });
-    });
-    xmlDoc.querySelectorAll("num").forEach((num) => {
-      const numId = num.getAttribute("w:numId") || "";
-      const absRef = num.querySelector("abstractNumId");
-      const abId = absRef?.getAttribute("w:val") || "";
-      const fmt = abstractFormatMap.get(abId) || "decimal";
-      map.set(numId, fmt);
-    });
-  } catch {
-    // ignore
-  }
-  return map;
-}
-
-function formatToHtmlType(fmt: string): string {
-  if (fmt === "lowerLetter") return "a";
-  if (fmt === "upperLetter") return "A";
-  if (fmt === "lowerRoman") return "i";
-  if (fmt === "upperRoman") return "I";
-  return "";
-}
-
-async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<string, string>): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mammoth = await import("mammoth") as any;
-  const result = await mammoth.convertToHtml(
-    { arrayBuffer },
-    {
-      styleMap: ["p[style-name='List Paragraph'] => p.list-paragraph"],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      transformDocument: (element: any) => { return element; }
+    const session = await auth();
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
-  );
-  const numIdsInOrder: string[] = [];
-  try {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const docFile = zip.file("word/document.xml");
-    if (docFile) {
-      const xml = await docFile.async("string");
-      const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
-      const paras = xmlDoc.querySelectorAll("p");
-      paras.forEach((para) => {
-        const numId = para.querySelector("numId");
-        if (numId) {
-          const val = numId.getAttribute("w:val");
-          if (val && val !== "0") {
-            if (numIdsInOrder.length === 0 || numIdsInOrder[numIdsInOrder.length - 1] !== val) {
-              numIdsInOrder.push(val);
-            }
+    if (session.user.role !== "admin") {
+      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    }
+    const data = await req.json();
+    const { name, slug, short_description, law_number, published, sections, categoryIds } = data;
+    if (!name || !sections || !Array.isArray(sections)) {
+      return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
+    }
+    const categories = categoryIds?.length
+      ? await prisma.category.findMany({
+          where: { id: { in: categoryIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const document = await prisma.document.create({
+      data: {
+        name,
+        slug: slug || null,
+        short_description: short_description || "",
+        law_number: law_number || "",
+        published: published ?? true,
+        categories: {
+          create: categories.map((cat) => ({
+            categoryId: cat.id,
+            name: cat.name,
+          })),
+        },
+      },
+    });
+    let totalSections = 0;
+    let totalChapters = 0;
+    let totalArticles = 0;
+    let skippedDuplicates = 0;
+    for (const sectionData of sections) {
+      const section = await prisma.section.create({
+        data: { title: sectionData.title, documentId: document.id },
+      });
+      totalSections++;
+      for (const chapterData of sectionData.chapters || []) {
+        const chapter = await prisma.chapter.create({
+          data: { title: chapterData.title, sectionId: section.id },
+        });
+        totalChapters++;
+        const seenArticleLabels = new Set<string>();
+        for (const articleData of chapterData.articles || []) {
+          const label = articleData.articleLabel || String(articleData.articleNumber);
+          if (seenArticleLabels.has(label)) {
+            skippedDuplicates++;
+            continue;
           }
+          seenArticleLabels.add(label);
+          await prisma.article.create({
+            data: {
+              articleNumber: articleData.articleNumber,
+              articleLabel: articleData.articleLabel || null,
+              content: articleData.content || "",
+              contentPlainText: articleData.contentPlainText || "",
+              chapterId: chapter.id,
+            },
+          });
+          totalArticles++;
         }
-      });
-    }
-  } catch {
-    // ignore
-  }
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(result.value, "text/html");
-  const lists = doc.querySelectorAll("ol");
-  lists.forEach((ol, idx) => {
-    const numId = numIdsInOrder[idx];
-    if (numId) {
-      const fmt = numIdFormatMap.get(numId) || "decimal";
-      const htmlType = formatToHtmlType(fmt);
-      if (htmlType) ol.setAttribute("type", htmlType);
-    }
-  });
-  return doc.body.innerHTML;
-}
-
-function parseDocument(htmlContent: string): Section[] {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlContent, "text/html");
-  const blocks = Array.from(doc.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, ol, ul, table"));
-  const sections: Section[] = [];
-  let currentSection: Section | null = null;
-  let currentChapter: Chapter | null = null;
-  let currentContentHtml: string[] = [];
-  let currentContentPlain: string[] = [];
-  let articleNumber = 0;
-  let articleLabel = "";
-  let lawStarted = false;
-
-  function flushArticle() {
-    if (articleNumber > 0) {
-      const targetChapter = currentChapter ?? (() => {
-        if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
-        const ch = { title: "General", articles: [] };
-        currentSection!.chapters.push(ch);
-        currentChapter = ch;
-        return ch;
-      })();
-      targetChapter.articles.push({
-        articleNumber,
-        articleLabel: articleLabel !== String(articleNumber) ? articleLabel : undefined,
-        content: currentContentHtml.join("") || "<p></p>",
-        contentPlainText: currentContentPlain.join("\n").trim(),
-      });
-      currentContentHtml = []; currentContentPlain = []; articleNumber = 0; articleLabel = "";
-    }
-  }
-
-  function ensureSection(title: string) {
-    flushArticle();
-    currentSection = { title, chapters: [] };
-    sections.push(currentSection);
-    currentChapter = null;
-  }
-
-  function ensureChapter(title: string) {
-    flushArticle();
-    if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
-    currentChapter = { title, articles: [] };
-    currentSection!.chapters.push(currentChapter);
-  }
-
-  for (const el of blocks) {
-    const tagName = el.tagName.toLowerCase();
-    const text = el.textContent?.trim() || "";
-    if (!text && tagName !== "ol" && tagName !== "ul" && tagName !== "table") continue;
-    const lineType = classifyLine(text);
-    if (!lawStarted) {
-      if (["libro", "titulo", "capitulo", "seccion", "articulo"].includes(lineType)) lawStarted = true;
-      else continue;
-    }
-    if (lineType === "libro" || lineType === "titulo") { ensureSection(text); }
-    else if (lineType === "capitulo" || lineType === "seccion") { ensureChapter(text); }
-    else if (lineType === "articulo") {
-      flushArticle();
-      if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
-      if (!currentChapter) { currentChapter = { title: "General", articles: [] }; currentSection.chapters.push(currentChapter); }
-      const info = getArticleInfo(text);
-      articleNumber = info.articleNumber;
-      articleLabel = info.articleLabel;
-    } else if (articleNumber > 0) {
-      if (tagName === "ol") {
-        const items = el.querySelectorAll("li");
-        const olType = el.getAttribute("type") || "";
-        const olTypeAttr = olType ? ` type="${olType}"` : "";
-        let olHtml = `<ol${olTypeAttr}>`; let olPlain = ""; let idx = 1;
-        items.forEach((li) => { olHtml += `<li>${li.innerHTML}</li>`; olPlain += `${idx}. ${li.textContent?.trim()}\n`; idx++; });
-        olHtml += "</ol>";
-        currentContentHtml.push(olHtml); currentContentPlain.push(olPlain);
-      } else if (tagName === "ul") {
-        const items = el.querySelectorAll("li");
-        let ulHtml = "<ul>"; let ulPlain = "";
-        items.forEach((li) => { ulHtml += `<li>${li.innerHTML}</li>`; ulPlain += `• ${li.textContent?.trim()}\n`; });
-        ulHtml += "</ul>";
-        currentContentHtml.push(ulHtml); currentContentPlain.push(ulPlain);
-      } else if (tagName === "table") {
-        currentContentHtml.push(el.outerHTML);
-        currentContentPlain.push(el.textContent?.trim() || "");
-      } else if (text) {
-        currentContentHtml.push(`<p>${el.innerHTML}</p>`);
-        currentContentPlain.push(text);
       }
     }
-  }
-  flushArticle();
-  return sections;
-}
-
-export default function DocumentImporter() {
-  const router = useRouter();
-  const [step, setStep] = useState<"upload" | "preview" | "saving">("upload");
-  const [parsed, setParsed] = useState<ParsedDocument | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const { data: categories } = useQuery<Category[]>({
-    queryKey: ["categories"],
-    queryFn: () => fetch("/api/categories").then((res) => res.json()),
-  });
-
-  const processFile = useCallback(async (file: File) => {
-    if (!file.name.endsWith(".docx")) { toast.error("Please upload a .docx file."); return; }
-    setIsLoading(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const numIdFormatMap = await buildNumIdFormatMap(arrayBuffer);
-      const fixedHtml = await convertDocxToHtml(arrayBuffer, numIdFormatMap);
-      const sections = parseDocument(fixedHtml);
-      const name = file.name.replace(".docx", "").replace(/_/g, " ");
-      const slug = generateSlug(name);
-      setParsed({ name, slug, short_description: "", law_number: "", categoryIds: [], sections });
-      setStep("preview");
-      toast.success(`Document processed: ${sections.length} sections found.`);
-    } catch (e) {
-      console.error(e);
-      toast.error("Error processing document. Please try again.");
-    } finally { setIsLoading(false); }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }, [processFile]);
-
-  const handleSave = async () => {
-    if (!parsed) return;
-    setStep("saving");
-    try {
-      const response = await fetch("/api/documents/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      const data = await response.json();
-      if (!response.ok) { toast.error(data.error || "Error saving document."); setStep("preview"); return; }
-      toast.success(`"${parsed.name}" saved! ${data.summary?.sections} sections, ${data.summary?.chapters} chapters, ${data.summary?.articles} articles.`);
-      router.push("/dashboard/documents");
-    } catch { toast.error("Error saving document."); setStep("preview"); }
-  };
-
-  const toggleCategory = (id: string) => {
-    setParsed((p) => {
-      if (!p) return p;
-      const already = p.categoryIds.includes(id);
-      return { ...p, categoryIds: already ? p.categoryIds.filter((c) => c !== id) : [...p.categoryIds, id] };
+    return NextResponse.json({
+      success: true,
+      message: `Law "${name}" was imported successfully.`,
+      documentId: document.id,
+      summary: {
+        sections: totalSections,
+        chapters: totalChapters,
+        articles: totalArticles,
+        skippedDuplicates,
+      },
     });
-  };
-
-  const totalChapters = parsed?.sections.reduce((a, s) => a + s.chapters.length, 0) ?? 0;
-  const totalArticles = parsed?.sections.reduce((a, s) => s.chapters.reduce((b, c) => b + c.articles.length, 0) + a, 0) ?? 0;
-
-  if (step === "upload") {
-    return (
-      <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-6">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => document.getElementById("fileInput")?.click()}
-          className={`border-2 border-dashed rounded-[8px] p-16 text-center cursor-pointer transition-colors ${isDragging ? "border-primary bg-primary/5" : "border-black/20 hover:border-primary/50"}`}
-        >
-          <div className="text-5xl mb-4">📄</div>
-          <p className="font-semibold text-[18px] text-primary mb-2">
-            {isLoading ? "Processing document..." : "Upload your Word file (.docx)"}
-          </p>
-          <p className="text-gray-500 text-[14px]">Drag and drop here or click to select</p>
-          <input id="fileInput" type="file" accept=".docx" className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); }} />
-        </div>
-      </div>
+  } catch (error: unknown) {
+    console.error("Error importing law:", error);
+    return NextResponse.json(
+      { error: "Internal server error.", detail: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
     );
   }
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-4">
-        <h2 className="font-semibold text-[20px] text-primary">Document Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Document Name *</label>
-            <Input
-              value={parsed?.name ?? ""}
-              onChange={(e) => setParsed((p) => p ? { ...p, name: e.target.value } : p)}
-              placeholder="Law name"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Law Number / Decree</label>
-            <Input
-              value={parsed?.law_number ?? ""}
-              onChange={(e) => setParsed((p) => p ? { ...p, law_number: e.target.value } : p)}
-              placeholder="e.g. Decree 189-1959"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">Slug (URL)</label>
-          <Input
-            value={parsed?.slug ?? ""}
-            onChange={(e) => setParsed((p) => p ? { ...p, slug: e.target.value } : p)}
-            placeholder="url-del-documento"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Se genera automáticamente desde el nombre del archivo. Cámbialo si ya existe un documento con este slug.
-          </p>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">Short Description</label>
-          <Textarea
-            value={parsed?.short_description ?? ""}
-            onChange={(e) => setParsed((p) => p ? { ...p, short_description: e.target.value } : p)}
-            placeholder="Brief description of the law..."
-            className="min-h-[80px] resize-none"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-700 block mb-2">Categories</label>
-          <div className="flex flex-wrap gap-2">
-            {categories?.map((cat) => {
-              const selected = parsed?.categoryIds.includes(cat.id);
-              return (
-                <button key={cat.id} type="button" onClick={() => toggleCategory(cat.id)}
-                  className={`px-4 py-2 rounded-full text-[13px] font-medium border transition-colors ${selected ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-300 hover:border-primary"}`}>
-                  {cat.name}
-                </button>
-              );
-            })}
-          </div>
-          {parsed?.categoryIds && parsed.categoryIds.length > 0 && (
-            <p className="text-xs text-gray-500 mt-1">{parsed.categoryIds.length} categor{parsed.categoryIds.length === 1 ? "y" : "ies"} selected</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {[{ label: "Sections", value: parsed?.sections.length ?? 0 }, { label: "Chapters", value: totalChapters }, { label: "Articles", value: totalArticles }].map((s) => (
-          <div key={s.label} className="bg-white p-6 border border-black/20 rounded-[8px] text-center">
-            <div className="text-[36px] font-semibold text-primary">{s.value}</div>
-            <div className="text-gray-500 text-[14px]">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white p-[30px] border border-black/20 rounded-[8px] space-y-3">
-        <h2 className="font-semibold text-[20px] text-primary">Structure Preview</h2>
-        <div className="max-h-[400px] overflow-y-auto space-y-2">
-          {parsed?.sections.map((section, si) => (
-            <div key={si} className="border border-black/10 rounded-[6px] overflow-hidden">
-              <div className="bg-primary/5 px-4 py-2 font-semibold text-primary text-[14px] flex justify-between">
-                <span>{section.title}</span>
-                <span className="text-gray-400 font-normal">{section.chapters.length} cap.</span>
-              </div>
-              {section.chapters.slice(0, 3).map((chapter, ci) => (
-                <div key={ci} className="px-4 py-2 border-t border-black/5">
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-gray-700">{chapter.title}</span>
-                    <span className="text-gray-400">{chapter.articles.length} arts.</span>
-                  </div>
-                  {chapter.articles.slice(0, 1).map((article, ai) => (
-                    <div key={ai} className="ml-4 mt-1 text-[12px] text-gray-500 truncate">
-                      Art. {article.articleLabel ?? article.articleNumber} — {article.contentPlainText.slice(0, 80)}...
-                    </div>
-                  ))}
-                </div>
-              ))}
-              {section.chapters.length > 3 && (
-                <div className="px-4 py-1 text-[12px] text-gray-400">+{section.chapters.length - 3} more chapters...</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" className="text-primary hover:text-primary/80" onClick={() => { setParsed(null); setStep("upload"); }}>
-          Upload Another
-        </Button>
-        <Button onClick={handleSave} disabled={step === "saving"} className="w-fit bg-primary text-white hover:bg-primary/90">
-          {step === "saving" ? "Saving..." : "Save to Database"}
-        </Button>
-      </div>
-    </div>
-  );
 }
