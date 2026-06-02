@@ -1,7 +1,6 @@
 export interface ParsedArticle { articleNumber: number; articleLabel?: string; content: string; contentPlainText: string; }
 export interface ParsedChapter { title: string; articles: ParsedArticle[]; }
 export interface ParsedSection { title: string; chapters: ParsedChapter[]; }
-
 type LineType = "libro" | "titulo" | "capitulo" | "seccion" | "articulo" | "content";
 
 export function classifyLine(text: string): LineType {
@@ -23,6 +22,7 @@ export function getArticleInfo(text: string): { articleNumber: number; articleLa
   return { articleNumber: num, articleLabel: label };
 }
 
+// Ahora guarda TODOS los niveles: "numId-ilvl" -> fmt
 export async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
@@ -32,23 +32,32 @@ export async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map
     if (!numberingFile) return map;
     const xml = await numberingFile.async("string");
     const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
-    const abstractFormatMap = new Map<string, string>();
+
+    // abstractNumId -> { ilvl -> fmt }
+    const abstractFormatMap = new Map<string, Map<string, string>>();
     xmlDoc.querySelectorAll("abstractNum").forEach((abstractNum) => {
       const abId = abstractNum.getAttribute("w:abstractNumId") || "";
+      const lvlMap = new Map<string, string>();
       abstractNum.querySelectorAll("lvl").forEach((lvl) => {
-        if (lvl.getAttribute("w:ilvl") === "0") {
-          const numFmt = lvl.querySelector("numFmt");
-          const fmt = numFmt?.getAttribute("w:val") || "decimal";
-          abstractFormatMap.set(abId, fmt);
-        }
+        const ilvl = lvl.getAttribute("w:ilvl") || "0";
+        const numFmt = lvl.querySelector("numFmt");
+        const fmt = numFmt?.getAttribute("w:val") || "decimal";
+        lvlMap.set(ilvl, fmt);
       });
+      abstractFormatMap.set(abId, lvlMap);
     });
+
+    // numId -> abstractNumId, store as "numId-ilvl" -> fmt
     xmlDoc.querySelectorAll("num").forEach((num) => {
       const numId = num.getAttribute("w:numId") || "";
       const absRef = num.querySelector("abstractNumId");
       const abId = absRef?.getAttribute("w:val") || "";
-      const fmt = abstractFormatMap.get(abId) || "decimal";
-      map.set(numId, fmt);
+      const lvlMap = abstractFormatMap.get(abId);
+      if (lvlMap) {
+        lvlMap.forEach((fmt, ilvl) => {
+          map.set(`${numId}-${ilvl}`, fmt);
+        });
+      }
     });
   } catch {
     // ignore
@@ -75,7 +84,9 @@ export async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap
       transformDocument: (element: any) => element,
     }
   );
-  const numIdsInOrder: string[] = [];
+
+  // Construir lista ordenada de (numId, ilvl) por aparición en el documento
+  const numIdIlvlInOrder: { numId: string; ilvl: string }[] = [];
   try {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(arrayBuffer);
@@ -84,12 +95,16 @@ export async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap
       const xml = await docFile.async("string");
       const xmlDoc = new DOMParser().parseFromString(xml, "application/xml");
       xmlDoc.querySelectorAll("p").forEach((para) => {
-        const numId = para.querySelector("numId");
-        if (numId) {
-          const val = numId.getAttribute("w:val");
+        const numIdEl = para.querySelector("numId");
+        const ilvlEl = para.querySelector("ilvl");
+        if (numIdEl) {
+          const val = numIdEl.getAttribute("w:val");
+          const ilvl = ilvlEl?.getAttribute("w:val") || "0";
           if (val && val !== "0") {
-            if (numIdsInOrder.length === 0 || numIdsInOrder[numIdsInOrder.length - 1] !== val)
-              numIdsInOrder.push(val);
+            const last = numIdIlvlInOrder[numIdIlvlInOrder.length - 1];
+            if (!last || last.numId !== val || last.ilvl !== ilvl) {
+              numIdIlvlInOrder.push({ numId: val, ilvl });
+            }
           }
         }
       });
@@ -97,22 +112,21 @@ export async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap
   } catch {
     // ignore
   }
+
   const parser = new DOMParser();
   const doc = parser.parseFromString(result.value, "text/html");
-  // Solo aplicar tipo a listas de nivel raíz
-  const topLevelLists = Array.from(doc.body.children).filter(
-    (el) => el.tagName.toLowerCase() === "ol" || el.tagName.toLowerCase() === "ul"
-  );
-  let listIdx = 0;
-  for (const ol of topLevelLists) {
-    const numId = numIdsInOrder[listIdx];
-    if (numId) {
-      const fmt = numIdFormatMap.get(numId) || "decimal";
+
+  // Aplicar tipo a TODAS las listas (raíz y anidadas) en orden de aparición
+  const allLists = Array.from(doc.querySelectorAll("ol, ul"));
+  allLists.forEach((ol, idx) => {
+    const entry = numIdIlvlInOrder[idx];
+    if (entry) {
+      const fmt = numIdFormatMap.get(`${entry.numId}-${entry.ilvl}`) || "decimal";
       const htmlType = formatToHtmlType(fmt);
       if (htmlType) ol.setAttribute("type", htmlType);
     }
-    listIdx++;
-  }
+  });
+
   return doc.body.innerHTML;
 }
 
