@@ -5,7 +5,6 @@ import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
 export const dynamic = "force-dynamic";
-
 export async function generateMetadata(
   { params }: { params: { id: string } }
 ): Promise<Metadata> {
@@ -38,11 +37,9 @@ export async function generateMetadata(
     },
   };
 }
-
 const Page = async ({ params }: { params: { id: string } }) => {
   const cu = await auth();
   const isLoggedin = !!cu;
-
   const document = await prisma.document.findFirst({
     where: {
       OR: [
@@ -51,15 +48,11 @@ const Page = async ({ params }: { params: { id: string } }) => {
       ],
     },
   });
-
   if (!document) notFound();
-
-  // Incrementar viewCount cada vez que alguien abre el documento
   await prisma.document.update({
     where: { id: document.id },
     data: { viewCount: { increment: 1 } },
   });
-
   let hasSubscription = false;
   if (cu?.user?.id) {
     const user = await prisma.user.findUnique({
@@ -80,19 +73,22 @@ const Page = async ({ params }: { params: { id: string } }) => {
       );
     }
   }
-
   const sections = await prisma.section.findMany({
     where: { documentId: document.id },
     include: {
       chapters: {
         include: {
-          articles: { orderBy: { articleNumber: "asc" } },
+          articles: {
+            orderBy: [
+              { articleNumber: "asc" },
+              { articleLabel: "asc" },
+            ],
+          },
         },
       },
     },
     orderBy: { createdAt: "asc" },
   });
-
   return (
     <div>
       <CollectionHeader document={document} hasFullAccess={true} isLoggedin={isLoggedin} />
@@ -105,5 +101,4 @@ const Page = async ({ params }: { params: { id: string } }) => {
     </div>
   );
 };
-
 export default Page;
