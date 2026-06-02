@@ -11,15 +11,32 @@ interface Props {
   documentId: string;
 }
 
+function sortArticles(articles: Article[]): Article[] {
+  return [...articles].sort((a, b) => {
+    if (a.articleNumber !== b.articleNumber) {
+      return a.articleNumber - b.articleNumber;
+    }
+    // Mismo número base, ordenar por label
+    const labelA = a.articleLabel ?? "";
+    const labelB = b.articleLabel ?? "";
+    // Sin label va primero (artículo 29 antes de 29-A)
+    if (!labelA && labelB) return -1;
+    if (labelA && !labelB) return 1;
+    return labelA.localeCompare(labelB);
+  });
+}
+
 const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
   const { query } = useArticleSearchStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const sortedData = sortArticles(data);
+
   useEffect(() => {
     const searchNumber = parseInt(query.trim(), 10);
     if (!isNaN(searchNumber)) {
-      const targetIndex = data.findIndex(
+      const targetIndex = sortedData.findIndex(
         (article) => article.articleNumber === searchNumber
       );
       if (targetIndex !== -1) {
@@ -37,11 +54,11 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
         }
       }
     }
-  }, [query, data]);
+  }, [query, sortedData]);
 
   return (
     <div className="space-y-5">
-      {data?.map((item, i) => (
+      {sortedData?.map((item, i) => (
         <div
           key={item.id}
           ref={(el) => {
