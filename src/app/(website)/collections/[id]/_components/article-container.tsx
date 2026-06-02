@@ -31,9 +31,11 @@ const ArticleContainer = ({ documentId, isLoggedin, hasSubscription, sections }:
 
   return (
     <div className="container min-h-[calc(100vh-600px)]">
-      <div className="flex gap-8 items-start">
+      <div className="flex gap-8 items-start relative">
         {/* Índice lateral izquierdo */}
-        <DocumentIndex sections={sections} />
+        <div className="hidden lg:block w-[260px] shrink-0 self-start sticky top-[80px]">
+          <DocumentIndex sections={sections} />
+        </div>
 
         {/* Contenido principal */}
         <div className="flex-1 min-w-0">
