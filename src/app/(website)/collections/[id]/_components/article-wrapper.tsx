@@ -4,6 +4,10 @@ import { Article } from "@prisma/client";
 import { memo, useEffect, useRef, useState } from "react";
 import ArticleCard from "./article-card";
 
+const ADSENSE_CLIENT = "ca-pub-XXXXXXXXXX"; // reemplaza con tu client ID
+const ADSENSE_SLOT = "XXXXXXXXXX"; // reemplaza con tu ad slot ID
+const AD_EVERY_N_ARTICLES = 15;
+
 interface Props {
   data: Article[];
   isLoggedin: boolean;
@@ -24,11 +28,34 @@ function sortArticles(articles: Article[]): Article[] {
   });
 }
 
+const AdBanner = () => {
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  return (
+    <div className="my-4 flex justify-center">
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block" }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={ADSENSE_SLOT}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
+};
+
 const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
   const { query, setQuery } = useArticleSearchStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
-
   const sortedData = sortArticles(data);
 
   useEffect(() => {
@@ -46,8 +73,6 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
             target.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
           setHighlightedArticle(searchNumber);
-
-          // Limpiar query después del scroll para no bloquear el scroll libre
           setTimeout(() => {
             setQuery("");
             setHighlightedArticle(null);
@@ -60,20 +85,25 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
   return (
     <div className="space-y-5">
       {sortedData?.map((item, i) => (
-        <div
-          key={item.id}
-          ref={(el) => {
-            articleRefs.current[i] = el;
-          }}
-        >
-          <ArticleCard
-            data={item}
-            index={i}
-            isLoggedin={isLoggedin}
-            hasSubscription={hasSubscription}
-            documentId={documentId}
-            highlightedArticle={highlightedArticle}
-          />
+        <div key={item.id}>
+          <div
+            ref={(el) => {
+              articleRefs.current[i] = el;
+            }}
+          >
+            <ArticleCard
+              data={item}
+              index={i}
+              isLoggedin={isLoggedin}
+              hasSubscription={hasSubscription}
+              documentId={documentId}
+              highlightedArticle={highlightedArticle}
+            />
+          </div>
+          {/* Ad cada 15 artículos, solo para usuarios sin suscripción */}
+          {!hasSubscription && (i + 1) % AD_EVERY_N_ARTICLES === 0 && (
+            <AdBanner key={`ad-${i}`} />
+          )}
         </div>
       ))}
     </div>
