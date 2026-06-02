@@ -6,6 +6,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import NextTopLoader from "nextjs-toploader";
 import { ReactNode } from "react";
 import CookieBanner from "@/components/shared/cookie-banner";
+import { Analytics } from "@vercel/analytics/react";
 
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
@@ -17,7 +18,6 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       },
     });
   }
-
   return (
     <div>
       <Navbar isLoggedin={!!cu} user={user ?? null} />
@@ -26,8 +26,8 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       <CookieBanner />
       <NextTopLoader showSpinner={false} color="#FFFFFF" />
       <GoogleAnalytics gaId={process.env.GOOGLE_ANALYTICS_ID!} />
+      <Analytics />
     </div>
   );
 };
-
 export default WebsiteLayout;
