@@ -6,7 +6,6 @@ import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { initializePaddle, Paddle } from "@paddle/paddle-js";
 import { useEffect, useState } from "react";
-
 interface Sub {
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
@@ -14,7 +13,6 @@ interface Sub {
   isActive: boolean;
   userId: string;
 }
-
 interface Props {
   subscription?: Sub;
   sub_type: "user" | "company";
@@ -25,7 +23,6 @@ interface Props {
   priceId: string;
   userId: string;
 }
-
 function FeatureItem({
   included,
   name,
@@ -60,7 +57,6 @@ function FeatureItem({
     </div>
   );
 }
-
 export default function PricingComparison({
   subscription,
   price,
@@ -72,7 +68,6 @@ export default function PricingComparison({
 }: Props) {
   const router = useRouter();
   const [paddle, setPaddle] = useState<Paddle>();
-
   useEffect(() => {
     if (!paddleToken) return;
     initializePaddle({
@@ -82,7 +77,6 @@ export default function PricingComparison({
       .then((p) => setPaddle(p))
       .catch((err) => console.error("Paddle initialization error:", err));
   }, [paddleToken]);
-
   const freeFeatures = [
     { name: "Acceso ilimitado a documentos", included: true },
     { name: "Actualizaciones y noticias", included: true },
@@ -92,7 +86,6 @@ export default function PricingComparison({
     { name: "Guardar y resaltar artículos", included: false },
     { name: "Acceso multiusuario", included: false },
   ];
-
   const personalFeatures = [
     { name: "Acceso ilimitado a documentos", included: true },
     { name: "Actualizaciones y noticias", included: true },
@@ -102,7 +95,6 @@ export default function PricingComparison({
     { name: "Guardar y resaltar artículos", included: true },
     { name: "Acceso multiusuario", included: false },
   ];
-
   const empresarialFeatures = [
     { name: "Acceso ilimitado a documentos", included: true },
     { name: "Actualizaciones y noticias", included: true },
@@ -112,7 +104,6 @@ export default function PricingComparison({
     { name: "Guardar y resaltar artículos", included: true },
     { name: "Acceso multiusuario", included: true },
   ];
-
   const now = new Date();
   const isSubscribed =
     subscription?.isActive && new Date(subscription.currentPeriodEnd) > now;
@@ -135,17 +126,19 @@ export default function PricingComparison({
   };
 
   const personalButtonLabel = !isLoggedin
-    ? "Comenzar"
+    ? "Suscribirse"
     : isSubscribed
       ? "Suscrito"
       : !paddle
-        ? "Loading..."
+        ? "Cargando..."
         : "Suscribirse";
+
+  // Botón plan gratis: si está loggeado muestra "Listo", si no "Registrarse"
+  const freeButtonLabel = isLoggedin ? "Listo" : "Registrarse";
 
   return (
     <div className="container mx-auto py-[100px]">
       <div className="flex flex-col md:flex-row justify-center gap-10">
-
         {/* Free Plan */}
         <Card className="relative bg-white border-2 border-gray-200 w-full md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
           <CardHeader className="text-start pb-8">
@@ -160,9 +153,10 @@ export default function PricingComparison({
           <CardContent className="space-y-6">
             <Button
               className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-              onClick={() => router.push("/sign-up")}
+              disabled={isLoggedin}
+              onClick={() => !isLoggedin && router.push("/sign-up")}
             >
-              Registrarse
+              {freeButtonLabel}
             </Button>
             <div className="space-y-3">
               {freeFeatures.map((f, i) => (
@@ -171,7 +165,6 @@ export default function PricingComparison({
             </div>
           </CardContent>
         </Card>
-
         {/* Personal Plan */}
         <Card className="relative bg-white border-2 border-gray-200 w-full md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
           <CardHeader className="text-start pb-8">
@@ -186,7 +179,7 @@ export default function PricingComparison({
           <CardContent className="space-y-6">
             <Button
               className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-              disabled={isSubscribed || (!isLoggedin ? false : !paddle)}
+              disabled={isSubscribed || (isLoggedin && !paddle)}
               onClick={handlePersonalClick}
             >
               {personalButtonLabel}
@@ -198,7 +191,6 @@ export default function PricingComparison({
             </div>
           </CardContent>
         </Card>
-
         {/* Enterprise Plan */}
         <Card className="relative bg-primary border-2 w-full border-black/20 md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
           <CardHeader className="text-start pb-8">
@@ -221,7 +213,6 @@ export default function PricingComparison({
             </div>
           </CardContent>
         </Card>
-
       </div>
     </div>
   );
