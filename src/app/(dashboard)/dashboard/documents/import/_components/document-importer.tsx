@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { generateSlug } from "@/lib/slug";
 
-interface Article { articleNumber: number; content: string; contentPlainText: string; }
+interface Article { articleNumber: number; articleLabel?: string; content: string; contentPlainText: string; }
 interface Chapter { title: string; articles: Article[]; }
 interface Section { title: string; chapters: Chapter[]; }
 interface ParsedDocument { name: string; slug: string; short_description: string; law_number: string; categoryIds: string[]; sections: Section[]; }
@@ -21,19 +21,22 @@ function classifyLine(text: string): LineType {
   if (/^título\s+|^titulo\s+/i.test(t)) return "titulo";
   if (/^capítulo\s+|^capitulo\s+/i.test(t)) return "capitulo";
   if (/^sección\s+|^seccion\s+/i.test(t)) return "seccion";
-  if (/^artículo\s+\d+|^articulo\s+\d+/i.test(t)) return "articulo";
+  if (/^art[ií]culo\s+\d+[-]?[a-zA-Z]*/i.test(t)) return "articulo";
   return "content";
 }
 
-function getArticleNumber(text: string): number {
-  const match = text.match(/\d+/);
-  return match ? parseInt(match[0]) : 0;
+function getArticleInfo(text: string): { articleNumber: number; articleLabel: string } {
+  const match = text.match(/art[ií]culo\s+(\d+)(-[a-zA-Z]+)?/i);
+  if (!match) return { articleNumber: 0, articleLabel: "" };
+  const num = parseInt(match[1]);
+  const suffix = match[2] ? match[2].toUpperCase() : "";
+  const label = suffix ? `${num}${suffix}` : String(num);
+  return { articleNumber: num, articleLabel: label };
 }
 
 async function buildNumIdFormatMap(arrayBuffer: ArrayBuffer): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(arrayBuffer);
     const numberingFile = zip.file("word/numbering.xml");
@@ -85,7 +88,6 @@ async function convertDocxToHtml(arrayBuffer: ArrayBuffer, numIdFormatMap: Map<s
   );
   const numIdsInOrder: string[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(arrayBuffer);
     const docFile = zip.file("word/document.xml");
@@ -132,6 +134,7 @@ function parseDocument(htmlContent: string): Section[] {
   let currentContentHtml: string[] = [];
   let currentContentPlain: string[] = [];
   let articleNumber = 0;
+  let articleLabel = "";
   let lawStarted = false;
 
   function flushArticle() {
@@ -145,10 +148,11 @@ function parseDocument(htmlContent: string): Section[] {
       })();
       targetChapter.articles.push({
         articleNumber,
+        articleLabel: articleLabel !== String(articleNumber) ? articleLabel : undefined,
         content: currentContentHtml.join("") || "<p></p>",
         contentPlainText: currentContentPlain.join("\n").trim(),
       });
-      currentContentHtml = []; currentContentPlain = []; articleNumber = 0;
+      currentContentHtml = []; currentContentPlain = []; articleNumber = 0; articleLabel = "";
     }
   }
 
@@ -181,7 +185,9 @@ function parseDocument(htmlContent: string): Section[] {
       flushArticle();
       if (!currentSection) { currentSection = { title: "General", chapters: [] }; sections.push(currentSection); }
       if (!currentChapter) { currentChapter = { title: "General", articles: [] }; currentSection.chapters.push(currentChapter); }
-      articleNumber = getArticleNumber(text);
+      const info = getArticleInfo(text);
+      articleNumber = info.articleNumber;
+      articleLabel = info.articleLabel;
     } else if (articleNumber > 0) {
       if (tagName === "ol") {
         const items = el.querySelectorAll("li");
@@ -383,7 +389,7 @@ export default function DocumentImporter() {
                   </div>
                   {chapter.articles.slice(0, 1).map((article, ai) => (
                     <div key={ai} className="ml-4 mt-1 text-[12px] text-gray-500 truncate">
-                      Art. {article.articleNumber} — {article.contentPlainText.slice(0, 80)}...
+                      Art. {article.articleLabel ?? article.articleNumber} — {article.contentPlainText.slice(0, 80)}...
                     </div>
                   ))}
                 </div>
