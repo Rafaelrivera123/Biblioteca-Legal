@@ -17,6 +17,11 @@ export async function GET(
     }
   }
 
+  const articleOrderBy = [
+    { articleNumber: "asc" as const },
+    { articleLabel: "asc" as const },
+  ];
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sections: any[] = [];
@@ -49,9 +54,7 @@ export async function GET(
         include: {
           chapters: {
             include: {
-              articles: {
-                orderBy: { articleNumber: "asc" }, // ✅
-              },
+              articles: { orderBy: articleOrderBy },
             },
           },
         },
@@ -70,9 +73,7 @@ export async function GET(
             chapters: {
               where: { title: { contains: searchQuery, mode: "insensitive" } },
               include: {
-                articles: {
-                  orderBy: { articleNumber: "asc" }, // ✅
-                },
+                articles: { orderBy: articleOrderBy },
               },
             },
           },
@@ -117,7 +118,7 @@ export async function GET(
                       mode: "insensitive",
                     },
                   },
-                  orderBy: { articleNumber: "asc" }, // ✅
+                  orderBy: articleOrderBy,
                 },
               },
             },
@@ -142,9 +143,7 @@ export async function GET(
         include: {
           chapters: {
             include: {
-              articles: {
-                orderBy: { articleNumber: "asc" }, // ✅
-              },
+              articles: { orderBy: articleOrderBy },
             },
           },
         },
