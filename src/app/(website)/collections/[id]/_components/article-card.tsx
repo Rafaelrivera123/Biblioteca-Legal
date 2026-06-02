@@ -92,6 +92,9 @@ const ArticleCard = ({
 
   if (!data?.id) return null;
 
+  // Usa articleLabel si existe, si no usa articleNumber
+  const displayLabel = data.articleLabel ?? String(data.articleNumber);
+
   const handleArticleButtonClick = () => {
     if (!isLoggedin || !hasSubscription) {
       setShowSubscribeModal(true);
@@ -168,7 +171,7 @@ const ArticleCard = ({
                 onClick={handleArticleButtonClick}
                 disabled={isLoading || pending}
               >
-                Artículo {data.articleNumber}
+                Artículo {displayLabel}
               </Button>
 
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
