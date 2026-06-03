@@ -1,5 +1,5 @@
 "use client";
-import { useArticleSearchStore } from "@/store/collections";
+import { useActiveChapterStore, useArticleSearchStore } from "@/store/collections";
 import { Article } from "@prisma/client";
 import { memo, useEffect, useRef, useState } from "react";
 import ArticleCard from "./article-card";
@@ -13,6 +13,7 @@ interface Props {
   isLoggedin: boolean;
   hasSubscription: boolean;
   documentId: string;
+  chapterId: string;
 }
 
 function sortArticles(articles: Article[]): Article[] {
@@ -52,8 +53,9 @@ const AdBanner = () => {
   );
 };
 
-const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props) => {
+const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId, chapterId }: Props) => {
   const { query, setQuery } = useArticleSearchStore();
+  const { setActiveChapterId } = useActiveChapterStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
   const sortedData = sortArticles(data);
@@ -75,6 +77,7 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
             target.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
           setHighlightedArticle(searchNumber);
+          setActiveChapterId(chapterId);
           setTimeout(() => {
             setQuery("");
             setHighlightedArticle(null);
@@ -82,7 +85,7 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
         }
       }
     }
-  }, [query, sortedData, setQuery]);
+  }, [query, sortedData, setQuery, chapterId, setActiveChapterId]);
 
   return (
     <div className="space-y-5">
