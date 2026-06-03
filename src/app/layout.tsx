@@ -1,89 +1,97 @@
-import { prisma } from "@/lib/db";
-import { cn } from "@/lib/utils";
-import AppProvider from "@/provider/AppProvider";
-import type { Metadata } from "next";
-import { Poppins, Raleway } from "next/font/google";
-import NextTopLoader from "nextjs-toploader";
-import { Toaster } from "sonner";
-import Script from "next/script";
-import "./globals.css";
-
-const raleway = Raleway({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-raleway",
-});
-
-const poppins = Poppins({
-  weight: ["300", "400", "500", "600", "700", "800"],
-  subsets: ["latin"],
-  variable: "--font-poppins",
-});
-
-export async function generateMetadata(): Promise<Metadata> {
-  const data = await prisma.setting.findFirst();
-  return {
-    title: {
-      default: "Biblioteca Legal",
-      template: `%s - Biblioteca Legal`,
-    },
-    description:
-      data?.description ??
-      "Biblioteca Legal provides expert legal document services, including drafting, reviewing, and managing legal paperwork with accuracy and confidentiality.",
-    keywords: data?.keywords ?? [
-      "legal document services",
-      "legal drafting",
-      "contract creation",
-      "document review",
-      "legal paperwork",
-      "business legal documents",
-      "remote legal assistance",
-      "legal templates",
-      "freelance legal support",
-      "online legal document services",
-      "legal compliance documentation",
-      "legal writing services",
-      "privacy policy drafting",
-      "terms and conditions generator",
-    ],
-    openGraph: {
-      images: [
-        "https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp",
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [
-        "https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp",
-      ],
-    },
-    // ✅ Meta tag para verificación de Google AdSense
-    other: {
-      "google-adsense-account": "ca-pub-5685390714020326",
-    },
-  };
-}
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <head>
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5685390714020326"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-      </head>
-      <body className={cn(raleway.className, poppins.variable, "")}>
-        <AppProvider>{children}</AppProvider>
-        <Toaster richColors position="bottom-right" />
-        <NextTopLoader showSpinner={false} color="#1E2A38" />
-      </body>
-    </html>
-  );
+{
+  "name": "rafarivera123_fullstack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate && prisma db push --accept-data-loss",
+    "email": "email dev --dir src/email-templates"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@auth/prisma-adapter": "^2.9.1",
+    "@edgestore/react": "^0.5.2",
+    "@edgestore/server": "^0.5.2",
+    "@hookform/resolvers": "^5.0.1",
+    "@next/third-parties": "^15.3.3",
+    "@paddle/paddle-js": "^1.4.1",
+    "@paddle/paddle-node-sdk": "^2.7.2",
+    "@prisma/client": "^6.8.2",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.15",
+    "@radix-ui/react-popover": "^1.1.14",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@react-email/components": "^0.0.41",
+    "@tanstack/react-query": "^5.77.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tiptap/extension-highlight": "^2.12.0",
+    "@tiptap/extension-image": "^2.12.0",
+    "@tiptap/extension-text-align": "^2.12.0",
+    "@tiptap/react": "^2.12.0",
+    "@tiptap/starter-kit": "^2.12.0",
+    "@vercel/analytics": "^1.3.2",
+    "@vercel/speed-insights": "^1.2.0",
+    "bcryptjs": "^3.0.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^3.6.0",
+    "dompurify": "^3.2.6",
+    "framer-motion": "^12.12.2",
+    "fuse.js": "^7.1.0",
+    "js-cookie": "^3.0.5",
+    "jsdom": "^26.1.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.511.0",
+    "mammoth": "^1.6.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.45",
+    "next": "14.2.29",
+    "next-auth": "^5.0.0-beta.28",
+    "nextjs-toploader": "^3.8.16",
+    "openai": "^4.103.0",
+    "react": "^18",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "^18",
+    "react-hook-form": "^7.56.4",
+    "react-icons": "^5.5.0",
+    "react-intersection-observer": "^9.16.0",
+    "resend": "^4.5.1",
+    "sharp": "^0.34.2",
+    "sonner": "^2.0.3",
+    "striptags": "^3.2.0",
+    "tailwind-merge": "^3.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "tiptap-extension-resize-image": "^1.2.2",
+    "vaul": "^1.1.2",
+    "xss": "^1.0.15",
+    "zod": "^3.25.49",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@tanstack/eslint-plugin-query": "^5.74.7",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.29",
+    "postcss": "^8",
+    "prisma": "^6.8.2",
+    "react-email": "4.0.15",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
 }
