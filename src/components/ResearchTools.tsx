@@ -1,11 +1,8 @@
 "use client";
-
 import useCollectionSearchStore from "@/store/collections";
-import { Gavel, Search } from "lucide-react";
+import { BookOpen, Gavel, Scale, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { GiWhiteBook } from "react-icons/gi";
-import { VscLaw } from "react-icons/vsc";
 import { Input } from "./ui/input";
 
 type TabKey = "legislation" | "jurisprudence" | "doctrine";
@@ -72,7 +69,7 @@ export default function ResearchTools() {
   return (
     <section className="py-16 px-4 md:py-24">
       <div className="mx-auto max-w-4xl text-center">
-        <h2 className="my-8 text-2xl font-bold text-[#D4AF37] ">
+        <h2 className="my-8 text-2xl font-bold text-[#D4AF37]">
           Herramientas de Investigación
         </h2>
         <h3 className="my-4 text-2xl font-bold text-[#1E2A38] md:text-[40px]">
@@ -82,8 +79,7 @@ export default function ResearchTools() {
           Busca en nuestra extensa base de datos de recursos legales para
           encontrar la información que necesitas.
         </p>
-
-        <div className="relative mx-auto max-w-3xl ">
+        <div className="relative mx-auto max-w-3xl">
           <div className="relative z-10 overflow-hidden rounded-xl bg-white p-6 shadow-xl">
             <div className="mb-6 flex justify-between border-b overflow-x-auto whitespace-nowrap">
               <button
@@ -105,23 +101,21 @@ export default function ResearchTools() {
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <VscLaw className="h-8 w-8" />
+                <Scale className="h-8 w-8" />
                 Jurisprudencia
               </button>
               <button
                 onClick={() => setActiveTab("doctrine")}
-                className={`flex  items-center gap-2 border-b-2 px-4 py-2 text-lg font-medium transition-colors md:text-base ${
+                className={`flex items-center gap-2 border-b-2 px-4 py-2 text-lg font-medium transition-colors md:text-base ${
                   activeTab === "doctrine"
                     ? "border-[#0D99FF] text-[#0D99FF]"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <GiWhiteBook className="h-8 w-8" />
+                <BookOpen className="h-8 w-8" />
                 Doctrina
               </button>
             </div>
-
-            {/* Tab Content */}
             <div className="py-4">{tabContent[activeTab]}</div>
           </div>
         </div>
