@@ -2,7 +2,7 @@
 import { useActiveChapterStore, useArticleSearchStore } from "@/store/collections";
 import { Article, UserArticleMeta } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ArticleCard from "./article-card";
 
 const ADSENSE_CLIENT = "ca-pub-5685390714020326";
@@ -58,9 +58,9 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId, chapter
   const { setActiveChapterId } = useActiveChapterStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const sortedData = sortArticles(data);
 
-  const articleIds = sortedData.map((a) => a.id);
+  const sortedData = useMemo(() => sortArticles(data), [data]);
+  const articleIds = useMemo(() => sortedData.map((a) => a.id), [sortedData]);
 
   const { data: metaMapRes, isLoading: isMetaLoading } = useQuery<{
     success: boolean;
