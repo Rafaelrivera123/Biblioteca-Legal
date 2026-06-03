@@ -8,7 +8,7 @@ import useOutsideClick from "@/hooks/useOutsideClick";
 import { getBackgroundClass } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 import { Article, UserArticleMeta } from "@prisma/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bookmark, MessageSquare } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -26,12 +26,8 @@ interface Props {
   hasSubscription: boolean;
   documentId: string;
   highlightedArticle?: number | null;
-}
-
-interface ApiRes {
-  success: boolean;
-  message: string;
-  data: UserArticleMeta | null;
+  initialMeta: UserArticleMeta | null;
+  isMetaLoading: boolean;
 }
 
 const ArticleCard = ({
@@ -40,6 +36,8 @@ const ArticleCard = ({
   hasSubscription,
   documentId,
   highlightedArticle,
+  initialMeta,
+  isMetaLoading,
 }: Props) => {
   const [pending, startTransition] = useTransition();
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -48,7 +46,6 @@ const ArticleCard = ({
   const [comment, setComment] = useState("");
   const [bookmarked, setBookmarked] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-
   const cardRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -56,34 +53,24 @@ const ArticleCard = ({
   // Bloquear copy/paste para usuarios sin suscripción
   useEffect(() => {
     if (hasSubscription) return;
-
     const blockCopy = (e: ClipboardEvent) => {
       e.preventDefault();
     };
-
     document.addEventListener("copy", blockCopy);
     document.addEventListener("cut", blockCopy);
-
     return () => {
       document.removeEventListener("copy", blockCopy);
       document.removeEventListener("cut", blockCopy);
     };
   }, [hasSubscription]);
 
-  const { data: articleMeta, isLoading } = useQuery<ApiRes>({
-    queryKey: ["meta", data?.id ?? ""],
-    queryFn: () =>
-      fetch(`/api/article-meta-data/${data?.id}`).then((res) => res.json()),
-    enabled: hasSubscription && !!data?.id,
-  });
-
   useEffect(() => {
-    if (articleMeta?.success && articleMeta?.data) {
-      setSelectedColor(articleMeta.data.selectedColor ?? "");
-      setComment(articleMeta.data.comment ?? "");
-      setBookmarked(articleMeta.data.isBookmarked);
+    if (initialMeta) {
+      setSelectedColor(initialMeta.selectedColor ?? "");
+      setComment(initialMeta.comment ?? "");
+      setBookmarked(initialMeta.isBookmarked);
     }
-  }, [articleMeta]);
+  }, [initialMeta]);
 
   useOutsideClick(cardRef, () => {
     setIsColorPickerOpen(false);
@@ -92,7 +79,6 @@ const ArticleCard = ({
 
   if (!data?.id) return null;
 
-  // Usa articleLabel si existe, si no usa articleNumber
   const displayLabel = data.articleLabel ?? String(data.articleNumber);
 
   const handleArticleButtonClick = () => {
@@ -103,11 +89,16 @@ const ArticleCard = ({
     setIsColorPickerOpen(true);
   };
 
+  const invalidateMeta = () => {
+    // Invalida el batch del chapter para que se refresque
+    queryClient.invalidateQueries({ queryKey: ["meta-batch"] });
+  };
+
   const onColorUpdate = (color: string) => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, selectedColor: color, documentId }).then((res) => {
         if (!res.success) { toast.error(res.message); return; }
-        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        invalidateMeta();
         setIsColorPickerOpen(false);
       });
     });
@@ -117,7 +108,7 @@ const ArticleCard = ({
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, isBookmarked: !bookmarked, documentId }).then((res) => {
         if (!res.success) { toast.error(res.message); return; }
-        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        invalidateMeta();
         setIsColorPickerOpen(false);
       });
     });
@@ -127,7 +118,7 @@ const ArticleCard = ({
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment, documentId }).then((res) => {
         if (!res.success) { toast.error(res.message); return; }
-        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        invalidateMeta();
         setIsCommentOpen(false);
         setIsColorPickerOpen(false);
       });
@@ -138,7 +129,7 @@ const ArticleCard = ({
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment: "", documentId }).then((res) => {
         if (!res.success) { toast.error(res.message); return; }
-        queryClient.invalidateQueries({ queryKey: ["meta", data.id] });
+        invalidateMeta();
         setIsCommentOpen(false);
         setIsColorPickerOpen(false);
       });
@@ -169,31 +160,29 @@ const ArticleCard = ({
               <Button
                 className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
                 onClick={handleArticleButtonClick}
-                disabled={isLoading || pending}
+                disabled={isMetaLoading || pending}
               >
                 Artículo {displayLabel}
               </Button>
-
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
                 <div className="flex items-center gap-x-3">
-                  {articleMeta?.data?.isBookmarked && (
-                    <Button size="icon" variant="outline" className="text-primary border-primary/50" onClick={onBookmark} disabled={pending || isLoading}>
+                  {initialMeta?.isBookmarked && (
+                    <Button size="icon" variant="outline" className="text-primary border-primary/50" onClick={onBookmark} disabled={pending || isMetaLoading}>
                       <Bookmark className="fill-[#1E2A38]" />
                     </Button>
                   )}
-                  {articleMeta?.data?.comment && (
+                  {initialMeta?.comment && (
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button size="icon" variant="outline" className="text-primary border-primary/50">
                           <MessageSquare className="fill-[#1E2A38]" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-fit">{articleMeta.data.comment}</PopoverContent>
+                      <PopoverContent className="w-fit">{initialMeta.comment}</PopoverContent>
                     </Popover>
                   )}
                 </div>
               )}
-
               <AnimatePresence>
                 {isColorPickerOpen && hasSubscription && (
                   <ColorPicker
@@ -205,11 +194,10 @@ const ArticleCard = ({
                   />
                 )}
               </AnimatePresence>
-
               <AnimatePresence>
                 {isCommentOpen && hasSubscription && (
                   <CommentPopover
-                    loading={pending || isLoading}
+                    loading={pending || isMetaLoading}
                     comment={comment}
                     setComment={setComment}
                     onDelete={onCommentDelete}
@@ -220,7 +208,6 @@ const ArticleCard = ({
               </AnimatePresence>
             </div>
           </CardHeader>
-
           <CardContent>
             <ContentViewer content={data.content} />
           </CardContent>
