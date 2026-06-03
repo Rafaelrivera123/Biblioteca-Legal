@@ -1,7 +1,6 @@
 "use client";
 import { useActiveChapterStore, useArticleSearchStore } from "@/store/collections";
 import { Article, UserArticleMeta } from "@prisma/client";
-import { useQuery } from "@tanstack/react-query";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ArticleCard from "./article-card";
 
@@ -15,6 +14,8 @@ interface Props {
   hasSubscription: boolean;
   documentId: string;
   chapterId: string;
+  metaMap: Record<string, UserArticleMeta>;
+  isMetaLoading: boolean;
 }
 
 function sortArticles(articles: Article[]): Article[] {
@@ -39,6 +40,7 @@ const AdBanner = () => {
       // ignore
     }
   }, []);
+
   return (
     <div className="my-4 flex justify-center">
       <ins
@@ -53,30 +55,20 @@ const AdBanner = () => {
   );
 };
 
-const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId, chapterId }: Props) => {
+const ArticleWrapper = ({
+  data,
+  isLoggedin,
+  hasSubscription,
+  documentId,
+  chapterId,
+  metaMap,
+  isMetaLoading,
+}: Props) => {
   const { query, setQuery } = useArticleSearchStore();
   const { setActiveChapterId } = useActiveChapterStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
-
   const sortedData = useMemo(() => sortArticles(data), [data]);
-  const articleIds = useMemo(() => sortedData.map((a) => a.id), [sortedData]);
-
-  const { data: metaMapRes, isLoading: isMetaLoading } = useQuery<{
-    success: boolean;
-    data: Record<string, UserArticleMeta>;
-  }>({
-    queryKey: ["meta-batch", chapterId],
-    queryFn: () =>
-      fetch("/api/article-meta-data/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleIds }),
-      }).then((res) => res.json()),
-    enabled: hasSubscription && articleIds.length > 0,
-  });
-
-  const metaMap = metaMapRes?.data ?? {};
 
   useEffect(() => {
     if (!query) return;
