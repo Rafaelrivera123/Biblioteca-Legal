@@ -1,6 +1,5 @@
-// store/searchStore.ts
 import { create } from "zustand";
-// types/store.ts
+
 export interface SearchState {
   query: string;
   category: string;
@@ -29,4 +28,14 @@ export interface ArticleSearchState {
 export const useArticleSearchStore = create<ArticleSearchState>((set) => ({
   query: "",
   setQuery: (query) => set({ query }),
+}));
+
+export interface ActiveChapterState {
+  activeChapterId: string | null;
+  setActiveChapterId: (id: string | null) => void;
+}
+
+export const useActiveChapterStore = create<ActiveChapterState>((set) => ({
+  activeChapterId: null,
+  setActiveChapterId: (id) => set({ activeChapterId: id }),
 }));
