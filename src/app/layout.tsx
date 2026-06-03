@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import AppProvider from "@/provider/AppProvider";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Raleway } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
@@ -20,6 +20,13 @@ const poppins = Poppins({
   subsets: ["latin"],
   variable: "--font-poppins",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const data = await prisma.setting.findFirst();
