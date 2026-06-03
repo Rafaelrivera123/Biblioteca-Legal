@@ -31,8 +31,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Convertir array a un objeto { [articleId]: meta }
-    const metaMap: Record<string, typeof metas[0]> = {};
+    const metaMap: Record<string, (typeof metas)[0]> = {};
     for (const meta of metas) {
       metaMap[meta.articleId] = meta;
     }
