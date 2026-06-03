@@ -29,7 +29,6 @@ const ArticleContainer = ({
   hasSubscription,
   sections,
 }: Props) => {
-  // Un solo array con todos los articleIds del documento
   const allArticleIds = useMemo(
     () =>
       sections.flatMap((section) =>
@@ -40,7 +39,6 @@ const ArticleContainer = ({
     [sections]
   );
 
-  // Un solo fetch para todo el documento en lugar de uno por chapter
   const { data: metaMapRes, isLoading: isMetaLoading } = useQuery<{
     success: boolean;
     data: Record<string, UserArticleMeta>;
@@ -84,4 +82,22 @@ const ArticleContainer = ({
                       <ArticleWrapper
                         data={chapter.articles}
                         isLoggedin={isLoggedin}
-                        hasSubscr
+                        hasSubscription={hasSubscription}
+                        documentId={documentId}
+                        chapterId={chapter.id}
+                        metaMap={metaMap}
+                        isMetaLoading={isMetaLoading}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ArticleContainer;
