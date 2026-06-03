@@ -68,7 +68,9 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
       if (targetIndex !== -1) {
         const target = articleRefs.current[targetIndex];
         if (target) {
-          const yOffset = -80;
+          const elementHeight = target.getBoundingClientRect().height;
+          const windowHeight = window.innerHeight;
+          const yOffset = -(windowHeight / 2) + elementHeight / 2;
           const y =
             target.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
@@ -100,7 +102,6 @@ const ArticleWrapper = ({ data, isLoggedin, hasSubscription, documentId }: Props
               highlightedArticle={highlightedArticle}
             />
           </div>
-          {/* Ad cada 15 artículos, solo para usuarios sin suscripción */}
           {!hasSubscription && (i + 1) % AD_EVERY_N_ARTICLES === 0 && (
             <AdBanner key={`ad-${i}`} />
           )}
