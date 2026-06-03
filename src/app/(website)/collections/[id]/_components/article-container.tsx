@@ -1,6 +1,7 @@
 "use client";
-import { Prisma } from "@prisma/client";
-import { useEffect } from "react";
+import { Prisma, UserArticleMeta } from "@prisma/client";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 import ArticleHeader from "./article-header";
 import ArticleWrapper from "./article-wrapper";
 import DocumentIndex from "./document-index";
@@ -22,7 +23,40 @@ interface Props {
   sections: FullSectionResponse[];
 }
 
-const ArticleContainer = ({ documentId, isLoggedin, hasSubscription, sections }: Props) => {
+const ArticleContainer = ({
+  documentId,
+  isLoggedin,
+  hasSubscription,
+  sections,
+}: Props) => {
+  // Un solo array con todos los articleIds del documento
+  const allArticleIds = useMemo(
+    () =>
+      sections.flatMap((section) =>
+        section.chapters.flatMap((chapter) =>
+          chapter.articles.map((a) => a.id)
+        )
+      ),
+    [sections]
+  );
+
+  // Un solo fetch para todo el documento en lugar de uno por chapter
+  const { data: metaMapRes, isLoading: isMetaLoading } = useQuery<{
+    success: boolean;
+    data: Record<string, UserArticleMeta>;
+  }>({
+    queryKey: ["meta-batch", documentId],
+    queryFn: () =>
+      fetch("/api/article-meta-data/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleIds: allArticleIds }),
+      }).then((res) => res.json()),
+    enabled: hasSubscription && allArticleIds.length > 0,
+  });
+
+  const metaMap = metaMapRes?.data ?? {};
+
   useEffect(() => {
     if (documentId) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -50,20 +84,4 @@ const ArticleContainer = ({ documentId, isLoggedin, hasSubscription, sections }:
                       <ArticleWrapper
                         data={chapter.articles}
                         isLoggedin={isLoggedin}
-                        hasSubscription={hasSubscription}
-                        documentId={documentId}
-                        chapterId={chapter.id}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ArticleContainer;
+                        hasSubscr
