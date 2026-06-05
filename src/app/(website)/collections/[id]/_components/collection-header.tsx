@@ -16,6 +16,7 @@ interface apiProps {
   message: string;
   data: WatchLists;
 }
+
 interface Props {
   document: Document;
   hasFullAccess: boolean;
@@ -89,6 +90,13 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
         <h1 className="font-bold text-[30px] md:text-[35px] lg:text-[40px] leading-[120%] text-center">
           {document.name}
         </h1>
+
+        {document.short_description && (
+          <p className="text-muted-foreground text-center text-sm md:text-base max-w-[700px] leading-relaxed">
+            {document.short_description}
+          </p>
+        )}
+
         {hasFullAccess && !isScrolled && (
           <div className="w-full max-w-[600px] mx-auto flex flex-col items-center gap-y-3">
             <Input
