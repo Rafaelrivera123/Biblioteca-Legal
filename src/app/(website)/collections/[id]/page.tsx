@@ -19,27 +19,50 @@ export async function generateMetadata({
   params: { id: string };
 }): Promise<Metadata> {
   const document = await getDocument(params.id);
-
   if (!document) {
     return { title: "Documento no encontrado | Biblioteca Legal HN" };
   }
 
+  const name = document.name.trim();
+  const nameWithHonduras = name.toLowerCase().includes("honduras")
+    ? name
+    : `${name} de Honduras`;
+
+  const description = document.short_description
+    ? `${document.short_description.trim()} Consulta el texto completo en Biblioteca Legal HN.`
+    : `Consulta el texto completo del ${nameWithHonduras} actualizado. Leyes y códigos de Honduras accesibles para abogados, estudiantes y ciudadanos.`;
+
+  const url = `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`;
+
   return {
-    title: `${document.name} | Biblioteca Legal HN`,
-    description: document.short_description
-      ? `${document.short_description} Consulta el texto completo de ${document.name} en Biblioteca Legal HN.`
-      : `Consulta el texto completo de ${document.name} en Biblioteca Legal HN. Leyes y códigos de Honduras actualizados.`,
+    title: `${nameWithHonduras} | Biblioteca Legal HN`,
+    description,
+    keywords: [
+      nameWithHonduras,
+      name,
+      `${name} Honduras`,
+      `${name} texto completo`,
+      `${name} actualizado`,
+      "leyes Honduras",
+      "códigos legales Honduras",
+      "legislación hondureña",
+      "Biblioteca Legal HN",
+    ],
     openGraph: {
-      title: `${document.name} | Biblioteca Legal HN`,
-      description:
-        document.short_description || `Texto completo de ${document.name}`,
-      url: `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`,
+      title: `${nameWithHonduras} | Biblioteca Legal HN`,
+      description: document.short_description?.trim() || `Texto completo del ${nameWithHonduras}`,
+      url,
       siteName: "Biblioteca Legal HN",
       locale: "es_HN",
       type: "article",
     },
+    twitter: {
+      card: "summary_large_image",
+      title: `${nameWithHonduras} | Biblioteca Legal HN`,
+      description: document.short_description?.trim() || `Texto completo del ${nameWithHonduras}`,
+    },
     alternates: {
-      canonical: `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`,
+      canonical: url,
     },
   };
 }
@@ -47,7 +70,6 @@ export async function generateMetadata({
 const Page = async ({ params }: { params: { id: string } }) => {
   const cu = await auth();
   const isLoggedin = !!cu;
-
   const document = await getDocument(params.id);
   if (!document) notFound();
 
@@ -70,7 +92,6 @@ const Page = async ({ params }: { params: { id: string } }) => {
         },
       },
     });
-
     if (user?.role === "admin") {
       hasSubscription = true;
     } else {
@@ -95,8 +116,38 @@ const Page = async ({ params }: { params: { id: string } }) => {
     orderBy: { createdAt: "asc" },
   });
 
+  const name = document.name.trim();
+  const nameWithHonduras = name.toLowerCase().includes("honduras")
+    ? name
+    : `${name} de Honduras`;
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Legislation",
+            name: nameWithHonduras,
+            alternateName: name,
+            description:
+              document.short_description?.trim() ||
+              `Texto completo del ${nameWithHonduras}`,
+            url: `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`,
+            inLanguage: "es-HN",
+            jurisdictionOf: {
+              "@type": "AdministrativeArea",
+              name: "Honduras",
+            },
+            publisher: {
+              "@type": "Organization",
+              name: "Biblioteca Legal HN",
+              url: "https://www.bibliotecalegalhn.com",
+            },
+          }),
+        }}
+      />
       <CollectionHeader
         document={document}
         hasFullAccess={true}
