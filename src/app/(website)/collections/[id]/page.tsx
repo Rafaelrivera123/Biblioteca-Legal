@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
+import LegalChatbot from "./_components/legal-chatbot";
 
 async function getDocument(id: string) {
   return prisma.document.findFirst({
@@ -22,18 +23,14 @@ export async function generateMetadata({
   if (!document) {
     return { title: "Documento no encontrado | Biblioteca Legal HN" };
   }
-
   const name = document.name.trim();
   const nameWithHonduras = name.toLowerCase().includes("honduras")
     ? name
     : `${name} de Honduras`;
-
   const description = document.short_description
     ? `${document.short_description.trim()} Consulta el texto completo en Biblioteca Legal HN.`
     : `Consulta el texto completo del ${nameWithHonduras} actualizado. Leyes y códigos de Honduras accesibles para abogados, estudiantes y ciudadanos.`;
-
   const url = `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`;
-
   return {
     title: `${nameWithHonduras} | Biblioteca Legal HN`,
     description,
@@ -158,6 +155,12 @@ const Page = async ({ params }: { params: { id: string } }) => {
         isLoggedin={isLoggedin}
         hasSubscription={hasSubscription}
         sections={sections}
+      />
+      <LegalChatbot
+        documentId={document.id}
+        documentName={document.name.trim()}
+        isLoggedin={isLoggedin}
+        hasSubscription={hasSubscription}
       />
     </div>
   );
