@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const BATCH_SIZE = 40;
-const PARALLEL_SIZE = 10;
+const BATCH_SIZE = 30;
+const PARALLEL_SIZE = 3;
 
 async function generateSummary(articleText: string, articleLabel: string): Promise<string> {
   const res = await fetch(GROQ_API_URL, {
@@ -73,22 +73,41 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const documentId: string | undefined = body.documentId;
 
-  const articles = await prisma.article.findMany({
-    where: {
-      aiSummary: null,
-      contentPlainText: { not: "" },
-      ...(documentId
-        ? { chapter: { section: { documentId } } }
-        : {}),
-    },
-    select: {
-      id: true,
-      articleNumber: true,
-      articleLabel: true,
-      contentPlainText: true,
-    },
-    take: BATCH_SIZE,
-  });
+  // Si se pasa documentId específico, filtra por ese documento
+  // Si no, ordena por viewCount del documento para priorizar los más visitados
+  const articles = documentId
+    ? await prisma.article.findMany({
+        where: {
+          aiSummary: null,
+          contentPlainText: { not: "" },
+          chapter: { section: { documentId } },
+        },
+        select: {
+          id: true,
+          articleNumber: true,
+          articleLabel: true,
+          contentPlainText: true,
+        },
+        take: BATCH_SIZE,
+      })
+    : await prisma.$queryRaw
+        {
+          id: string;
+          articleNumber: number;
+          articleLabel: string | null;
+          contentPlainText: string;
+        }[]
+      >`
+        SELECT a.id, a."articleNumber", a."articleLabel", a."contentPlainText"
+        FROM "Article" a
+        JOIN "Chapter" c ON a."chapterId" = c.id
+        JOIN "Section" s ON c."sectionId" = s.id
+        JOIN "Document" d ON s."documentId" = d.id
+        WHERE a."aiSummary" IS NULL
+        AND a."contentPlainText" != ''
+        ORDER BY d."viewCount" DESC
+        LIMIT ${BATCH_SIZE}
+      `;
 
   if (articles.length === 0) {
     return NextResponse.json({ message: "No hay artículos pendientes", generated: 0 });
@@ -97,7 +116,6 @@ export async function POST(req: NextRequest) {
   let generated = 0;
   let failed = 0;
 
-  // Procesar en grupos paralelos de PARALLEL_SIZE
   for (let i = 0; i < articles.length; i += PARALLEL_SIZE) {
     const chunk = articles.slice(i, i + PARALLEL_SIZE);
     const results = await Promise.all(chunk.map(processArticle));
@@ -105,6 +123,9 @@ export async function POST(req: NextRequest) {
       if (r.success) generated++;
       else failed++;
     });
+    if (i + PARALLEL_SIZE < articles.length) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
   }
 
   return NextResponse.json({
