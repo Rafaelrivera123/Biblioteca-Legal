@@ -5,8 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,47 +64,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
     }
 
-    const contents = [
+    const messages = [
       {
-        role: "user",
-        parts: [
-          {
-            text: `Eres un asistente legal especializado en legislación hondureña. El usuario está consultando el documento: "${documentName}". Responde de forma clara, concisa y en español. Limita tus respuestas a temas legales relacionados con este documento y la legislación de Honduras. Si te preguntan algo fuera de este contexto, redirige amablemente al tema legal.`,
-          },
-        ],
-      },
-      {
-        role: "model",
-        parts: [{ text: "Entendido, estoy listo para ayudarte con preguntas sobre este documento legal." }],
+        role: "system",
+        content: `Eres un asistente legal especializado en legislación hondureña. El usuario está consultando el documento: "${documentName}". Responde de forma clara, concisa y en español. Limita tus respuestas a temas legales relacionados con este documento y la legislación de Honduras. Si te preguntan algo fuera de este contexto, redirige amablemente al tema legal.`,
       },
       ...history.slice(-8).map((h) => ({
-        role: h.role,
-        parts: [{ text: h.text }],
+        role: h.role === "model" ? "assistant" : "user",
+        content: h.text,
       })),
-      { role: "user", parts: [{ text: message }] },
+      { role: "user", content: message },
     ];
 
-    const geminiRes = await fetch(
-      `${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { maxOutputTokens: 500, temperature: 0.3 },
-        }),
-      }
-    );
+    const groqRes = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        max_tokens: 500,
+        temperature: 0.3,
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("[chat/legal] Gemini error:", errText);
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      console.error("[chat/legal] Groq error:", errText);
       return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
     }
 
-    const geminiData = await geminiRes.json();
-    const reply =
-      geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
