@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/ai/generate-summaries",
-      "schedule": "0 2 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
