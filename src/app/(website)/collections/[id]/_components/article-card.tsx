@@ -16,6 +16,7 @@ import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import ColorPicker from "./tool/color-picker";
 import CommentPopover from "./tool/comment-provider";
+
 const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
 
 interface LockedSummaryProps {
@@ -214,7 +215,7 @@ const ArticleCard = ({
                     : <ChevronDown className="w-3 h-3" />}
                 </Button>
               )}
-              {/* Badge para no suscriptores */}
+              {/* Badge clickeable para no suscriptores */}
               {data.aiSummary && !hasSubscription && (
                 <button
                   onClick={() => setShowSubscribeModal(true)}
@@ -269,7 +270,7 @@ const ArticleCard = ({
             </div>
           </CardHeader>
           <CardContent>
-            {/* Resumen IA para suscriptores */}
+            {/* Resumen IA expandible para suscriptores */}
             <AnimatePresence>
               {showSummary && hasSubscription && data.aiSummary && (
                 <motion.div
@@ -294,3 +295,14 @@ const ArticleCard = ({
               <LockedSummary
                 aiSummary={data.aiSummary}
                 onUnlock={() => setShowSubscribeModal(true)}
+              />
+            )}
+            <ContentViewer content={data.content} />
+          </CardContent>
+        </Card>
+      </motion.div>
+    </>
+  );
+};
+
+export default memo(ArticleCard);
