@@ -10,15 +10,13 @@ import { cn } from "@/lib/utils";
 import { Article, UserArticleMeta } from "@prisma/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, MessageSquare, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Bookmark, MessageSquare, Sparkles, ChevronDown, ChevronUp, Crown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import ColorPicker from "./tool/color-picker";
 import CommentPopover from "./tool/comment-provider";
-
 const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
-
 interface Props {
   data: Article;
   index: number;
@@ -29,7 +27,6 @@ interface Props {
   initialMeta: UserArticleMeta | null;
   isMetaLoading: boolean;
 }
-
 const ArticleCard = ({
   data,
   isLoggedin,
@@ -50,7 +47,6 @@ const ArticleCard = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
-
   useEffect(() => {
     if (hasSubscription) return;
     const blockCopy = (e: ClipboardEvent) => { e.preventDefault(); };
@@ -61,7 +57,6 @@ const ArticleCard = ({
       document.removeEventListener("cut", blockCopy);
     };
   }, [hasSubscription]);
-
   useEffect(() => {
     if (initialMeta) {
       setSelectedColor(initialMeta.selectedColor ?? "");
@@ -69,16 +64,12 @@ const ArticleCard = ({
       setBookmarked(initialMeta.isBookmarked);
     }
   }, [initialMeta]);
-
   useOutsideClick(cardRef, () => {
     setIsColorPickerOpen(false);
     setIsCommentOpen(false);
   });
-
   if (!data?.id) return null;
-
   const displayLabel = data.articleLabel ?? String(data.articleNumber);
-
   const handleArticleButtonClick = () => {
     if (!isLoggedin || !hasSubscription) {
       setShowSubscribeModal(true);
@@ -86,7 +77,6 @@ const ArticleCard = ({
     }
     setIsColorPickerOpen(true);
   };
-
   const handleSummaryClick = () => {
     if (!isLoggedin || !hasSubscription) {
       setShowSubscribeModal(true);
@@ -94,11 +84,9 @@ const ArticleCard = ({
     }
     setShowSummary((prev) => !prev);
   };
-
   const invalidateMeta = () => {
     queryClient.invalidateQueries({ queryKey: ["meta-batch"] });
   };
-
   const onColorUpdate = (color: string) => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, selectedColor: color, documentId }).then((res) => {
@@ -108,7 +96,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onBookmark = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, isBookmarked: !bookmarked, documentId }).then((res) => {
@@ -118,7 +105,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onCommentSubmit = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment, documentId }).then((res) => {
@@ -129,7 +115,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onCommentDelete = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment: "", documentId }).then((res) => {
@@ -140,6 +125,35 @@ const ArticleCard = ({
       });
     });
   };
+
+  // Resumen bloqueado para no suscriptores
+  const LockedSummary = () => (
+    <div className="mb-4 relative">
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+        <div className="flex items-center gap-1 mb-1">
+          <Sparkles className="w-3 h-3 text-purple-600" />
+          <span className="text-xs font-semibold text-purple-700">Resumen generado por IA</span>
+        </div>
+        {/* Texto cortado con blur */}
+        <div className="relative">
+          <p className="text-sm text-purple-900 leading-relaxed line-clamp-2 select-none">
+            {data.aiSummary}
+          </p>
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-purple-50 to-transparent" />
+        </div>
+      </div>
+      {/* CTA superpuesto */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <button
+          onClick={() => setShowSubscribeModal(true)}
+          className="flex items-center gap-2 bg-white border border-purple-300 shadow-sm rounded-full px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-50 transition-colors"
+        >
+          <Crown className="w-3 h-3" />
+          Ver resumen completo
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -169,9 +183,8 @@ const ArticleCard = ({
               >
                 Artículo {displayLabel}
               </Button>
-
-              {/* Botón resumen IA — solo si el artículo tiene resumen */}
-              {data.aiSummary && (
+              {/* Botón resumen IA — solo si el artículo tiene resumen y el usuario es suscriptor */}
+              {data.aiSummary && hasSubscription && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -180,12 +193,21 @@ const ArticleCard = ({
                 >
                   <Sparkles className="w-3 h-3" />
                   Resumen IA
-                  {showSummary && hasSubscription
+                  {showSummary
                     ? <ChevronUp className="w-3 h-3" />
                     : <ChevronDown className="w-3 h-3" />}
                 </Button>
               )}
-
+              {/* Badge de resumen disponible para no suscriptores */}
+              {data.aiSummary && !hasSubscription && (
+                <button
+                  onClick={() => setShowSubscribeModal(true)}
+                  className="flex items-center gap-1 text-xs border border-purple-300 text-purple-600 rounded-md px-2 py-1 hover:bg-purple-50 transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Resumen IA disponible
+                </button>
+              )}
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
                 <div className="flex items-center gap-x-3">
                   {initialMeta?.isBookmarked && (
@@ -196,70 +218,4 @@ const ArticleCard = ({
                   {initialMeta?.comment && (
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button size="icon" variant="outline" className="text-primary border-primary/50">
-                          <MessageSquare className="fill-[#1E2A38]" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-fit">{initialMeta.comment}</PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-              )}
-
-              <AnimatePresence>
-                {isColorPickerOpen && hasSubscription && (
-                  <ColorPicker
-                    isBookmarked={bookmarked}
-                    selectedColor={selectedColor}
-                    onColorSelect={(color) => { setSelectedColor(color); onColorUpdate(color); }}
-                    onBookmark={onBookmark}
-                    onOpenComment={() => setIsCommentOpen(true)}
-                  />
-                )}
-              </AnimatePresence>
-              <AnimatePresence>
-                {isCommentOpen && hasSubscription && (
-                  <CommentPopover
-                    loading={pending || isMetaLoading}
-                    comment={comment}
-                    setComment={setComment}
-                    onDelete={onCommentDelete}
-                    inputRef={commentInputRef}
-                    onSubmit={onCommentSubmit}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            {/* Resumen IA expandible */}
-            <AnimatePresence>
-              {showSummary && hasSubscription && data.aiSummary && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mb-4 overflow-hidden"
-                >
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <div className="flex items-center gap-1 mb-1">
-                      <Sparkles className="w-3 h-3 text-purple-600" />
-                      <span className="text-xs font-semibold text-purple-700">Resumen generado por IA</span>
-                    </div>
-                    <p className="text-sm text-purple-900 leading-relaxed">{data.aiSummary}</p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <ContentViewer content={data.content} />
-          </CardContent>
-        </Card>
-      </motion.div>
-    </>
-  );
-};
-
-export default memo(ArticleCard);
+                        <Button size="icon" variant="outline" className="text-primary border
