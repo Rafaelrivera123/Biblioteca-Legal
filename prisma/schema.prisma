@@ -1,17 +1,14 @@
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 enum Role {
   admin
   user
 }
-
 model User {
   id               String    @id @default(cuid())
   first_name       String
@@ -37,10 +34,10 @@ model User {
   userSubscription UserSubscription?
   companyId        String?
   company          Company?  @relation(fields: [companyId], references: [id])
+  chatUsages       ChatUsage[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
-
 model UserQue {
   id         String   @id @default(cuid())
   first_name String
@@ -51,7 +48,6 @@ model UserQue {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
-
 model Device {
   id        String   @id @default(cuid())
   userId    String
@@ -63,7 +59,6 @@ model Device {
   updatedAt DateTime @updatedAt
   @@unique([userId, deviceId])
 }
-
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -82,7 +77,6 @@ model Account {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
 }
-
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -92,7 +86,6 @@ model Session {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-
 model VerificationToken {
   id         String   @id @default(cuid())
   identifier String
@@ -100,7 +93,6 @@ model VerificationToken {
   expires    DateTime
   @@unique([identifier, token])
 }
-
 model ResetReq {
   id            String   @id @default(cuid())
   email         String
@@ -110,21 +102,18 @@ model ResetReq {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
-
 model NewsLetter {
   id        String   @id @default(cuid())
   email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Category {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Document {
   id                String            @id @default(cuid())
   name              String
@@ -142,7 +131,6 @@ model Document {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
-
 model DocumentCategory {
   id         String   @id @default(cuid())
   documentId String
@@ -151,7 +139,6 @@ model DocumentCategory {
   name       String
   createdAt  DateTime @default(now())
 }
-
 model WatchLists {
   id         String   @id @default(cuid())
   userId     String
@@ -159,7 +146,6 @@ model WatchLists {
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
-
 model Section {
   id         String    @id @default(cuid())
   title      String
@@ -169,7 +155,6 @@ model Section {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
-
 model Chapter {
   id        String    @id @default(cuid())
   title     String
@@ -179,11 +164,11 @@ model Chapter {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
-
 model Article {
   id               String            @id @default(cuid())
   content          String
   contentPlainText String            @default("")
+  aiSummary        String?
   articleNumber    Int
   articleLabel     String?
   viewCount        Int               @default(0)
@@ -193,7 +178,6 @@ model Article {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 }
-
 model UserArticleMeta {
   id            String   @id @default(cuid())
   userId        String
@@ -209,7 +193,6 @@ model UserArticleMeta {
   updatedAt     DateTime @updatedAt
   @@unique([userId, articleId])
 }
-
 model Company {
   id            String                @id @default(cuid())
   name          String
@@ -221,7 +204,6 @@ model Company {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 }
-
 model CompanySubscription {
   id                 String   @id @default(cuid())
   companyId          String   @unique
@@ -231,7 +213,6 @@ model CompanySubscription {
   currentPeriodStart DateTime @default(now())
   currentPeriodEnd   DateTime
 }
-
 model UserSubscription {
   id                 String   @id @default(cuid())
   userId             String   @unique
@@ -244,28 +225,24 @@ model UserSubscription {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
-
 model PrivacyPolicy {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model TermsOfService {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model RefundPolicy {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Setting {
   id           String   @id @default(cuid())
   adminId      String   @unique
@@ -276,4 +253,14 @@ model Setting {
   price        Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+model ChatUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, date])
 }
