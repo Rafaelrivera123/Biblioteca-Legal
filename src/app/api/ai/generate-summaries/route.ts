@@ -38,6 +38,15 @@ ${articleText}`,
 }
 
 export async function POST(req: NextRequest) {
+  // Acepta tanto llamadas manuales con CRON_SECRET como llamadas automáticas de Vercel
+  const authHeader = req.headers.get("authorization");
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
+  const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isVercelCron && !isManual) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const documentId: string | undefined = body.documentId;
 
