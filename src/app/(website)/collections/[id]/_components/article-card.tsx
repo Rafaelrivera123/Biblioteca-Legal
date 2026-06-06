@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Article, UserArticleMeta } from "@prisma/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, MessageSquare } from "lucide-react";
+import { Bookmark, MessageSquare, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import dynamic from "next/dynamic";
 import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -46,16 +46,14 @@ const ArticleCard = ({
   const [comment, setComment] = useState("");
   const [bookmarked, setBookmarked] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
 
-  // Bloquear copy/paste para usuarios sin suscripción
   useEffect(() => {
     if (hasSubscription) return;
-    const blockCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-    };
+    const blockCopy = (e: ClipboardEvent) => { e.preventDefault(); };
     document.addEventListener("copy", blockCopy);
     document.addEventListener("cut", blockCopy);
     return () => {
@@ -89,8 +87,15 @@ const ArticleCard = ({
     setIsColorPickerOpen(true);
   };
 
+  const handleSummaryClick = () => {
+    if (!isLoggedin || !hasSubscription) {
+      setShowSubscribeModal(true);
+      return;
+    }
+    setShowSummary((prev) => !prev);
+  };
+
   const invalidateMeta = () => {
-    // Invalida el batch del chapter para que se refresque
     queryClient.invalidateQueries({ queryKey: ["meta-batch"] });
   };
 
@@ -156,7 +161,7 @@ const ArticleCard = ({
           )}
         >
           <CardHeader>
-            <div className="flex items-center gap-x-2 relative">
+            <div className="flex items-center gap-x-2 relative flex-wrap">
               <Button
                 className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
                 onClick={handleArticleButtonClick}
@@ -164,6 +169,23 @@ const ArticleCard = ({
               >
                 Artículo {displayLabel}
               </Button>
+
+              {/* Botón resumen IA — solo si el artículo tiene resumen */}
+              {data.aiSummary && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                  onClick={handleSummaryClick}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Resumen IA
+                  {showSummary && hasSubscription
+                    ? <ChevronUp className="w-3 h-3" />
+                    : <ChevronDown className="w-3 h-3" />}
+                </Button>
+              )}
+
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
                 <div className="flex items-center gap-x-3">
                   {initialMeta?.isBookmarked && (
@@ -183,6 +205,7 @@ const ArticleCard = ({
                   )}
                 </div>
               )}
+
               <AnimatePresence>
                 {isColorPickerOpen && hasSubscription && (
                   <ColorPicker
@@ -208,7 +231,29 @@ const ArticleCard = ({
               </AnimatePresence>
             </div>
           </CardHeader>
+
           <CardContent>
+            {/* Resumen IA expandible */}
+            <AnimatePresence>
+              {showSummary && hasSubscription && data.aiSummary && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mb-4 overflow-hidden"
+                >
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Sparkles className="w-3 h-3 text-purple-600" />
+                      <span className="text-xs font-semibold text-purple-700">Resumen generado por IA</span>
+                    </div>
+                    <p className="text-sm text-purple-900 leading-relaxed">{data.aiSummary}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <ContentViewer content={data.content} />
           </CardContent>
         </Card>
