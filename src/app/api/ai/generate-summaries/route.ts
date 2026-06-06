@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const BATCH_SIZE = 40;
+const PARALLEL_SIZE = 10;
 
 async function generateSummary(articleText: string, articleLabel: string): Promise<string> {
   const res = await fetch(GROQ_API_URL, {
@@ -37,8 +39,29 @@ ${articleText}`,
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
+async function processArticle(article: {
+  id: string;
+  articleNumber: number;
+  articleLabel: string | null;
+  contentPlainText: string;
+}): Promise<{ success: boolean }> {
+  try {
+    const label = article.articleLabel ?? String(article.articleNumber);
+    const summary = await generateSummary(article.contentPlainText, label);
+    if (summary) {
+      await prisma.article.update({
+        where: { id: article.id },
+        data: { aiSummary: summary },
+      });
+      return { success: true };
+    }
+    return { success: false };
+  } catch {
+    return { success: false };
+  }
+}
+
 export async function POST(req: NextRequest) {
-  // Acepta tanto llamadas manuales con CRON_SECRET como llamadas automáticas de Vercel
   const authHeader = req.headers.get("authorization");
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
   const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
@@ -64,7 +87,7 @@ export async function POST(req: NextRequest) {
       articleLabel: true,
       contentPlainText: true,
     },
-    take: 50,
+    take: BATCH_SIZE,
   });
 
   if (articles.length === 0) {
@@ -74,24 +97,14 @@ export async function POST(req: NextRequest) {
   let generated = 0;
   let failed = 0;
 
-  for (const article of articles) {
-    try {
-      const label = article.articleLabel ?? String(article.articleNumber);
-      const summary = await generateSummary(article.contentPlainText, label);
-
-      if (summary) {
-        await prisma.article.update({
-          where: { id: article.id },
-          data: { aiSummary: summary },
-        });
-        generated++;
-      }
-
-      await new Promise((r) => setTimeout(r, 500));
-    } catch (err) {
-      console.error(`Error en artículo ${article.id}:`, err);
-      failed++;
-    }
+  // Procesar en grupos paralelos de PARALLEL_SIZE
+  for (let i = 0; i < articles.length; i += PARALLEL_SIZE) {
+    const chunk = articles.slice(i, i + PARALLEL_SIZE);
+    const results = await Promise.all(chunk.map(processArticle));
+    results.forEach((r) => {
+      if (r.success) generated++;
+      else failed++;
+    });
   }
 
   return NextResponse.json({
