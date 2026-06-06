@@ -30,7 +30,7 @@ const page = () => {
                 Derecho.
               </p>
               <p className="text-[14px] md:text-[16px]">
-                La plataforma fue creada por un estudiante de Derecho visionario
+                La plataforma fue creada por un estudiante de Derecho 
                 que, basado en su propia experiencia, identificó las
                 deficiencias del sector y decidió convertirlas en una
                 oportunidad para mejorar el acceso al conocimiento legal.
