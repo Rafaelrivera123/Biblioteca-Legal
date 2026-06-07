@@ -9,33 +9,19 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function getRelevantArticles(documentId: string, query: string): Promise<string> {
   try {
-    const keywords = query
-      .toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .split(" ")
-      .filter((w) => w.length > 3)
-      .slice(0, 5);
-
-    if (keywords.length === 0) return "";
-
-    const articles = await prisma.article.findMany({
-      where: {
-        chapter: {
-          section: {
-            documentId,
-          },
-        },
-        OR: keywords.map((k) => ({
-          contentPlainText: { contains: k, mode: "insensitive" as const },
-        })),
-      },
-      select: {
-        articleNumber: true,
-        articleLabel: true,
-        contentPlainText: true,
-      },
-      take: 5,
-    });
+    const articles = await prisma.$queryRawUnsafe
+      { articleNumber: number; articleLabel: string | null; contentPlainText: string }[]
+    >(
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText"
+       FROM "Article" a
+       JOIN "Chapter" c ON a."chapterId" = c.id
+       JOIN "Section" s ON c."sectionId" = s.id
+       WHERE s."documentId" = $1
+       AND a."contentPlainText" ILIKE $2
+       LIMIT 5`,
+      documentId,
+      `%${query.slice(0, 50)}%`
+    );
 
     if (articles.length === 0) return "";
 
@@ -45,7 +31,8 @@ async function getRelevantArticles(documentId: string, query: string): Promise<s
         return `Articulo ${label}: ${a.contentPlainText}`;
       })
       .join("\n\n");
-  } catch {
+  } catch (err) {
+    console.error("[chat/legal] getRelevantArticles error:", err);
     return "";
   }
 }
