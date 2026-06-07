@@ -9,7 +9,6 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function getRelevantArticles(documentId: string, query: string): Promise<string> {
   try {
-    // Busca artículos cuyo texto contenga palabras clave de la pregunta
     const keywords = query
       .toLowerCase()
       .replace(/[^\w\s]/g, "")
@@ -19,26 +18,31 @@ async function getRelevantArticles(documentId: string, query: string): Promise<s
 
     if (keywords.length === 0) return "";
 
-    const articles = await prisma.$queryRaw
-      { articleNumber: number; articleLabel: string | null; content: string }[]
-    >`
-      SELECT a."articleNumber", a."articleLabel", a."contentPlainText" as content
-      FROM "Article" a
-      JOIN "Chapter" c ON a."chapterId" = c.id
-      JOIN "Section" s ON c."sectionId" = s.id
-      WHERE s."documentId" = ${documentId}
-      AND (
-        ${keywords.map((k) => `a."contentPlainText" ILIKE '%${k}%'`).join(" OR ")}
-      )
-      LIMIT 5
-    `;
+    const articles = await prisma.article.findMany({
+      where: {
+        chapter: {
+          section: {
+            documentId,
+          },
+        },
+        OR: keywords.map((k) => ({
+          contentPlainText: { contains: k, mode: "insensitive" as const },
+        })),
+      },
+      select: {
+        articleNumber: true,
+        articleLabel: true,
+        contentPlainText: true,
+      },
+      take: 5,
+    });
 
     if (articles.length === 0) return "";
 
     return articles
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
-        return `Artículo ${label}: ${a.content}`;
+        return `Articulo ${label}: ${a.contentPlainText}`;
       })
       .join("\n\n");
   } catch {
@@ -103,16 +107,74 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
     }
 
-    // Buscar artículos relevantes en la DB
     const relevantArticles = documentId
       ? await getRelevantArticles(documentId, message)
       : "";
 
     const systemContent = relevantArticles
-      ? `Eres un asistente legal especializado en legislación hondureña. El usuario está consultando el documento: "${documentName}".
+      ? `Eres un asistente legal especializado en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
 
-ARTÍCULOS RELEVANTES DEL DOCUMENTO:
+ARTICULOS RELEVANTES DEL DOCUMENTO:
 ${relevantArticles}
 
-Responde basándote en los artículos anteriores cuando sean relevantes. Si la pregunta no está cubierta por esos artículos, responde con tu conocimiento general de la legislación hondureña. Responde siempre en español de forma clara y concisa.`
-      : `Ere
+Responde basandote en los articulos anteriores cuando sean relevantes. Si la pregunta no esta cubierta por esos articulos, responde con tu conocimiento general de la legislacion hondurena. Responde siempre en espanol de forma clara y concisa.`
+      : `Eres un asistente legal especializado en legislacion hondurena. El usuario esta consultando el documento: "${documentName}". Responde de forma clara, concisa y en espanol.`;
+
+    const messages = [
+      { role: "system", content: systemContent },
+      ...history.slice(-8).map((h) => ({
+        role: h.role === "model" ? "assistant" : "user",
+        content: h.text,
+      })),
+      { role: "user", content: message },
+    ];
+
+    const groqRes = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        max_tokens: 500,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      console.error("[chat/legal] Groq error:", errText);
+      return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
+    }
+
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
+
+    if (!reply) {
+      return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
+    }
+
+    if (!isAdmin) {
+      await prisma.chatUsage.upsert({
+        where: { userId_date: { userId, date: today } },
+        update: { count: { increment: 1 } },
+        create: { userId, date: today, count: 1 },
+      });
+    }
+
+    const updatedUsage = isAdmin
+      ? null
+      : await prisma.chatUsage.findUnique({
+          where: { userId_date: { userId, date: today } },
+        });
+
+    const remaining = isAdmin ? 999 : DAILY_LIMIT - (updatedUsage?.count ?? 1);
+
+    return NextResponse.json({ reply, remaining });
+  } catch (err) {
+    console.error("[chat/legal] ERROR:", String(err));
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
