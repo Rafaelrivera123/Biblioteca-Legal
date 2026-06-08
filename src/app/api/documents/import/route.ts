@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -10,17 +11,21 @@ export async function POST(req: NextRequest) {
     if (session.user.role !== "admin") {
       return NextResponse.json({ error: "Access denied." }, { status: 403 });
     }
+
     const data = await req.json();
     const { name, slug, short_description, law_number, published, sections, categoryIds } = data;
+
     if (!name || !sections || !Array.isArray(sections)) {
       return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
     }
+
     const categories = categoryIds?.length
       ? await prisma.category.findMany({
           where: { id: { in: categoryIds } },
           select: { id: true, name: true },
         })
       : [];
+
     const document = await prisma.document.create({
       data: {
         name,
@@ -36,20 +41,24 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
     let totalSections = 0;
     let totalChapters = 0;
     let totalArticles = 0;
     let skippedDuplicates = 0;
+
     for (const sectionData of sections) {
       const section = await prisma.section.create({
         data: { title: sectionData.title, documentId: document.id },
       });
       totalSections++;
+
       for (const chapterData of sectionData.chapters || []) {
         const chapter = await prisma.chapter.create({
           data: { title: chapterData.title, sectionId: section.id },
         });
         totalChapters++;
+
         const seenArticleLabels = new Set<string>();
         for (const articleData of chapterData.articles || []) {
           const label = articleData.articleLabel || String(articleData.articleNumber);
@@ -71,6 +80,17 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Disparar batch de summaries para el documento recién importado (fire and forget)
+    fetch(`${process.env.NEXTAUTH_URL}/api/ai/batch-create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ documentId: document.id, limit: 10000 }),
+    }).catch((err) => console.error("Error disparando batch de summaries:", err));
+
     return NextResponse.json({
       success: true,
       message: `Law "${name}" was imported successfully.`,
