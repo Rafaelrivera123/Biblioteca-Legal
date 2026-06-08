@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         WHERE a."aiSummary" IS NULL
         AND a."contentPlainText" != ''
         ORDER BY d."viewCount" DESC
-        LIMIT ${BATCH_SIZE}
+        LIMIT 30
       `;
 
   if (articles.length === 0) {
