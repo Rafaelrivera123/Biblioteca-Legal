@@ -56,7 +56,8 @@ async function processArticle(article: {
       return { success: true };
     }
     return { success: false };
-  } catch {
+  } catch (err) {
+    console.error(`Error procesando artículo ${article.id}:`, err);
     return { success: false };
   }
 }
@@ -72,10 +73,6 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
   const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-
-  console.log("authHeader recibido:", authHeader);
-  console.log("CRON_SECRET en env:", process.env.CRON_SECRET);
-  console.log("isManual:", isManual);
 
   if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -99,17 +96,19 @@ export async function POST(req: NextRequest) {
         },
         take: BATCH_SIZE,
       })
-    : await prisma.$queryRaw<ArticleRaw[]>`
-        SELECT a.id, a."articleNumber", a."articleLabel", a."contentPlainText"
-        FROM "Article" a
-        JOIN "Chapter" c ON a."chapterId" = c.id
-        JOIN "Section" s ON c."sectionId" = s.id
-        JOIN "Document" d ON s."documentId" = d.id
-        WHERE a."aiSummary" IS NULL
-        AND a."contentPlainText" != ''
-        ORDER BY d."viewCount" DESC
-        LIMIT 30
-      `;
+    : await prisma.article.findMany({
+        where: {
+          aiSummary: null,
+          contentPlainText: { not: "" },
+        },
+        select: {
+          id: true,
+          articleNumber: true,
+          articleLabel: true,
+          contentPlainText: true,
+        },
+        take: BATCH_SIZE,
+      });
 
   if (articles.length === 0) {
     return NextResponse.json({ message: "No hay artículos pendientes", generated: 0 });
