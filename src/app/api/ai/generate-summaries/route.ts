@@ -3,19 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const BATCH_SIZE = 30;
 const PARALLEL_SIZE = 3;
 
 async function generateSummary(articleText: string, articleLabel: string): Promise<string> {
-  const res = await fetch(GROQ_API_URL, {
+  const res = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "x-api-key": `${process.env.ANTHROPIC_API_KEY}`,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
       messages: [
         {
           role: "user",
@@ -25,18 +27,16 @@ Artículo ${articleLabel}:
 ${articleText}`,
         },
       ],
-      max_tokens: 300,
-      temperature: 0.3,
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Groq error: ${err}`);
+    throw new Error(`Anthropic error: ${err}`);
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
+  return data.content?.[0]?.text?.trim() ?? "";
 }
 
 async function processArticle(article: {
@@ -73,8 +73,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const documentId: string | undefined = body.documentId;
 
-  // Si se pasa documentId específico, filtra por ese documento
-  // Si no, ordena por viewCount del documento para priorizar los más visitados
   const articles = documentId
     ? await prisma.article.findMany({
         where: {
