@@ -61,6 +61,13 @@ async function processArticle(article: {
   }
 }
 
+type ArticleRaw = {
+  id: string;
+  articleNumber: number;
+  articleLabel: string | null;
+  contentPlainText: string;
+};
+
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const documentId: string | undefined = body.documentId;
 
-  const articles = documentId
+  const articles: ArticleRaw[] = documentId
     ? await prisma.article.findMany({
         where: {
           aiSummary: null,
@@ -92,14 +99,7 @@ export async function POST(req: NextRequest) {
         },
         take: BATCH_SIZE,
       })
-    : await prisma.$queryRaw
-        {
-          id: string;
-          articleNumber: number;
-          articleLabel: string | null;
-          contentPlainText: string;
-        }[]
-      >`
+    : await prisma.$queryRaw<ArticleRaw[]>`
         SELECT a.id, a."articleNumber", a."articleLabel", a."contentPlainText"
         FROM "Article" a
         JOIN "Chapter" c ON a."chapterId" = c.id
