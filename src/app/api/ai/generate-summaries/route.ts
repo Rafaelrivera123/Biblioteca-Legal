@@ -3,71 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const BATCH_SIZE = 30;
-const PARALLEL_SIZE = 3;
-
-async function generateSummary(articleText: string, articleLabel: string): Promise<string> {
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": `${process.env.ANTHROPIC_API_KEY}`,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [
-        {
-          role: "user",
-          content: `Eres un asistente legal hondureño. Resume el siguiente artículo de ley en 2-3 oraciones claras y simples, en español, para que un estudiante de derecho pueda entender rápidamente su contenido. No uses viñetas. Solo devuelve el resumen, sin introducción ni frases como "Este artículo dice".
-
-Artículo ${articleLabel}:
-${articleText}`,
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Anthropic error: ${err}`);
-  }
-
-  const data = await res.json();
-  return data.content?.[0]?.text?.trim() ?? "";
-}
-
-async function processArticle(article: {
-  id: string;
-  articleNumber: number;
-  articleLabel: string | null;
-  contentPlainText: string;
-}): Promise<{ success: boolean }> {
-  try {
-    const label = article.articleLabel ?? String(article.articleNumber);
-    const summary = await generateSummary(article.contentPlainText, label);
-    if (summary) {
-      await prisma.article.update({
-        where: { id: article.id },
-        data: { aiSummary: summary },
-      });
-      return { success: true };
-    }
-    return { success: false };
-  } catch (err) {
-    console.error(`Error procesando artículo ${article.id}:`, err);
-    return { success: false };
-  }
-}
-
-type ArticleRaw = {
-  id: string;
-  articleNumber: number;
-  articleLabel: string | null;
-  contentPlainText: string;
-};
+const ANTHROPIC_BATCH_URL = "https://api.anthropic.com/v1/messages/batches";
+const CHUNK_SIZE = 1000;
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -80,59 +17,79 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const documentId: string | undefined = body.documentId;
+  const limit: number = body.limit ?? CHUNK_SIZE;
 
-  const articles: ArticleRaw[] = documentId
-    ? await prisma.article.findMany({
-        where: {
-          aiSummary: null,
-          contentPlainText: { not: "" },
-          chapter: { section: { documentId } },
-        },
-        select: {
-          id: true,
-          articleNumber: true,
-          articleLabel: true,
-          contentPlainText: true,
-        },
-        take: BATCH_SIZE,
-      })
-    : await prisma.article.findMany({
-        where: {
-          aiSummary: null,
-          contentPlainText: { not: "" },
-        },
-        select: {
-          id: true,
-          articleNumber: true,
-          articleLabel: true,
-          contentPlainText: true,
-        },
-        take: BATCH_SIZE,
-      });
+  const articles = await prisma.article.findMany({
+    where: {
+      aiSummary: null,
+      contentPlainText: { not: "" },
+      ...(documentId
+        ? { chapter: { section: { documentId } } }
+        : {}),
+    },
+    select: {
+      id: true,
+      articleNumber: true,
+      articleLabel: true,
+      contentPlainText: true,
+    },
+    take: limit,
+  });
 
   if (articles.length === 0) {
-    return NextResponse.json({ message: "No hay artículos pendientes", generated: 0 });
+    return NextResponse.json({ message: "No hay artículos pendientes" });
   }
 
-  let generated = 0;
-  let failed = 0;
+  const requests = articles.map((article) => {
+    const label = article.articleLabel ?? String(article.articleNumber);
+    return {
+      custom_id: article.id,
+      params: {
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        messages: [
+          {
+            role: "user",
+            content: `Eres un asistente legal hondureño. Resume el siguiente artículo de ley en 2-3 oraciones claras y simples, en español, para que un estudiante de derecho pueda entender rápidamente su contenido. No uses viñetas. Solo devuelve el resumen, sin introducción ni frases como "Este artículo dice".
 
-  for (let i = 0; i < articles.length; i += PARALLEL_SIZE) {
-    const chunk = articles.slice(i, i + PARALLEL_SIZE);
-    const results = await Promise.all(chunk.map(processArticle));
-    results.forEach((r) => {
-      if (r.success) generated++;
-      else failed++;
-    });
-    if (i + PARALLEL_SIZE < articles.length) {
-      await new Promise((r) => setTimeout(r, 300));
-    }
+Artículo ${label}:
+${article.contentPlainText}`,
+          },
+        ],
+      },
+    };
+  });
+
+  const res = await fetch(ANTHROPIC_BATCH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": `${process.env.ANTHROPIC_API_KEY}`,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "message-batches-2024-09-24",
+    },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    return NextResponse.json({ error: `Anthropic error: ${err}` }, { status: 500 });
   }
+
+  const data = await res.json();
+  const batchId: string = data.id;
+
+  await prisma.batchJob.create({
+    data: {
+      batchId,
+      status: "pending",
+      totalItems: articles.length,
+    },
+  });
 
   return NextResponse.json({
-    message: "Proceso completado",
-    generated,
-    failed,
-    pending: articles.length - generated - failed,
+    message: "Batch creado",
+    batchId,
+    totalItems: articles.length,
   });
 }
