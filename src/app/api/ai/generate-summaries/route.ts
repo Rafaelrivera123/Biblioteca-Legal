@@ -66,6 +66,10 @@ export async function POST(req: NextRequest) {
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
   const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
+  console.log("authHeader recibido:", authHeader);
+  console.log("CRON_SECRET en env:", process.env.CRON_SECRET);
+  console.log("isManual:", isManual);
+
   if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
