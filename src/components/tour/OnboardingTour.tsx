@@ -9,22 +9,21 @@ interface Props {
 
 const DEMO_DOCUMENT_SLUG = "codigo-civil-honduras";
 
-function waitForElement(selector: string, timeout = 5000): Promise<Element | null> {
+function waitForElement(selector: string, timeout = 8000): Promise<Element | null> {
   return new Promise((resolve) => {
     const el = document.querySelector(selector);
     if (el) return resolve(el);
-    const observer = new MutationObserver(() => {
+    const start = Date.now();
+    const interval = setInterval(() => {
       const found = document.querySelector(selector);
       if (found) {
-        observer.disconnect();
+        clearInterval(interval);
         resolve(found);
+      } else if (Date.now() - start > timeout) {
+        clearInterval(interval);
+        resolve(null);
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, timeout);
+    }, 200);
   });
 }
 
@@ -46,7 +45,7 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
 
     const initTour = async () => {
       const Shepherd = (await import("shepherd.js")).default;
-      await import("shepherd.js/dist/css/shepherd.css");
+      // NO importamos shepherd.css -- usamos nuestros propios estilos
 
       if (cancelled) return;
       startedRef.current = true;
@@ -77,35 +76,30 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       tour.on("complete", markCompleted);
       tour.on("cancel", markCompleted);
 
-      // Paso 1 - Bienvenida
+      // Paso 1 - Bienvenida (centrado, sin attachTo)
       tour.addStep({
         id: "welcome",
         title: "Bienvenido a Biblioteca Legal HN",
         text: "Te mostramos todo lo que tienes disponible en la plataforma. Este tour dura menos de 2 minutos.",
         buttons: [
           {
-            text: "Comenzar tour",
+            text: "Comenzar",
             classes: "blhn-btn-primary",
-            action() {
+            async action() {
               router.push("/collections");
+              await waitForElement("#tour-collections-grid");
               tour.next();
             },
           },
         ],
       });
 
-      // Paso 2 - Colección
+      // Paso 2 - Colección de documentos
       tour.addStep({
         id: "collections",
         title: "Colección de documentos",
-        text: "Aquí encuentras todas las leyes, códigos y reglamentos de Honduras organizados por categoría. Haz clic en cualquier documento para leerlo.",
-        attachTo: { element: "#tour-collections-grid", on: "bottom" },
-        when: {
-          async show() {
-            const el = await waitForElement("#tour-collections-grid");
-            if (!el) tour.next();
-          },
-        },
+        text: "Aquí encuentras todas las leyes, códigos y reglamentos de Honduras. Haz clic en cualquier documento para leer sus artículos.",
+        attachTo: { element: "#tour-collections-grid", on: "top" },
         buttons: [
           {
             text: "Anterior",
@@ -115,32 +109,28 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
           {
             text: "Siguiente",
             classes: "blhn-btn-primary",
-            action() {
+            async action() {
               router.push(`/collections/${DEMO_DOCUMENT_SLUG}`);
+              await waitForElement("#tour-article-tools");
               tour.next();
             },
           },
         ],
       });
 
-      // Paso 3 - Artículo
+      // Paso 3 - Herramientas del artículo
       tour.addStep({
         id: "article-tools",
         title: "Interactúa con los artículos",
         text: "Haz clic en el botón de cualquier artículo para resaltarlo con colores, guardarlo con un marcador o agregar una nota privada. Disponible para suscriptores.",
         attachTo: { element: "#tour-article-tools", on: "bottom" },
-        when: {
-          async show() {
-            const el = await waitForElement("#tour-article-tools");
-            if (!el) tour.next();
-          },
-        },
         buttons: [
           {
             text: "Anterior",
             classes: "blhn-btn-secondary",
-            action() {
+            async action() {
               router.push("/collections");
+              await waitForElement("#tour-collections-grid");
               tour.back();
             },
           },
@@ -158,12 +148,6 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
         title: "Resumen IA por artículo",
         text: "Cada artículo tiene un resumen generado por inteligencia artificial que explica su contenido en lenguaje claro. Exclusivo para suscriptores.",
         attachTo: { element: "#tour-ai-summary", on: "bottom" },
-        when: {
-          async show() {
-            const el = await waitForElement("#tour-ai-summary");
-            if (!el) tour.next();
-          },
-        },
         buttons: [
           {
             text: "Anterior",
@@ -184,12 +168,6 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
         title: "Asistente legal IA",
         text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos. Hasta 20 consultas diarias para suscriptores.",
         attachTo: { element: "#tour-chatbot", on: "top" },
-        when: {
-          async show() {
-            const el = await waitForElement("#tour-chatbot");
-            if (!el) tour.next();
-          },
-        },
         buttons: [
           {
             text: "Anterior",
@@ -199,8 +177,9 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
           {
             text: "Siguiente",
             classes: "blhn-btn-primary",
-            action() {
+            async action() {
               router.push("/subscriptions");
+              await waitForElement("#tour-subscriptions");
               tour.next();
             },
           },
@@ -213,20 +192,13 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
         title: "Desbloquea todo el potencial",
         text: "Suscríbete para acceder a los resúmenes IA, el asistente legal, resaltado de artículos, marcadores y notas privadas.",
         attachTo: { element: "#tour-subscriptions", on: "bottom" },
-        when: {
-          async show() {
-            const el = await waitForElement("#tour-subscriptions");
-            if (!el) {
-              // si no encuentra el elemento en navbar igual muestra el paso centrado
-            }
-          },
-        },
         buttons: [
           {
             text: "Anterior",
             classes: "blhn-btn-secondary",
-            action() {
+            async action() {
               router.push(`/collections/${DEMO_DOCUMENT_SLUG}`);
+              await waitForElement("#tour-chatbot");
               tour.back();
             },
           },
