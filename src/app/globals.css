@@ -1,11 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 }
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -61,6 +63,7 @@
     --chart-5: 340 75% 55%;
   }
 }
+
 @layer base {
   * {
     @apply border-border;
@@ -70,20 +73,106 @@
   }
 }
 
-/* Tour Shepherd.js - reset completo */
-.shepherd-element,
-.shepherd-element * {
-  box-sizing: border-box;
-}
 .shepherd-element {
   border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18) !important;
   max-width: 340px !important;
   font-family: inherit !important;
   border: 1px solid #e5e7eb !important;
   background: #ffffff !important;
   z-index: 9999 !important;
 }
+
 .shepherd-content {
   padding: 0 !important;
-  border-radius: 12px !imp
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.shepherd-header {
+  background: #1E2A38 !important;
+  border-radius: 12px 12px 0 0 !important;
+  padding: 12px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.shepherd-title {
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  flex: 1 !important;
+  font-family: inherit !important;
+}
+
+.shepherd-cancel-icon {
+  color: rgba(255,255,255,0.8) !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  margin-left: 8px !important;
+}
+
+.shepherd-cancel-icon:hover {
+  color: #ffffff !important;
+}
+
+.shepherd-text {
+  padding: 14px 16px !important;
+  font-size: 13px !important;
+  color: #374151 !important;
+  line-height: 1.6 !important;
+  background: #ffffff !important;
+  font-family: inherit !important;
+}
+
+.shepherd-footer {
+  padding: 0 16px 14px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+  background: #ffffff !important;
+}
+
+.shepherd-button {
+  border-radius: 8px !important;
+  padding: 7px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  transition: background 0.15s !important;
+}
+
+.shepherd-button.blhn-btn-primary {
+  background: #1E2A38 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.shepherd-button.blhn-btn-primary:hover {
+  background: #2d3f54 !important;
+}
+
+.shepherd-button.blhn-btn-secondary {
+  background: transparent !important;
+  color: #1E2A38 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.shepherd-button.blhn-btn-secondary:hover {
+  background: #f3f4f6 !important;
+}
+
+.shepherd-arrow::before {
+  background: #1E2A38 !important;
+}
+
+.shepherd-modal-overlay-container {
+  opacity: 0.5 !important;
+}
