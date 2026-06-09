@@ -1,109 +1,194 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
+"use client";
+
+import { Menu } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 
-export default function OurServices() {
+import { logoutAction } from "@/actions/auth/logout";
+import { logoSrc } from "@/helper/assets";
+import { cn } from "@/lib/utils";
+import { User } from "@prisma/client";
+import Image from "next/image";
+import { toast } from "sonner";
+import { Button } from "../ui/button";
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "../ui/sheet";
+import FramerDropdown from "./framer-dropdown";
+
+interface Props {
+  isLoggedin: boolean;
+  user: User | null;
+}
+
+const Navbar = ({ isLoggedin, user }: Props) => {
+  const [isPending, startTransition] = useTransition();
+  const [scrolling, setScrolling] = useState(false);
+
+  const pathname = usePathname();
+
+  const menus = [
+    { id: 1, href: "/", linkText: "Inicio" },
+    { id: 2, href: "/collections", linkText: "Colección" },
+    { id: 3, href: "/subscriptions", linkText: "Subscripciones" },
+    { id: 4, href: "/contact", linkText: "Contacto" },
+  ];
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 0) {
+        setScrolling(true);
+      } else {
+        setScrolling(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  const onLogout = async () => {
+    startTransition(() => {
+      logoutAction().then((res) => {
+        if (res && !res.success) {
+          toast.error(res.message);
+          return;
+        }
+      });
+    });
+  };
+
   return (
-    <section className="bg-slate-800 py-16 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-blue-400 text-lg font-medium mb-4">
-            Nuestros Servicios
-          </h2>
-          <h3 className="text-white text-[20px] md:text-4xl font-bold mb-6">
-            Recursos Legales Integrales
-          </h3>
-          <p className="text-gray-300 text-[14px] md:text-lg max-w-4xl mx-auto">
-            Descubre las herramientas y recursos diseñados para mejorar tu
-            práctica legal y proporcionarte la información más actualizada.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
-            <CardContent className="p-8">
-              <div className="mb-6 flex justify-between">
-                <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
-                  Biblioteca Jurídica
-                </h4>
-                <BookOpen className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
-              </div>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Accede a todos los documentos legales, leyes y decretos
-              </p>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Nuestra colección integral incluye los documentos legales más
-                recientes, organizados y de fácil acceso.
-              </p>
-              <Button
-                variant="outline"
-                className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
-                asChild
+    <div
+      className={cn(
+        "py-3 fixed top-0 z-50 w-full h-[60px] transition duration-300",
+        scrolling && "bg-white",
+        pathname === "/"
+          ? "text-primary"
+          : pathname.startsWith("/collections/") ||
+              pathname.startsWith("/account")
+            ? "text-black"
+            : scrolling
+              ? "text-primary"
+              : "text-white"
+      )}
+    >
+      <div className="container mx-auto h-full">
+        <div className="flex justify-between items-center">
+          <div>
+            <Link href={"/"} className="bg-red-500">
+              <Image src={logoSrc} width={40} height={40} alt="Logo" />
+            </Link>
+          </div>
+          <div className="hidden md:flex items-center md:gap-x-5 lg:gap-x-10">
+            {menus.map((menu) => (
+              <Link
+                key={menu.id}
+                href={menu.href}
+                className={cn(
+                  pathname === menu.href ? "font-semibold" : "font-light"
+                )}
               >
-                <Link href="/collections">
-                  Explorar Biblioteca
-                  <ArrowRight className="ml-2 w-4 h-4" />
+                {menu.linkText}
+              </Link>
+            ))}
+          </div>
+          <div className="hidden md:block">
+            {isLoggedin ? (
+              <>
+                <FramerDropdown
+                  trigger={
+                    <Image
+                      src={user?.image ?? "https://github.com/shadcn.png"}
+                      alt={user?.first_name + " " + user?.last_name}
+                      height={30}
+                      width={30}
+                      className="rounded-full"
+                    />
+                  }
+                >
+                  {(close) => (
+                    <div>
+                      <Button
+                        className="w-full text-primary hover:text-primary/90 border-none"
+                        variant="outline"
+                        asChild
+                        onClick={close}
+                      >
+                        <Link href="/account" className="w-full">
+                          Cuenta
+                        </Link>
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          close();
+                          await onLogout();
+                        }}
+                        className="cursor-pointer w-full text-primary hover:text-primary/90 border-none"
+                        variant="outline"
+                        disabled={isPending}
+                      >
+                        Cerrar sesión
+                      </Button>
+                    </div>
+                  )}
+                </FramerDropdown>
+              </>
+            ) : (
+              <Button asChild>
+                <Link href="/login" className="w-full h-full">
+                  Iniciar sesión
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
 
-          <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
-            <CardContent className="p-8">
-              <div className="mb-6 flex justify-between">
-                <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
-                  Actualizaciones Legales
-                </h4>
-              </div>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Mantente informado con los últimos desarrollos legales
-              </p>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Recibe actualizaciones oportunas sobre nuevas leyes, enmiendas y
-                cambios legales importantes que afectan tu práctica.
-              </p>
-              <Button
-                variant="outline"
-                className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
-              >
-                Ver Actualizaciones
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
-            <CardContent className="p-8">
-              <div className="mb-2 flex justify-between">
-                <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
-                  Análisis Legal IA
-                </h4>
-                <Sparkles className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
-              </div>
-              <span className="inline-block mb-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white group-hover:bg-purple-100 group-hover:text-purple-800 transition-colors duration-300">
-                Nuevo
-              </span>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Consulta nuestro asistente con acceso a toda la legislación hondureña de Biblioteca Legal HN
-              </p>
-              <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Haz preguntas legales, sube documentos o imágenes y obtén respuestas basadas en las leyes y códigos de Honduras.
-              </p>
-              <Button
-                variant="outline"
-                className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
-                asChild
-              >
-                <Link href="/legal-ai">
-                  Consultar Ahora
-                  <ArrowRight className="ml-2 w-4 h-4" />
+          <div className="md:hidden flex items-center gap-x-4">
+            <div>
+              {!isLoggedin && <Button size="sm">Iniciar sesión</Button>}
+              {isLoggedin && (
+                <Link href="/account" className="flex items-center">
+                  <Image
+                    src={user?.image ?? "https://github.com/shadcn.png"}
+                    alt={user?.first_name + " " + user?.last_name}
+                    height={30}
+                    width={30}
+                    className="rounded-full"
+                  />
                 </Link>
-              </Button>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="p-1" size="icon">
+                  <Menu />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="top" className="bg-white text-primary">
+                <div className="flex flex-col items-center gap-y-8 mt-6">
+                  <div className="flex flex-col items-center gap-y-5">
+                    {menus.map((menu) => (
+                      <Link
+                        key={menu.id}
+                        href={menu.href}
+                        className={`${
+                          pathname === menu.href ? "font-semibold" : "font-light"
+                        }`}
+                      >
+                        <SheetClose>{menu.linkText}</SheetClose>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
-}
+};
+
+export default Navbar;
