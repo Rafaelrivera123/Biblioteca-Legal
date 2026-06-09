@@ -7,56 +7,26 @@ interface Props {
   isLoggedin: boolean;
 }
 
-const TOUR_STEPS = [
-  {
-    id: "welcome",
-    title: "Bienvenido a Biblioteca Legal HN",
-    text: "Te mostramos todo lo que tienes disponible en la plataforma. Este tour dura menos de 2 minutos.",
-    attachTo: null,
-  },
-  {
-    id: "nav-collections",
-    title: "Colección de documentos",
-    text: "Aquí encuentras todas las leyes, códigos y reglamentos de Honduras organizados por categoría.",
-    attachTo: { element: "#tour-collections", on: "bottom" as const },
-  },
-  {
-    id: "nav-subscriptions",
-    title: "Planes y precios",
-    text: "Consulta los planes disponibles para desbloquear todas las funciones premium de la plataforma.",
-    attachTo: { element: "#tour-subscriptions", on: "bottom" as const },
-  },
-  {
-    id: "article-tools",
-    title: "Resalta y marca artículos",
-    text: "Como suscriptor puedes resaltar artículos con colores, guardarlos con marcadores y agregar notas privadas.",
-    attachTo: { element: "#tour-article-tools", on: "bottom" as const },
-  },
-  {
-    id: "ai-summary",
-    title: "Resumen IA por artículo",
-    text: "Cada artículo tiene un resumen generado por inteligencia artificial que explica su contenido en lenguaje claro. Exclusivo para suscriptores.",
-    attachTo: { element: "#tour-ai-summary", on: "bottom" as const },
-  },
-  {
-    id: "chatbot",
-    title: "Asistente legal IA",
-    text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos. Hasta 20 consultas diarias para suscriptores.",
-    attachTo: { element: "#tour-chatbot", on: "top" as const },
-  },
-  {
-    id: "profile",
-    title: "Tu cuenta",
-    text: "Gestiona tu perfil, suscripción y preferencias desde aquí.",
-    attachTo: { element: "#tour-profile", on: "bottom" as const },
-  },
-  {
-    id: "finish",
-    title: "Listo para comenzar",
-    text: "Ya conoces todo lo que ofrece Biblioteca Legal HN. Suscríbete para desbloquear los resúmenes IA, el asistente legal y más herramientas.",
-    attachTo: null,
-  },
-];
+const DEMO_DOCUMENT_SLUG = "codigo-civil-honduras";
+
+function waitForElement(selector: string, timeout = 5000): Promise<Element | null> {
+  return new Promise((resolve) => {
+    const el = document.querySelector(selector);
+    if (el) return resolve(el);
+    const observer = new MutationObserver(() => {
+      const found = document.querySelector(selector);
+      if (found) {
+        observer.disconnect();
+        resolve(found);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeout);
+  });
+}
 
 export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Props) {
   const searchParams = useSearchParams();
@@ -81,6 +51,17 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       if (cancelled) return;
       startedRef.current = true;
 
+      const markCompleted = async () => {
+        try {
+          await fetch("/api/users/onboarding", { method: "POST" });
+        } catch {}
+        if (forceStart) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("tour");
+          router.replace(url.pathname + (url.search !== "?" ? url.search : ""));
+        }
+      };
+
       const tour = new Shepherd.Tour({
         useModalOverlay: true,
         defaultStepOptions: {
@@ -93,78 +74,173 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       });
 
       tourRef.current = tour;
-
-      const markCompleted = async () => {
-        try {
-          await fetch("/api/users/onboarding", { method: "POST" });
-        } catch {}
-        if (forceStart) {
-          const url = new URL(window.location.href);
-          url.searchParams.delete("tour");
-          router.replace(url.pathname + (url.search !== "?" ? url.search : ""));
-        }
-      };
-
       tour.on("complete", markCompleted);
       tour.on("cancel", markCompleted);
 
-      TOUR_STEPS.forEach((step, index) => {
-        const isFirst = index === 0;
-        const isLast = index === TOUR_STEPS.length - 1;
+      // Paso 1 - Bienvenida
+      tour.addStep({
+        id: "welcome",
+        title: "Bienvenido a Biblioteca Legal HN",
+        text: "Te mostramos todo lo que tienes disponible en la plataforma. Este tour dura menos de 2 minutos.",
+        buttons: [
+          {
+            text: "Comenzar tour",
+            classes: "blhn-btn-primary",
+            action() {
+              router.push("/collections");
+              tour.next();
+            },
+          },
+        ],
+      });
 
-        const buttons = [];
+      // Paso 2 - Colección
+      tour.addStep({
+        id: "collections",
+        title: "Colección de documentos",
+        text: "Aquí encuentras todas las leyes, códigos y reglamentos de Honduras organizados por categoría. Haz clic en cualquier documento para leerlo.",
+        attachTo: { element: "#tour-collections-grid", on: "bottom" },
+        when: {
+          async show() {
+            const el = await waitForElement("#tour-collections-grid");
+            if (!el) tour.next();
+          },
+        },
+        buttons: [
+          {
+            text: "Anterior",
+            classes: "blhn-btn-secondary",
+            action() { tour.back(); },
+          },
+          {
+            text: "Siguiente",
+            classes: "blhn-btn-primary",
+            action() {
+              router.push(`/collections/${DEMO_DOCUMENT_SLUG}`);
+              tour.next();
+            },
+          },
+        ],
+      });
 
-        if (!isFirst) {
-          buttons.push({
+      // Paso 3 - Artículo
+      tour.addStep({
+        id: "article-tools",
+        title: "Interactúa con los artículos",
+        text: "Haz clic en el botón de cualquier artículo para resaltarlo con colores, guardarlo con un marcador o agregar una nota privada. Disponible para suscriptores.",
+        attachTo: { element: "#tour-article-tools", on: "bottom" },
+        when: {
+          async show() {
+            const el = await waitForElement("#tour-article-tools");
+            if (!el) tour.next();
+          },
+        },
+        buttons: [
+          {
             text: "Anterior",
             classes: "blhn-btn-secondary",
             action() {
+              router.push("/collections");
               tour.back();
             },
-          });
-        }
+          },
+          {
+            text: "Siguiente",
+            classes: "blhn-btn-primary",
+            action() { tour.next(); },
+          },
+        ],
+      });
 
-        if (isLast) {
-          buttons.push({
-            text: "Ver planes",
-            classes: "blhn-btn-primary",
-            action() {
-              tour.complete();
-              router.push("/subscriptions");
-            },
-          });
-          buttons.push({
-            text: "Continuar gratis",
+      // Paso 4 - Resumen IA
+      tour.addStep({
+        id: "ai-summary",
+        title: "Resumen IA por artículo",
+        text: "Cada artículo tiene un resumen generado por inteligencia artificial que explica su contenido en lenguaje claro. Exclusivo para suscriptores.",
+        attachTo: { element: "#tour-ai-summary", on: "bottom" },
+        when: {
+          async show() {
+            const el = await waitForElement("#tour-ai-summary");
+            if (!el) tour.next();
+          },
+        },
+        buttons: [
+          {
+            text: "Anterior",
             classes: "blhn-btn-secondary",
-            action() {
-              tour.complete();
-            },
-          });
-        } else {
-          buttons.push({
-            text: isFirst ? "Comenzar tour" : "Siguiente",
+            action() { tour.back(); },
+          },
+          {
+            text: "Siguiente",
+            classes: "blhn-btn-primary",
+            action() { tour.next(); },
+          },
+        ],
+      });
+
+      // Paso 5 - Chatbot
+      tour.addStep({
+        id: "chatbot",
+        title: "Asistente legal IA",
+        text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos. Hasta 20 consultas diarias para suscriptores.",
+        attachTo: { element: "#tour-chatbot", on: "top" },
+        when: {
+          async show() {
+            const el = await waitForElement("#tour-chatbot");
+            if (!el) tour.next();
+          },
+        },
+        buttons: [
+          {
+            text: "Anterior",
+            classes: "blhn-btn-secondary",
+            action() { tour.back(); },
+          },
+          {
+            text: "Siguiente",
             classes: "blhn-btn-primary",
             action() {
+              router.push("/subscriptions");
               tour.next();
             },
-          });
-        }
+          },
+        ],
+      });
 
-        tour.addStep({
-          id: step.id,
-          title: step.title,
-          text: step.text,
-          attachTo: step.attachTo ?? undefined,
-          buttons,
-          when: step.attachTo
-            ? {
-                show() {
-                  const el = document.querySelector(step.attachTo!.element);
-                  if (!el) tour.next();
-                },
-              }
-            : undefined,
-        });
+      // Paso 6 - Suscripciones
+      tour.addStep({
+        id: "finish",
+        title: "Desbloquea todo el potencial",
+        text: "Suscríbete para acceder a los resúmenes IA, el asistente legal, resaltado de artículos, marcadores y notas privadas.",
+        attachTo: { element: "#tour-subscriptions", on: "bottom" },
+        when: {
+          async show() {
+            const el = await waitForElement("#tour-subscriptions");
+            if (!el) {
+              // si no encuentra el elemento en navbar igual muestra el paso centrado
+            }
+          },
+        },
+        buttons: [
+          {
+            text: "Anterior",
+            classes: "blhn-btn-secondary",
+            action() {
+              router.push(`/collections/${DEMO_DOCUMENT_SLUG}`);
+              tour.back();
+            },
+          },
+          {
+            text: "Ver planes",
+            classes: "blhn-btn-primary",
+            action() { tour.complete(); },
+          },
+          {
+            text: "Cerrar",
+            classes: "blhn-btn-secondary",
+            action() { tour.complete(); },
+          },
+        ],
       });
 
       tour.start();
