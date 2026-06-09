@@ -8,9 +8,7 @@ import { ReactNode, Suspense } from "react";
 import CookieBanner from "@/components/shared/cookie-banner";
 import { Analytics } from "@vercel/analytics/react";
 import dynamic from "next/dynamic";
-
 const OnboardingTour = dynamic(() => import("@/components/tour/OnboardingTour"), { ssr: false });
-
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;
@@ -28,16 +26,16 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       <NextTopLoader showSpinner={false} color="#FFFFFF" />
       <GoogleAnalytics gaId={process.env.GOOGLE_ANALYTICS_ID!} />
       <Analytics />
-      {cu && user && (
+      {/* Tour deshabilitado temporalmente */}
+      {/* {cu && user && (
         <Suspense>
           <OnboardingTour
             onboardingCompleted={user.onboardingCompleted}
             isLoggedin={true}
           />
         </Suspense>
-      )}
+      )} */}
     </div>
   );
 };
-
 export default WebsiteLayout;
