@@ -63,6 +63,7 @@ interface Props {
 
 const ArticleCard = ({
   data,
+  index,
   isLoggedin,
   hasSubscription,
   documentId,
@@ -109,6 +110,7 @@ const ArticleCard = ({
   if (!data?.id) return null;
 
   const displayLabel = data.articleLabel ?? String(data.articleNumber);
+  const isFirstCard = index === 0;
 
   const handleArticleButtonClick = () => {
     if (!isLoggedin || !hasSubscription) {
@@ -194,15 +196,16 @@ const ArticleCard = ({
           <CardHeader>
             <div className="flex items-center gap-x-2 relative flex-wrap">
               <Button
+                id={isFirstCard ? "tour-article-tools" : undefined}
                 className="bg-[#1E2A384D]/30 hover:bg-[#1E2A384D]/40 w-fit text-black"
                 onClick={handleArticleButtonClick}
                 disabled={isMetaLoading || pending}
               >
                 Artículo {displayLabel}
               </Button>
-              {/* Botón resumen IA para suscriptores */}
               {data.aiSummary && hasSubscription && (
                 <Button
+                  id={isFirstCard ? "tour-ai-summary" : undefined}
                   size="sm"
                   variant="outline"
                   className="flex items-center gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
@@ -215,9 +218,9 @@ const ArticleCard = ({
                     : <ChevronDown className="w-3 h-3" />}
                 </Button>
               )}
-              {/* Badge clickeable para no suscriptores */}
               {data.aiSummary && !hasSubscription && (
                 <button
+                  id={isFirstCard ? "tour-ai-summary" : undefined}
                   onClick={() => setShowSubscribeModal(true)}
                   className="flex items-center gap-1 text-xs border border-purple-300 text-purple-600 rounded-md px-2 py-1 hover:bg-purple-50 transition-colors"
                 >
@@ -270,7 +273,6 @@ const ArticleCard = ({
             </div>
           </CardHeader>
           <CardContent>
-            {/* Resumen IA expandible para suscriptores */}
             <AnimatePresence>
               {showSummary && hasSubscription && data.aiSummary && (
                 <motion.div
@@ -290,7 +292,6 @@ const ArticleCard = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            {/* Resumen bloqueado para no suscriptores */}
             {data.aiSummary && !hasSubscription && (
               <LockedSummary
                 aiSummary={data.aiSummary}
