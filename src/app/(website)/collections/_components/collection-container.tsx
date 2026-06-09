@@ -49,7 +49,7 @@ const CollectionContainer = () => {
     );
   } else {
     content = (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10">
+      <div id="tour-collections-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10">
         {data?.data?.map((item) => (
           <DocumentCard key={item.id} document={item} />
         ))}
