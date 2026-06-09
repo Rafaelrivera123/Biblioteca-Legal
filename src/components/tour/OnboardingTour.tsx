@@ -159,4 +159,28 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
           when: step.attachTo
             ? {
                 show() {
-                  con
+                  const el = document.querySelector(step.attachTo!.element);
+                  if (!el) tour.next();
+                },
+              }
+            : undefined,
+        });
+      });
+
+      tour.start();
+    };
+
+    initTour();
+
+    return () => {
+      cancelled = true;
+      if (tourRef.current) {
+        tourRef.current.complete();
+        tourRef.current = null;
+        startedRef.current = false;
+      }
+    };
+  }, [isLoggedin, onboardingCompleted, searchParams]);
+
+  return null;
+}
