@@ -29,7 +29,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const menus = [
     { id: 1, href: "/", linkText: "Inicio" },
     { id: 2, href: "/collections", linkText: "Colección" },
-    { id: 3, href: "/subscriptions", linkText: "Subscripciones" },
+    { id: 3, href: "/subscriptions", linkText: "Subscripciones", tourId: "tour-subscriptions" },
     { id: 4, href: "/contact", linkText: "Contacto" },
   ];
 
@@ -41,12 +41,8 @@ const Navbar = ({ isLoggedin, user }: Props) => {
         setScrolling(false);
       }
     };
-
     window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const onLogout = async () => {
@@ -54,7 +50,6 @@ const Navbar = ({ isLoggedin, user }: Props) => {
       logoutAction().then((res) => {
         if (res && !res.success) {
           toast.error(res.message);
-          return;
         }
       });
     });
@@ -87,6 +82,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
               <Link
                 key={menu.id}
                 href={menu.href}
+                id={menu.tourId}
                 className={cn(
                   pathname === menu.href ? "font-semibold" : "font-light"
                 )}
@@ -101,11 +97,12 @@ const Navbar = ({ isLoggedin, user }: Props) => {
                 <FramerDropdown
                   trigger={
                     <Image
+                      id="tour-profile"
                       src={user?.image ?? "https://github.com/shadcn.png"}
                       alt={user?.first_name + " " + user?.last_name}
                       height={30}
                       width={30}
-                      className="rounded-full"
+                      className="rounded-full cursor-pointer"
                     />
                   }
                 >
@@ -148,47 +145,3 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           <div className="md:hidden flex items-center gap-x-4">
             <div>
               {!isLoggedin && <Button size="sm">Iniciar sesión</Button>}
-              {isLoggedin && (
-                <Link href="/account" className="flex items-center">
-                  <Image
-                    src={user?.image ?? "https://github.com/shadcn.png"}
-                    alt={user?.first_name + " " + user?.last_name}
-                    height={30}
-                    width={30}
-                    className="rounded-full"
-                  />
-                </Link>
-              )}
-            </div>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" className="p-1" size="icon">
-                  <Menu />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="top" className="bg-white text-primary">
-                <div className="flex flex-col items-center gap-y-8 mt-6">
-                  <div className="flex flex-col items-center gap-y-5">
-                    {menus.map((menu) => (
-                      <Link
-                        key={menu.id}
-                        href={menu.href}
-                        className={`${
-                          pathname === menu.href ? "font-semibold" : "font-light"
-                        }`}
-                      >
-                        <SheetClose>{menu.linkText}</SheetClose>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Navbar;
