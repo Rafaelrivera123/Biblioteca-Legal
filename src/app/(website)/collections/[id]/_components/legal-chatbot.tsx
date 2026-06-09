@@ -160,6 +160,7 @@ const LegalChatbot = ({
             exit={{ scale: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={handleOpen}
+            id="tour-chatbot"
             className={cn(
               "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors",
               hasSubscription && isLoggedin
