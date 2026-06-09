@@ -1,18 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, BookOpen, FileSearch } from "lucide-react";
+import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export default function OurServices() {
   return (
     <section className="bg-slate-800 py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-blue-400 text-lg font-medium mb-4">
             Nuestros Servicios
           </h2>
-          <h3 className="text-white  text-[20px] md:text-4xl font-bold mb-6">
+          <h3 className="text-white text-[20px] md:text-4xl font-bold mb-6">
             Recursos Legales Integrales
           </h3>
           <p className="text-gray-300 text-[14px] md:text-lg max-w-4xl mx-auto">
@@ -21,9 +20,7 @@ export default function OurServices() {
           </p>
         </div>
 
-        {/* Services Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Legal Library Card */}
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
               <div className="mb-6 flex justify-between">
@@ -32,7 +29,6 @@ export default function OurServices() {
                 </h4>
                 <BookOpen className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
               </div>
-
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
                 Accede a todos los documentos legales, leyes y decretos
               </p>
@@ -53,16 +49,13 @@ export default function OurServices() {
             </CardContent>
           </Card>
 
-          {/* Legal Updates Card */}
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
               <div className="mb-6 flex justify-between">
                 <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
                   Actualizaciones Legales
                 </h4>
-                {/* <FileText className="w-12 h-12 text-white group-hover:text-slate-800 transition-colors duration-300" /> */}
               </div>
-
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
                 Mantente informado con los últimos desarrollos legales
               </p>
@@ -80,32 +73,30 @@ export default function OurServices() {
             </CardContent>
           </Card>
 
-          {/* Document Search Card */}
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
-              <div className="mb-6 flex justify-between">
+              <div className="mb-2 flex justify-between">
                 <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
-                  Búsqueda de Documentos
+                  Análisis Legal IA
                 </h4>
-
-                <FileSearch className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
+                <Sparkles className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
               </div>
-
+              <span className="inline-block mb-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white group-hover:bg-purple-100 group-hover:text-purple-800 transition-colors duration-300">
+                Nuevo
+              </span>
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Encuentra documentos legales específicos de forma rápida y
-                eficiente
+                Consulta nuestro asistente con acceso a toda la legislación hondureña de Biblioteca Legal HN
               </p>
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Nuestras potentes herramientas de búsqueda te ayudan a localizar
-                exactamente lo que necesitas dentro de nuestra amplia colección.
+                Haz preguntas legales, sube documentos o imágenes y obtén respuestas basadas en las leyes y códigos de Honduras.
               </p>
               <Button
                 variant="outline"
                 className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
                 asChild
               >
-                <Link href="/collections">
-                  Explorar Biblioteca
+                <Link href="/legal-ai">
+                  Consultar Ahora
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Link>
               </Button>
