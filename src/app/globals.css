@@ -70,86 +70,20 @@
   }
 }
 
-/* Tour Shepherd.js */
-.blhn-tour-step.shepherd-element {
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  max-width: 340px;
-  font-family: inherit;
-  border: 1px solid #e5e7eb;
+/* Tour Shepherd.js - reset completo */
+.shepherd-element,
+.shepherd-element * {
+  box-sizing: border-box;
 }
-.blhn-tour-step .shepherd-content {
-  padding: 0;
+.shepherd-element {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18) !important;
+  max-width: 340px !important;
+  font-family: inherit !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  z-index: 9999 !important;
 }
-.blhn-tour-step .shepherd-header {
-  background: #1E2A38;
-  border-radius: 12px 12px 0 0;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.blhn-tour-step .shepherd-title {
-  color: #ffffff !important;
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0;
-  flex: 1;
-}
-.blhn-tour-step .shepherd-cancel-icon {
-  color: rgba(255,255,255,0.8) !important;
-  font-size: 18px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  line-height: 1;
-}
-.blhn-tour-step .shepherd-cancel-icon:hover {
-  color: #ffffff !important;
-}
-.blhn-tour-step .shepherd-text {
-  padding: 14px 16px;
-  font-size: 13px;
-  color: #374151;
-  line-height: 1.6;
-  background: #ffffff;
-}
-.blhn-tour-step .shepherd-footer {
-  padding: 0 16px 14px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  background: #ffffff;
-  border-radius: 0 0 12px 12px;
-}
-.blhn-btn-primary {
-  background: #1E2A38;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.blhn-btn-primary:hover {
-  background: #2d3f54;
-}
-.blhn-btn-secondary {
-  background: transparent;
-  color: #1E2A38;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.blhn-btn-secondary:hover {
-  background: #f3f4f6;
-}
-.shepherd-modal-overlay-container {
-  opacity: 0.5;
-}
+.shepherd-content {
+  padding: 0 !important;
+  border-radius: 12px !imp
