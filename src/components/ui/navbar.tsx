@@ -27,10 +27,10 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const pathname = usePathname();
 
   const menus = [
-    { id: 1, href: "/", linkText: "Inicio" },
-    { id: 2, href: "/collections", linkText: "Colección" },
+    { id: 1, href: "/", linkText: "Inicio", tourId: undefined },
+    { id: 2, href: "/collections", linkText: "Colección", tourId: undefined },
     { id: 3, href: "/subscriptions", linkText: "Subscripciones", tourId: "tour-subscriptions" },
-    { id: 4, href: "/contact", linkText: "Contacto" },
+    { id: 4, href: "/contact", linkText: "Contacto", tourId: undefined },
   ];
 
   useEffect(() => {
@@ -145,3 +145,47 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           <div className="md:hidden flex items-center gap-x-4">
             <div>
               {!isLoggedin && <Button size="sm">Iniciar sesión</Button>}
+              {isLoggedin && (
+                <Link href="/account" className="flex items-center">
+                  <Image
+                    src={user?.image ?? "https://github.com/shadcn.png"}
+                    alt={user?.first_name + " " + user?.last_name}
+                    height={30}
+                    width={30}
+                    className="rounded-full"
+                  />
+                </Link>
+              )}
+            </div>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="p-1" size="icon">
+                  <Menu />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="top" className="bg-white text-primary">
+                <div className="flex flex-col items-center gap-y-8 mt-6">
+                  <div className="flex flex-col items-center gap-y-5">
+                    {menus.map((menu) => (
+                      <Link
+                        key={menu.id}
+                        href={menu.href}
+                        className={`${
+                          pathname === menu.href ? "font-semibold" : "font-light"
+                        }`}
+                      >
+                        <SheetClose>{menu.linkText}</SheetClose>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Navbar;
