@@ -121,13 +121,12 @@ REGLAS ESTRICTAS DE RESPUESTA:
       throw new Error("Respuesta vacía de OpenAI");
     }
 
-    // Sanitización básica para remover posibles bloques contenedores de markdown que el modelo a veces concatena por inercia
-   if (analysisHtml.startsWith("```html")) {
-  analysisHtml = analysisHtml.replace(/^
-```html\s*|\s*```$/g, "");
-} else if (analysisHtml.startsWith("```")) {
-  analysisHtml = analysisHtml.replace(/^```\s*|\s*```$/g, "");
-}
+    // [CORREGIDO] Sanitización segura utilizando métodos nativos de string sin expresiones regulares multilínea
+    if (analysisHtml.startsWith("```html") && analysisHtml.endsWith("```")) {
+      analysisHtml = analysisHtml.slice(7, -3).trim();
+    } else if (analysisHtml.startsWith("```") && analysisHtml.endsWith("```")) {
+      analysisHtml = analysisHtml.slice(3, -3).trim();
+    }
 
     // Paso 4: Construcción del cascarón de correo responsivo y despacho vía Resend
     await resend.emails.send({
