@@ -3,6 +3,7 @@ import { resend } from "@/lib/resend";
 import { NextResponse } from "next/server";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const TAVILY_API_URL = "https://api.tavily.com/search";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -11,54 +12,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Paso 1: buscar actualizaciones legales con OpenAI web search
-    const searchRes = await fetch(OPENAI_API_URL, {
+    // Paso 1: buscar actualizaciones legales con Tavily
+    const tavilyRes = await fetch(TAVILY_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini-search-preview",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: `Busca en internet las actualizaciones, reformas o nuevas leyes hondureñas de los últimos 7 días.
-Busca en el Diario Oficial La Gaceta de Honduras y otras fuentes oficiales.
-Devuelve SOLO un JSON valido con este formato, sin texto adicional:
-{
-  "updates": [
-    {
-      "law_name": "nombre exacto de la ley",
-      "law_number": "numero del decreto o ley si existe",
-      "change_type": "reforma | nueva_ley | derogacion",
-      "summary": "resumen de los cambios",
-      "affected_articles": ["articulo 5", "articulo 12"]
-    }
-  ]
-}
-Si no hay actualizaciones, devuelve: { "updates": [] }`,
-          },
-        ],
+        api_key: process.env.TAVILY_API_KEY,
+        query: "reformas leyes Honduras Gaceta Oficial decretos legislativos 2026",
+        search_depth: "advanced",
+        max_results: 10,
+        include_answer: true,
+        days: 7,
       }),
     });
 
-    let updates: any[] = [];
-
-    if (searchRes.ok) {
-      const searchData = await searchRes.json();
-      const searchText = searchData.choices?.[0]?.message?.content?.trim() ?? "";
-      try {
-        const clean = searchText.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
-        updates = parsed.updates || [];
-      } catch {
-        updates = [];
-      }
+    if (!tavilyRes.ok) {
+      throw new Error(`Tavily error: ${await tavilyRes.text()}`);
     }
 
-    // Paso 2: obtener solo nombres y numeros de ley
+    const tavilyData = await tavilyRes.json();
+    const searchResults = tavilyData.results ?? [];
+    const searchAnswer = tavilyData.answer ?? "";
+
+    // Paso 2: obtener documentos de la BD (solo nombres y numeros)
     const documents = await prisma.document.findMany({
       where: { published: true },
       select: {
@@ -69,8 +45,8 @@ Si no hay actualizaciones, devuelve: { "updates": [] }`,
       },
     });
 
-    // Paso 3: comparar y analizar con OpenAI
-    const compareRes = await fetch(OPENAI_API_URL, {
+    // Paso 3: analizar con OpenAI
+    const openaiRes = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -87,33 +63,35 @@ Si no hay actualizaciones, devuelve: { "updates": [] }`,
           },
           {
             role: "user",
-            content: `Tengo estas actualizaciones legales recientes encontradas en internet:
-${JSON.stringify(updates, null, 2)}
+            content: `Estas son las noticias y actualizaciones legales de Honduras de los ultimos 7 dias encontradas en internet:
 
-Y estos son los documentos que tengo en mi biblioteca legal:
-${JSON.stringify(documents.map((d) => ({ id: d.id, name: d.name, law_number: d.law_number, slug: d.slug })), null, 2)}
+RESUMEN: ${searchAnswer}
 
-Analiza y dime exactamente:
+FUENTES:
+${searchResults.map((r: any) => `- ${r.title}: ${r.content}`).join("\n")}
+
+Estos son los documentos que tengo en mi biblioteca legal:
+${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })), null, 2)}
+
+Analiza y dime:
 1. Que documentos de mi biblioteca necesitan actualizarse y por que
-2. Que articulos especificos dentro de cada documento cambiaron
-3. Que leyes nuevas deberia agregar que aun no tengo
-4. Que leyes fueron derogadas y deberia marcar o eliminar
+2. Que articulos especificos cambiaron
+3. Que leyes nuevas deberia agregar
+4. Que leyes fueron derogadas
 
-Formatea tu respuesta en HTML limpio con estilos inline, con colores: fondo #1a1a2e, texto blanco, acentos en #4CAF50.
-Se muy especifico con los numeros de articulos y secciones.
-Si ningun documento de mi biblioteca se ve afectado, indicalo claramente.`,
+Formatea tu respuesta en HTML limpio con estilos inline. Usa fondo #1a1a2e, texto blanco, acentos en #4CAF50.
+Si ningun documento se ve afectado, indicalo claramente.`,
           },
         ],
       }),
     });
 
-    if (!compareRes.ok) {
-      const errText = await compareRes.text();
-      throw new Error(`OpenAI error: ${errText}`);
+    if (!openaiRes.ok) {
+      throw new Error(`OpenAI error: ${await openaiRes.text()}`);
     }
 
-    const compareData = await compareRes.json();
-    const analysisHtml = compareData.choices?.[0]?.message?.content?.trim() ?? "";
+    const openaiData = await openaiRes.json();
+    const analysisHtml = openaiData.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!analysisHtml) {
       throw new Error("Respuesta vacia de OpenAI");
@@ -176,7 +154,7 @@ Si ningun documento de mi biblioteca se ve afectado, indicalo claramente.`,
       `,
     });
 
-    return NextResponse.json({ success: true, updates_found: updates.length });
+    return NextResponse.json({ success: true, results_found: searchResults.length });
   } catch (error) {
     console.error("Error en weekly-update:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
