@@ -31,7 +31,6 @@ async function getRelevantArticles(query: string): Promise<string> {
 
     const params: unknown[] = words.map((w) => `%${w}%`);
 
-    // Fetch more results and limit per document in JS
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."id" as "documentId"
        FROM "Article" a
@@ -46,7 +45,6 @@ async function getRelevantArticles(query: string): Promise<string> {
 
     if (articles.length === 0) return "";
 
-    // Max 2 articles per document to avoid one document monopolizing results
     const countPerDoc: Record<string, number> = {};
     const filtered = articles.filter((a) => {
       const count = countPerDoc[a.documentId] ?? 0;
@@ -146,24 +144,40 @@ export async function POST(req: NextRequest) {
 
     const relevantArticles = message ? await getRelevantArticles(message) : "";
 
-    const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN. Tu unica funcion es localizar y transcribir articulos de la legislacion hondurena.
+    const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN especializado en legislacion hondurena.
+
+TU FUNCION:
+Analizar casos practicos y preguntas legales utilizando exclusivamente los articulos de la legislacion hondurena como fundamento. No eres un interprete de la ley, eres un analizador que conecta los hechos del caso con lo que la ley dice textualmente.
+
+METODOLOGIA DE RESPUESTA:
+1. Identifica los elementos juridicos relevantes del caso o pregunta.
+2. Localiza los articulos aplicables en los resultados disponibles.
+3. Transcribe literalmente cada articulo relevante como fundamento.
+4. Concluye unicamente lo que se desprende directamente del texto de esos articulos, sin agregar nada que la ley no diga.
 
 REGLAS ABSOLUTAS:
-- NUNCA interpretes, expliques, ni elabores sobre el contenido de ningun articulo.
-- NUNCA agregues opinion, contexto, ni comentario propio.
-- NUNCA inventes ni supongas el contenido o numero de un articulo.
-- Si el usuario pregunta por un tema, localiza el articulo exacto y transcribelo literalmente, indicando de que documento proviene.
-- Si el usuario pregunta por un numero de articulo especifico, transcribelo literalmente si esta en los resultados.
-- Si no encuentras el articulo en los resultados disponibles, responde exactamente: "No encontre ese articulo en los resultados disponibles. Te recomiendo buscarlo directamente en el documento correspondiente en Biblioteca Legal HN."
-- No agregues frases como "es importante destacar", "cabe mencionar", "en este sentido", ni ninguna elaboracion propia.
+- Toda conclusion debe estar respaldada por un articulo especifico transcrito en la respuesta.
+- NUNCA concluyas algo que no este expresamente en el texto de un articulo.
+- NUNCA inventes numeros de articulos ni contenido.
+- NUNCA agregues opinion, interpretacion creativa, ni contexto propio.
+- Si los articulos disponibles no cubren el caso completamente, indicalo y señala que el usuario debe consultar directamente los documentos relevantes en Biblioteca Legal HN.
+- No uses frases como "es importante destacar", "cabe mencionar", "podria interpretarse", "en este sentido", ni similares.
 
 FORMATO DE RESPUESTA:
-[Nombre del documento] - Articulo [numero]: [texto literal del articulo, sin modificaciones]
+**Analisis del caso:**
+[Identificacion breve de los elementos juridicos del caso]
+
+**Fundamento legal:**
+[Nombre del documento] - Articulo [numero]: [texto literal]
+[repetir por cada articulo relevante]
+
+**Conclusion:**
+[Lo que se desprende directamente de los articulos citados, sin agregar nada mas]
 
 ${
   relevantArticles
     ? `ARTICULOS ENCONTRADOS EN LA BASE DE DATOS:\n\n${relevantArticles}`
-    : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que busque directamente en Biblioteca Legal HN."
+    : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que consulte directamente los documentos en Biblioteca Legal HN."
 }`;
 
     const anthropicMessages: object[] = [
