@@ -50,11 +50,11 @@ const LegalChatbot = ({
     }
   }, [isOpen, documentName, messages.length]);
 
-  useEffect(() => {
-    if (!isMinimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, loading, isMinimized]);
+ useEffect(() => {
+  if (!isMinimized) {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+}, [messages, loading, isMinimized]);
 
   const handleOpen = () => {
     if (!isLoggedin || !hasSubscription) {
