@@ -159,6 +159,10 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
     if (!text) return "";
     return text
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[#1E2A38] underline font-medium hover:opacity-70">$1</a>'
+      )
       .replace(/\n/g, "<br/>");
   };
 
