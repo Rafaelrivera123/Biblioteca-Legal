@@ -275,3 +275,18 @@ model BatchJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+model Article {
+  id               String            @id @default(cuid())
+  content          String
+  contentPlainText String            @default("")
+  aiSummary        String?
+  embedding        Unsupported("vector(768)")?
+  articleNumber    Int
+  articleLabel     String?
+  viewCount        Int               @default(0)
+  chapterId        String
+  chapter          Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  userMeta         UserArticleMeta[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
