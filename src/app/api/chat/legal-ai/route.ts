@@ -8,35 +8,47 @@ const DAILY_LIMIT = 20;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
 async function extractLegalKeywords(query: string): Promise<string[]> {
-  try {
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 100,
-        temperature: 0,
-        system: `Eres un extractor de terminos juridicos hondurenos. Dado un texto, devuelve UNICAMENTE una lista de terminos legales en espanol separados por comas, sin explicacion, sin puntos, sin frases. Solo los terminos. Ejemplos de terminos: violacion, abuso sexual, menor de edad, homicidio, hurto, fraude, apropiacion indebida, nulidad, acto administrativo, competencia, contrato, despido, preaviso, pension, sociedad anonima, quiebra.`,
-        messages: [{ role: "user", content: query }],
-      }),
-    });
+  const res = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 150,
+      temperature: 0,
+      system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
 
-    if (!res.ok) return [];
+Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
 
-    const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() ?? "";
-    return text
-      .split(",")
-      .map((k: string) => k.trim().toLowerCase())
-      .filter((k: string) => k.length > 2)
-      .slice(0, 8);
-  } catch {
-    return [];
+Ejemplos:
+Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
+Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
+Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
+Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
+      messages: [{ role: "user", content: query }],
+    }),
+  });
+
+  if (!res.ok) {
+    console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status, await res.text());
+    throw new Error(`extractLegalKeywords failed: ${res.status}`);
   }
+
+  const data = await res.json();
+  const text = data.content?.[0]?.text?.trim() ?? "";
+
+  console.log("[legal-ai] extracted keywords:", text);
+
+  if (!text) throw new Error("extractLegalKeywords returned empty");
+
+  return text
+    .split(",")
+    .map((k: string) => k.trim().toLowerCase())
+    .filter((k: string) => k.length > 2)
+    .slice(0, 10);
 }
 
 async function getRelevantArticles(query: string): Promise<string> {
@@ -48,23 +60,16 @@ async function getRelevantArticles(query: string): Promise<string> {
       documentName: string;
     };
 
-    const aiKeywords = await extractLegalKeywords(query);
+    // Use only AI-extracted keywords — raw query words contaminate results
+    const keywords = await extractLegalKeywords(query);
 
-    const rawWords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .slice(0, 5);
+    if (keywords.length === 0) return "";
 
-    const allKeywords = Array.from(new Set([...aiKeywords, ...rawWords])).slice(0, 10);
-
-    if (allKeywords.length === 0) return "";
-
-    const conditions = allKeywords
+    const conditions = keywords
       .map((_, i) => `a."contentPlainText" ILIKE $${i + 1}`)
       .join(" OR ");
 
-    const params: unknown[] = allKeywords.map((w) => `%${w}%`);
+    const params: unknown[] = keywords.map((w) => `%${w}%`);
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
@@ -172,7 +177,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN especializado en legislacion hondurena.
 
 TU FUNCION:
-Analizar casos practicos y preguntas legales utilizando exclusivamente los articulos de la legislacion hondurena como fundamento. No eres un interprete de la ley, eres un analizador que conecta los hechos del caso con lo que la ley dice textualmente.
+Analizar casos practicos y preguntas legales de cualquier rama del derecho hondureno (penal, civil, administrativo, constitucional, laboral, familiar, mercantil, etc.) utilizando exclusivamente los articulos de la legislacion hondurena como fundamento. No eres un interprete de la ley, eres un analizador que conecta los hechos del caso con lo que la ley dice textualmente.
 
 METODOLOGIA DE RESPUESTA:
 1. Identifica los elementos juridicos relevantes del caso o pregunta.
