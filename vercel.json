@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/weekly-update",
-      "schedule": "0 9 * * 1"
+      "schedule": "0 9 * * 1,5"
     },
     {
       "path": "/api/ai/generate-summaries",
