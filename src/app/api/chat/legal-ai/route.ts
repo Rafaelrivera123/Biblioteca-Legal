@@ -6,112 +6,29 @@ export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent`;
+const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
 
-function normalize(str: string): string {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
+async function getQueryEmbedding(query: string): Promise<number[]> {
+  const res = await fetch(OPENAI_EMBEDDINGS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "text-embedding-3-small",
+      input: query.slice(0, 2000),
+      dimensions: 768,
+    }),
+  });
 
-async function extractLegalKeywords(query: string): Promise<string[]> {
-  try {
-    const res = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{
-            text: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
-Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
-Ejemplos:
-Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
-Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
-Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
-Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`
-          }]
-        },
-        contents: [{ role: "user", parts: [{ text: query }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 150 },
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("[legal-ai] extractLegalKeywords Gemini error:", res.status);
-      return await extractLegalKeywordsGroq(query);
-    }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-
-    if (!text) return await extractLegalKeywordsGroq(query);
-
-    const keywords = text
-      .split(",")
-      .map((k: string) => normalize(k))
-      .filter((k: string) => k.length > 2)
-      .slice(0, 10);
-
-    console.log("[legal-ai] extracted keywords (Gemini):", keywords);
-    return keywords;
-  } catch (err) {
-    console.error("[legal-ai] extractLegalKeywords Gemini error:", err);
-    return await extractLegalKeywordsGroq(query);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI embedding error: ${err}`);
   }
-}
 
-async function extractLegalKeywordsGroq(query: string): Promise<string[]> {
-  try {
-    const res = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "system",
-            content: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
-Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
-Ejemplos:
-Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
-Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
-Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
-Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
-          },
-          { role: "user", content: query },
-        ],
-        max_tokens: 150,
-        temperature: 0,
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("[legal-ai] extractLegalKeywordsGroq error:", res.status);
-      return [];
-    }
-
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content?.trim() ?? "";
-
-    if (!text) return [];
-
-    const keywords = text
-      .split(",")
-      .map((k: string) => normalize(k))
-      .filter((k: string) => k.length > 2)
-      .slice(0, 10);
-
-    console.log("[legal-ai] extracted keywords (Groq fallback):", keywords);
-    return keywords;
-  } catch (err) {
-    console.error("[legal-ai] extractLegalKeywordsGroq error:", err);
-    return [];
-  }
+  const data = await res.json();
+  return data.data[0].embedding;
 }
 
 async function getRelevantArticles(query: string): Promise<string> {
@@ -124,38 +41,19 @@ async function getRelevantArticles(query: string): Promise<string> {
       documentSlug: string;
     };
 
-    const keywords = await extractLegalKeywords(query);
-    console.log("[legal-ai] keywords for RAG:", keywords);
-
-    if (keywords.length === 0) {
-      console.error("[legal-ai] no keywords extracted, RAG skipped");
-      return "";
-    }
-
-    const conditions = keywords
-      .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
-      .join(" OR ");
-
-    const scoreExpressions = keywords
-      .map((_, i) => `(CASE WHEN unaccent(a."contentPlainText") ILIKE $${keywords.length + i + 1} THEN 1 ELSE 0 END)`)
-      .join(" + ");
-
-    const params: unknown[] = [
-      ...keywords.map((w) => `%${w}%`),
-      ...keywords.map((w) => `%${w}%`),
-    ];
+    const embedding = await getQueryEmbedding(query);
+    const vectorStr = `[${embedding.join(",")}]`;
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug",
-              (${scoreExpressions}) as score
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
        JOIN "Document" d ON s."documentId" = d.id
-       WHERE ${conditions}
-       ORDER BY score DESC
+       WHERE a.embedding IS NOT NULL
+       ORDER BY a.embedding <=> $1::vector
        LIMIT 15`,
-      ...params
+      vectorStr
     );
 
     console.log("[legal-ai] articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
@@ -279,12 +177,12 @@ FORMATO DE RESPUESTA:
 
 **Fundamento legal:**
 [Nombre del documento](URL) - Articulo [numero]: [texto literal]
-[repetir por cada articulo relevante, usando el formato markdown de link para el nombre del documento]
+[repetir por cada articulo relevante]
 
 **Conclusion:**
 [Lo que se desprende directamente de los articulos citados, sin agregar nada mas]
 
-INSTRUCCION DE LINKS: Cada articulo en los resultados ya viene con su URL entre parentesis en formato markdown. Usa exactamente esa URL para el link del documento. No inventes URLs.
+INSTRUCCION DE LINKS: Cada articulo ya viene con su URL en formato markdown. Usa exactamente esa URL. No inventes URLs.
 
 ${
   relevantArticles
