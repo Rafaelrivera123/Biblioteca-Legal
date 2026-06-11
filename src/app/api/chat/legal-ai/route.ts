@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
 
 function normalize(str: string): string {
   return str
@@ -17,25 +17,23 @@ function normalize(str: string): string {
 
 async function extractLegalKeywords(query: string): Promise<string[]> {
   try {
-    const res = await fetch(ANTHROPIC_API_URL, {
+    const res = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 150,
-        temperature: 0,
-        system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
+        systemInstruction: {
+          parts: [{
+            text: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
 Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
 Ejemplos:
 Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
 Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
 Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
-Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
-        messages: [{ role: "user", content: query }],
+Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`
+          }]
+        },
+        contents: [{ role: "user", parts: [{ text: query }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 150 },
       }),
     });
 
@@ -45,7 +43,7 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
     }
 
     const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() ?? "";
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
 
     if (!text) return [];
 
@@ -80,29 +78,30 @@ async function getRelevantArticles(query: string): Promise<string> {
       return "";
     }
 
-    // Strategy 1: search with unaccent on DB side + normalized keywords
-   const conditions = keywords
-  .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
-  .join(" OR ");
+    const conditions = keywords
+      .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
+      .join(" OR ");
 
-// Count how many keywords match per article to rank by relevance
-const scoreExpressions = keywords
-  .map((_, i) => `(CASE WHEN unaccent(a."contentPlainText") ILIKE $${i + 1} THEN 1 ELSE 0 END)`)
-  .join(" + ");
+    const scoreExpressions = keywords
+      .map((_, i) => `(CASE WHEN unaccent(a."contentPlainText") ILIKE $${keywords.length + i + 1} THEN 1 ELSE 0 END)`)
+      .join(" + ");
 
-const params: unknown[] = keywords.map((w) => `%${w}%`);
+    const params: unknown[] = [
+      ...keywords.map((w) => `%${w}%`),
+      ...keywords.map((w) => `%${w}%`),
+    ];
 
-const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-  `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName",
-          (${scoreExpressions}) as score
-   FROM "Article" a
-   JOIN "Chapter" c ON a."chapterId" = c.id
-   JOIN "Section" s ON c."sectionId" = s.id
-   JOIN "Document" d ON s."documentId" = d.id
-   WHERE ${conditions}
-   ORDER BY score DESC
-   LIMIT 15`,
-  ...params, ...params  // params duplicated: once for WHERE, once for score
+    const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName",
+              (${scoreExpressions}) as score
+       FROM "Article" a
+       JOIN "Chapter" c ON a."chapterId" = c.id
+       JOIN "Section" s ON c."sectionId" = s.id
+       JOIN "Document" d ON s."documentId" = d.id
+       WHERE ${conditions}
+       ORDER BY score DESC
+       LIMIT 15`,
+      ...params
     );
 
     console.log("[legal-ai] articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
@@ -129,6 +128,60 @@ async function fileToBase64(file: File): Promise<string> {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
+}
+
+async function callGemini(
+  systemPrompt: string,
+  messages: { role: string; text: string }[],
+  file?: File | null
+): Promise<string> {
+  const contents: object[] = [];
+
+  // Build conversation history
+  for (const msg of messages) {
+    contents.push({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.text }],
+    });
+  }
+
+  // Add final user message with optional file
+  if (file) {
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
+
+    if (isImage || isPdf) {
+      const base64 = await fileToBase64(file);
+      contents.push({
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: file.type, data: base64 } },
+        ],
+      });
+    }
+  }
+
+  const res = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 2000,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("[legal-ai] Gemini error:", errText);
+    throw new Error(`Gemini error: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
 }
 
 export async function POST(req: NextRequest) {
@@ -198,7 +251,6 @@ export async function POST(req: NextRequest) {
     }
 
     const relevantArticles = message ? await getRelevantArticles(message) : "";
-
     console.log("[legal-ai] relevantArticles length:", relevantArticles.length);
 
     const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN especializado en legislacion hondurena.
@@ -237,81 +289,12 @@ ${
     : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que consulte directamente los documentos en Biblioteca Legal HN."
 }`;
 
-    const anthropicMessages: object[] = [
-      ...history.slice(-8).map((h) => ({
-        role: h.role === "assistant" ? "assistant" : "user",
-        content: h.text,
-      })),
+    const geminiHistory = [
+      ...history.slice(-8).map((h) => ({ role: h.role, text: h.text })),
+      ...(message ? [{ role: "user", text: message }] : []),
     ];
 
-    if (file) {
-      const isImage = file.type.startsWith("image/");
-      const isPdf = file.type === "application/pdf";
-
-      if (isImage) {
-        const base64 = await fileToBase64(file);
-        anthropicMessages.push({
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: file.type, data: base64 },
-            },
-            {
-              type: "text",
-              text: message || "Identifica que articulos de la legislacion hondurena aplican a esta imagen.",
-            },
-          ],
-        });
-      } else if (isPdf) {
-        const base64 = await fileToBase64(file);
-        anthropicMessages.push({
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: base64 },
-            },
-            {
-              type: "text",
-              text: message || "Identifica que articulos de la legislacion hondurena aplican a este documento.",
-            },
-          ],
-        });
-      } else {
-        anthropicMessages.push({
-          role: "user",
-          content: `${message || "Analiza este documento"} (Archivo: ${file.name})`,
-        });
-      }
-    } else {
-      anthropicMessages.push({ role: "user", content: message });
-    }
-
-    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2000,
-        temperature: 0,
-        system: systemPrompt,
-        messages: anthropicMessages,
-      }),
-    });
-
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error("[legal-ai] Anthropic error:", errText);
-      return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
-    }
-
-    const anthropicData = await anthropicRes.json();
-    const reply = anthropicData.content?.[0]?.text?.trim() ?? "";
+    const reply = await callGemini(systemPrompt, geminiHistory, file);
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
