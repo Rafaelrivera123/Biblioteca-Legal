@@ -20,9 +20,7 @@ async function extractLegalKeywords(query: string): Promise<string[]> {
       max_tokens: 150,
       temperature: 0,
       system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
-
 Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
-
 Ejemplos:
 Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
 Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
@@ -44,9 +42,13 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
 
   if (!text) throw new Error("extractLegalKeywords returned empty");
 
+  // Normalize: remove accents so ILIKE matches correctly against DB content
+  const normalize = (str: string) =>
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   return text
     .split(",")
-    .map((k: string) => k.trim().toLowerCase())
+    .map((k: string) => normalize(k.trim().toLowerCase()))
     .filter((k: string) => k.length > 2)
     .slice(0, 10);
 }
@@ -60,13 +62,13 @@ async function getRelevantArticles(query: string): Promise<string> {
       documentName: string;
     };
 
-    // Use only AI-extracted keywords — raw query words contaminate results
     const keywords = await extractLegalKeywords(query);
 
     if (keywords.length === 0) return "";
 
+    // Use unaccent() on both sides so tildes never block matches
     const conditions = keywords
-      .map((_, i) => `a."contentPlainText" ILIKE $${i + 1}`)
+      .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
       .join(" OR ");
 
     const params: unknown[] = keywords.map((w) => `%${w}%`);
