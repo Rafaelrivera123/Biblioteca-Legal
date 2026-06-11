@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent`;
 
 function normalize(str: string): string {
@@ -38,12 +39,65 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
     });
 
     if (!res.ok) {
-      console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status, await res.text());
-      return [];
+      console.error("[legal-ai] extractLegalKeywords Gemini error:", res.status);
+      // Fallback: extract keywords using Groq
+      return await extractLegalKeywordsGroq(query);
     }
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+
+    if (!text) return await extractLegalKeywordsGroq(query);
+
+    const keywords = text
+      .split(",")
+      .map((k: string) => normalize(k))
+      .filter((k: string) => k.length > 2)
+      .slice(0, 10);
+
+    console.log("[legal-ai] extracted keywords (Gemini):", keywords);
+    return keywords;
+  } catch (err) {
+    console.error("[legal-ai] extractLegalKeywords Gemini error:", err);
+    return await extractLegalKeywordsGroq(query);
+  }
+}
+
+async function extractLegalKeywordsGroq(query: string): Promise<string[]> {
+  try {
+    const res = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
+Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
+Ejemplos:
+Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
+Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
+Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
+Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
+          },
+          { role: "user", content: query },
+        ],
+        max_tokens: 150,
+        temperature: 0,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[legal-ai] extractLegalKeywordsGroq error:", res.status);
+      return [];
+    }
+
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!text) return [];
 
@@ -53,10 +107,10 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
       .filter((k: string) => k.length > 2)
       .slice(0, 10);
 
-    console.log("[legal-ai] extracted keywords:", keywords);
+    console.log("[legal-ai] extracted keywords (Groq fallback):", keywords);
     return keywords;
   } catch (err) {
-    console.error("[legal-ai] extractLegalKeywords error:", err);
+    console.error("[legal-ai] extractLegalKeywordsGroq error:", err);
     return [];
   }
 }
@@ -130,66 +184,12 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-async function callGemini(
-  systemPrompt: string,
-  messages: { role: string; text: string }[],
-  file?: File | null
-): Promise<string> {
-  const contents: object[] = [];
-
-  for (const msg of messages) {
-    contents.push({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.text }],
-    });
-  }
-
-  if (file) {
-    const isImage = file.type.startsWith("image/");
-    const isPdf = file.type === "application/pdf";
-    if (isImage || isPdf) {
-      const base64 = await fileToBase64(file);
-      contents.push({
-        role: "user",
-        parts: [{ inlineData: { mimeType: file.type, data: base64 } }],
-      });
-    }
-  }
-
-  const res = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 2000,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error("[legal-ai] Gemini error:", errText);
-    throw new Error(`Gemini error: ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-}
-
 export async function POST(req: NextRequest) {
   try {
     const cu = await auth();
     if (!cu?.user?.id) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
-
-    // DEBUG TEMPORAL - remover despues de confirmar
-    console.log("🔍 [DEBUG] Clave activa en Vercel:", process.env.GEMINI_API_KEY
-      ? `${process.env.GEMINI_API_KEY.slice(0, 6)}...${process.env.GEMINI_API_KEY.slice(-4)}`
-      : "¡No hay clave!");
 
     const userId = cu.user.id;
 
@@ -289,12 +289,60 @@ ${
     : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que consulte directamente los documentos en Biblioteca Legal HN."
 }`;
 
-    const geminiHistory = [
-      ...history.slice(-8).map((h) => ({ role: h.role, text: h.text })),
-      ...(message ? [{ role: "user", text: message }] : []),
+    // Build messages for Groq
+    const groqMessages: object[] = [
+      { role: "system", content: systemPrompt },
+      ...history.slice(-8).map((h) => ({
+        role: h.role === "assistant" ? "assistant" : "user",
+        content: h.text,
+      })),
     ];
 
-    const reply = await callGemini(systemPrompt, geminiHistory, file);
+    if (file) {
+      const isImage = file.type.startsWith("image/");
+      if (isImage) {
+        const base64 = await fileToBase64(file);
+        groqMessages.push({
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:${file.type};base64,${base64}` } },
+            { type: "text", text: message || "Identifica que articulos de la legislacion hondurena aplican a esta imagen." },
+          ],
+        });
+      } else {
+        groqMessages.push({
+          role: "user",
+          content: message || `Analiza este documento: ${file?.name}`,
+        });
+      }
+    } else {
+      groqMessages.push({ role: "user", content: message });
+    }
+
+    const groqRes = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: file?.type.startsWith("image/")
+          ? "llama-3.2-11b-vision-preview"
+          : "llama-3.3-70b-versatile",
+        messages: groqMessages,
+        max_tokens: 2000,
+        temperature: 0,
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      console.error("[legal-ai] Groq error:", errText);
+      return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
+    }
+
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
