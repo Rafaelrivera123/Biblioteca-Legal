@@ -40,7 +40,6 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
 
     if (!res.ok) {
       console.error("[legal-ai] extractLegalKeywords Gemini error:", res.status);
-      // Fallback: extract keywords using Groq
       return await extractLegalKeywordsGroq(query);
     }
 
@@ -122,6 +121,7 @@ async function getRelevantArticles(query: string): Promise<string> {
       articleLabel: string | null;
       contentPlainText: string;
       documentName: string;
+      documentSlug: string;
     };
 
     const keywords = await extractLegalKeywords(query);
@@ -146,7 +146,7 @@ async function getRelevantArticles(query: string): Promise<string> {
     ];
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName",
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug",
               (${scoreExpressions}) as score
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
@@ -165,7 +165,8 @@ async function getRelevantArticles(query: string): Promise<string> {
     return articles
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
-        return `[${a.documentName}] Articulo ${label}: ${a.contentPlainText}`;
+        const url = `https://www.bibliotecalegalhn.com/collections/${a.documentSlug}`;
+        return `[${a.documentName}](${url}) Articulo ${label}: ${a.contentPlainText}`;
       })
       .join("\n\n");
   } catch (err) {
@@ -277,11 +278,13 @@ FORMATO DE RESPUESTA:
 [Identificacion breve de los elementos juridicos del caso]
 
 **Fundamento legal:**
-[Nombre del documento] - Articulo [numero]: [texto literal]
-[repetir por cada articulo relevante]
+[Nombre del documento](URL) - Articulo [numero]: [texto literal]
+[repetir por cada articulo relevante, usando el formato markdown de link para el nombre del documento]
 
 **Conclusion:**
 [Lo que se desprende directamente de los articulos citados, sin agregar nada mas]
+
+INSTRUCCION DE LINKS: Cada articulo en los resultados ya viene con su URL entre parentesis en formato markdown. Usa exactamente esa URL para el link del documento. No inventes URLs.
 
 ${
   relevantArticles
@@ -289,7 +292,6 @@ ${
     : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que consulte directamente los documentos en Biblioteca Legal HN."
 }`;
 
-    // Build messages for Groq
     const groqMessages: object[] = [
       { role: "system", content: systemPrompt },
       ...history.slice(-8).map((h) => ({
