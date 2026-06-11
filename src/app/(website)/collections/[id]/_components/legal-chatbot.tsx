@@ -36,7 +36,8 @@ const LegalChatbot = ({
   const [remaining, setRemaining] = useState<number>(DAILY_LIMIT);
   const [limitReached, setLimitReached] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -50,11 +51,11 @@ const LegalChatbot = ({
     }
   }, [isOpen, documentName, messages.length]);
 
- useEffect(() => {
-  if (!isMinimized) {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }
-}, [messages, loading, isMinimized]);
+  useEffect(() => {
+    if (!isMinimized && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages, loading, isMinimized]);
 
   const handleOpen = () => {
     if (!isLoggedin || !hasSubscription) {
@@ -151,7 +152,6 @@ const LegalChatbot = ({
         open={showSubscribeModal}
         onClose={() => setShowSubscribeModal(false)}
       />
-
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -173,7 +173,6 @@ const LegalChatbot = ({
           </motion.button>
         )}
       </AnimatePresence>
-
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -217,10 +216,12 @@ const LegalChatbot = ({
                 </button>
               </div>
             </div>
-
             {!isMinimized && (
               <>
-                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+                >
                   {messages.map((msg, i) => (
                     <div
                       key={i}
@@ -240,7 +241,6 @@ const LegalChatbot = ({
                       />
                     </div>
                   ))}
-
                   {loading && (
                     <div className="flex justify-start">
                       <div className="bg-gray-100 rounded-xl rounded-bl-sm px-3 py-2">
@@ -248,9 +248,7 @@ const LegalChatbot = ({
                       </div>
                     </div>
                   )}
-                  <div ref={messagesEndRef} />
                 </div>
-
                 <div className="px-3 py-3 border-t border-gray-100 shrink-0">
                   {limitReached ? (
                     <p className="text-center text-[12px] text-gray-400 py-1">
