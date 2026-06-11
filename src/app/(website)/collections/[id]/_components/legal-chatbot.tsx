@@ -53,9 +53,13 @@ const LegalChatbot = ({
 
   useEffect(() => {
     if (!isMinimized && messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      const container = messagesContainerRef.current;
+      const lastMessage = container.lastElementChild;
+      if (lastMessage) {
+        lastMessage.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
-  }, [messages, loading, isMinimized]);
+  }, [messages, isMinimized]);
 
   const handleOpen = () => {
     if (!isLoggedin || !hasSubscription) {
