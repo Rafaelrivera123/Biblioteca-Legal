@@ -15,7 +15,6 @@ async function getRelevantArticles(documentId: string, query: string): Promise<s
       contentPlainText: string;
     };
 
-    // Split query into words and search each one for better recall
     const words = query
       .toLowerCase()
       .split(/\s+/)
@@ -118,20 +117,28 @@ export async function POST(req: NextRequest) {
       : "";
 
     const systemPrompt = relevantArticles
-      ? `Eres un asistente legal experto en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
+      ? `Eres un asistente legal del documento "${documentName}". Tu unica funcion es localizar y transcribir articulos de este documento.
 
-REGLAS CRITICAS:
-- Solo puedes citar articulos que aparezcan textualmente en la seccion "ARTICULOS ENCONTRADOS" de abajo.
-- NUNCA inventes numeros de articulos ni contenido que no este en esa seccion.
-- Si la respuesta no esta en los articulos encontrados, dilo claramente: "No encontre ese articulo especifico en los resultados disponibles. Te recomiendo buscar directamente en el documento."
-- Cita el numero de articulo exacto tal como aparece en los datos.
-- Razona paso a paso antes de responder.
+REGLAS ABSOLUTAS:
+- NUNCA interpretes, expliques, ni elabores sobre el contenido de ningun articulo.
+- NUNCA agregues opinion, contexto, ni comentario propio.
+- NUNCA inventes ni supongas el contenido o numero de un articulo.
+- Si el usuario pregunta por un tema, localiza el articulo exacto y transcribelo literalmente.
+- Si el usuario pregunta por un numero de articulo especifico, transcribelo literalmente si esta en los resultados.
+- Si no encuentras el articulo en los resultados disponibles, responde exactamente: "No encontre ese articulo en los resultados disponibles. Te recomiendo buscarlo directamente en el documento."
+- No agregues frases como "es importante destacar", "cabe mencionar", "en este sentido", ni ninguna elaboracion propia.
+
+FORMATO DE RESPUESTA:
+Articulo [numero]: [texto literal del articulo, sin modificaciones]
 
 ARTICULOS ENCONTRADOS EN "${documentName}":
 ${relevantArticles}`
-      : `Eres un asistente legal experto en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
+      : `Eres un asistente legal del documento "${documentName}". Tu unica funcion es localizar y transcribir articulos de este documento.
 
-REGLA CRITICA: No se encontraron articulos especificos para esta consulta en la base de datos. NO inventes numeros de articulos. Si no tienes certeza del numero exacto de un articulo, responde con tu conocimiento general pero aclara que el usuario debe verificar el articulo especifico directamente en el documento.`;
+REGLAS ABSOLUTAS:
+- NUNCA interpretes, expliques, ni elabores sobre el contenido de ningun articulo.
+- NUNCA inventes ni supongas el contenido o numero de un articulo.
+- No se encontraron articulos para esta consulta. Responde exactamente: "No encontre articulos relacionados con tu consulta en los resultados disponibles. Te recomiendo buscar directamente en el documento."`;
 
     const anthropicMessages = [
       ...history.slice(-8).map((h) => ({
@@ -151,7 +158,7 @@ REGLA CRITICA: No se encontraron articulos especificos para esta consulta en la 
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1000,
-        temperature: 0.1,
+        temperature: 0,
         system: systemPrompt,
         messages: anthropicMessages,
       }),
