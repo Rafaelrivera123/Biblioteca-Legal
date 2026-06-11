@@ -14,6 +14,7 @@ async function getRelevantArticles(query: string): Promise<string> {
       articleLabel: string | null;
       contentPlainText: string;
       documentName: string;
+      documentId: string;
     };
 
     const words = query
@@ -22,28 +23,40 @@ async function getRelevantArticles(query: string): Promise<string> {
       .filter((w) => w.length > 3)
       .slice(0, 5);
 
+    if (words.length === 0) return "";
+
     const conditions = words
       .map((_, i) => `a."contentPlainText" ILIKE $${i + 1}`)
       .join(" OR ");
 
-    const whereClause = conditions || "1=1";
     const params: unknown[] = words.map((w) => `%${w}%`);
 
+    // Fetch more results and limit per document in JS
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."id" as "documentId"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
        JOIN "Document" d ON s."documentId" = d.id
-       WHERE ${whereClause}
+       WHERE ${conditions}
        ORDER BY d."viewCount" DESC
-       LIMIT 10`,
+       LIMIT 50`,
       ...params
     );
 
     if (articles.length === 0) return "";
 
-    return articles
+    // Max 2 articles per document to avoid one document monopolizing results
+    const countPerDoc: Record<string, number> = {};
+    const filtered = articles.filter((a) => {
+      const count = countPerDoc[a.documentId] ?? 0;
+      if (count >= 2) return false;
+      countPerDoc[a.documentId] = count + 1;
+      return true;
+    });
+
+    return filtered
+      .slice(0, 10)
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
         return `[${a.documentName}] Articulo ${label}: ${a.contentPlainText}`;
