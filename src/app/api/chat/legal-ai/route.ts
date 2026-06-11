@@ -7,50 +7,60 @@ export const dynamic = "force-dynamic";
 const DAILY_LIMIT = 20;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
+function normalize(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 async function extractLegalKeywords(query: string): Promise<string[]> {
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 150,
-      temperature: 0,
-      system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
+  try {
+    const res = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 150,
+        temperature: 0,
+        system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
 Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
 Ejemplos:
 Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
 Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
 Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
 Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
-      messages: [{ role: "user", content: query }],
-    }),
-  });
+        messages: [{ role: "user", content: query }],
+      }),
+    });
 
-  if (!res.ok) {
-    console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status, await res.text());
-    throw new Error(`extractLegalKeywords failed: ${res.status}`);
+    if (!res.ok) {
+      console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status);
+      return [];
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text?.trim() ?? "";
+
+    if (!text) return [];
+
+    const keywords = text
+      .split(",")
+      .map((k: string) => normalize(k))
+      .filter((k: string) => k.length > 2)
+      .slice(0, 10);
+
+    console.log("[legal-ai] extracted keywords:", keywords);
+    return keywords;
+  } catch (err) {
+    console.error("[legal-ai] extractLegalKeywords error:", err);
+    return [];
   }
-
-  const data = await res.json();
-  const text = data.content?.[0]?.text?.trim() ?? "";
-
-  console.log("[legal-ai] extracted keywords:", text);
-
-  if (!text) throw new Error("extractLegalKeywords returned empty");
-
-  // Normalize: remove accents so ILIKE matches correctly against DB content
-  const normalize = (str: string) =>
-    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  return text
-    .split(",")
-    .map((k: string) => normalize(k.trim().toLowerCase()))
-    .filter((k: string) => k.length > 2)
-    .slice(0, 10);
 }
 
 async function getRelevantArticles(query: string): Promise<string> {
@@ -63,15 +73,21 @@ async function getRelevantArticles(query: string): Promise<string> {
     };
 
     const keywords = await extractLegalKeywords(query);
+    console.log("[legal-ai] keywords for RAG:", keywords);
 
-    if (keywords.length === 0) return "";
+    if (keywords.length === 0) {
+      console.error("[legal-ai] no keywords extracted, RAG skipped");
+      return "";
+    }
 
-    // Use unaccent() on both sides so tildes never block matches
+    // Strategy 1: search with unaccent on DB side + normalized keywords
     const conditions = keywords
       .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
       .join(" OR ");
 
     const params: unknown[] = keywords.map((w) => `%${w}%`);
+
+    console.log("[legal-ai] RAG params:", params);
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
@@ -84,6 +100,8 @@ async function getRelevantArticles(query: string): Promise<string> {
       ...params
     );
 
+    console.log("[legal-ai] articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
+
     if (articles.length === 0) return "";
 
     return articles
@@ -93,7 +111,7 @@ async function getRelevantArticles(query: string): Promise<string> {
       })
       .join("\n\n");
   } catch (err) {
-    console.error("[legal-ai] getRelevantArticles error:", err);
+    console.error("[legal-ai] getRelevantArticles error:", String(err));
     return "";
   }
 }
@@ -175,6 +193,8 @@ export async function POST(req: NextRequest) {
     }
 
     const relevantArticles = message ? await getRelevantArticles(message) : "";
+
+    console.log("[legal-ai] relevantArticles length:", relevantArticles.length);
 
     const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN especializado en legislacion hondurena.
 
