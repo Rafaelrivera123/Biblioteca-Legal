@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent`;
 
 function normalize(str: string): string {
   return str
@@ -17,35 +18,85 @@ function normalize(str: string): string {
 
 async function extractLegalKeywords(query: string): Promise<string[]> {
   try {
-    const res = await fetch(ANTHROPIC_API_URL, {
+    const res = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{
+            text: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
+Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
+Ejemplos:
+Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
+Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
+Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
+Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`
+          }]
+        },
+        contents: [{ role: "user", parts: [{ text: query }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 150 },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[chat/legal] extractLegalKeywords Gemini error:", res.status);
+      return await extractLegalKeywordsGroq(query);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+
+    if (!text) return await extractLegalKeywordsGroq(query);
+
+    const keywords = text
+      .split(",")
+      .map((k: string) => normalize(k))
+      .filter((k: string) => k.length > 2)
+      .slice(0, 10);
+
+    console.log("[chat/legal] extracted keywords (Gemini):", keywords);
+    return keywords;
+  } catch (err) {
+    console.error("[chat/legal] extractLegalKeywords Gemini error:", err);
+    return await extractLegalKeywordsGroq(query);
+  }
+}
+
+async function extractLegalKeywordsGroq(query: string): Promise<string[]> {
+  try {
+    const res = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 150,
-        temperature: 0,
-        system: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un extractor de terminos juridicos hondurenos. Tu tarea es analizar cualquier tipo de consulta legal (penal, civil, administrativa, constitucional, laboral, familiar, mercantil, etc.) y extraer los terminos exactos que aparecerian dentro del texto de los articulos de ley hondurenos relevantes al caso.
 Devuelve UNICAMENTE los terminos separados por comas. Sin explicacion, sin numeracion, sin puntos al final.
 Ejemplos:
 Consulta: "un maestro tuvo relaciones con una estudiante de 11 años" → violacion, abuso sexual, menor de edad, indemnidad sexual, docente, consentimiento
 Consulta: "me despidieron sin previo aviso despues de 5 años" → despido injustificado, preaviso, indemnizacion, contrato de trabajo, auxilio de cesantia
 Consulta: "la municipalidad nego mi permiso sin explicar por que" → acto administrativo, nulidad, motivacion, recurso de reposicion, procedimiento administrativo
 Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima, liquidacion, junta de socios, patrimonio social`,
-        messages: [{ role: "user", content: query }],
+          },
+          { role: "user", content: query },
+        ],
+        max_tokens: 150,
+        temperature: 0,
       }),
     });
 
     if (!res.ok) {
-      console.error("[chat/legal] extractLegalKeywords HTTP error:", res.status);
+      console.error("[chat/legal] extractLegalKeywordsGroq error:", res.status);
       return [];
     }
 
     const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() ?? "";
+    const text = data.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!text) return [];
 
@@ -55,10 +106,10 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
       .filter((k: string) => k.length > 2)
       .slice(0, 10);
 
-    console.log("[chat/legal] extracted keywords:", keywords);
+    console.log("[chat/legal] extracted keywords (Groq fallback):", keywords);
     return keywords;
   } catch (err) {
-    console.error("[chat/legal] extractLegalKeywords error:", err);
+    console.error("[chat/legal] extractLegalKeywordsGroq error:", err);
     return [];
   }
 }
@@ -209,7 +260,8 @@ No se encontraron articulos para esta consulta en la base de datos. Informa al u
 
 REGLA ABSOLUTA: NUNCA inventes articulos ni contenido cuando no hay resultados disponibles.`;
 
-    const anthropicMessages = [
+    const groqMessages: object[] = [
+      { role: "system", content: systemPrompt },
       ...history.slice(-8).map((h) => ({
         role: h.role === "model" ? "assistant" : "user",
         content: h.text,
@@ -217,30 +269,28 @@ REGLA ABSOLUTA: NUNCA inventes articulos ni contenido cuando no hay resultados d
       { role: "user", content: message },
     ];
 
-    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
+    const groqRes = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "llama-3.3-70b-versatile",
+        messages: groqMessages,
         max_tokens: 1500,
         temperature: 0,
-        system: systemPrompt,
-        messages: anthropicMessages,
       }),
     });
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error("[chat/legal] Anthropic error:", errText);
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      console.error("[chat/legal] Groq error:", errText);
       return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
     }
 
-    const anthropicData = await anthropicRes.json();
-    const reply = anthropicData.content?.[0]?.text?.trim() ?? "";
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
