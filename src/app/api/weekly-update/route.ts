@@ -122,12 +122,12 @@ REGLAS ESTRICTAS DE RESPUESTA:
     }
 
     // Sanitización básica para remover posibles bloques contenedores de markdown que el modelo a veces concatena por inercia
-    if (analysisHtml.startsWith("```html")) {
-      analysisHtml = analysisHtml.replace(/^```html\s*|\s*```$/g, "");
-    } else if (analysisHtml.startsWith("```")) {
-      analysisHtml = analysisHtml.replace(/^
-```\s*|\s*```$/g, "");
-    }
+   if (analysisHtml.startsWith("```html")) {
+  analysisHtml = analysisHtml.replace(/^
+```html\s*|\s*```$/g, "");
+} else if (analysisHtml.startsWith("```")) {
+  analysisHtml = analysisHtml.replace(/^```\s*|\s*```$/g, "");
+}
 
     // Paso 4: Construcción del cascarón de correo responsivo y despacho vía Resend
     await resend.emails.send({
