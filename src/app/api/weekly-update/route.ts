@@ -12,15 +12,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Paso 1: Buscar actualizaciones legales con Tavily (Query mejorada para capturar números de Gaceta y artículos)
+    // Paso 1: Buscar actualizaciones legales con Tavily (Query especializada con operadores para forzar la captura de la Gaceta y decretos)
     const tavilyRes = await fetch(TAVILY_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         api_key: process.env.TAVILY_API_KEY,
-        query: "reformas leyes Honduras 'La Gaceta' decretos articulos modificados 2026",
+        query: "reformas leyes Honduras 'La Gaceta' 'decreto' 'artículo' modificados 2026",
         search_depth: "advanced",
-        max_results: 15, // Incrementado para obtener más contexto y fuentes detalladas
+        max_results: 15,
         include_answer: true,
         days: 7,
       }),
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     const searchResults = tavilyData.results ?? [];
     const searchAnswer = tavilyData.answer ?? "";
 
-    // Paso 2: Obtener documentos de la BD
+    // Paso 2: Obtener documentos vigentes de la Base de Datos
     const documents = await prisma.document.findMany({
       where: { published: true },
       select: {
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       },
     });
 
-    // Paso 3: Analizar con OpenAI empleando un prompt de alta precisión estructural
+    // Paso 3: Análisis ultra estructurado y restrictivo con OpenAI (gpt-4o-mini)
     const openaiRes = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
@@ -55,49 +55,56 @@ export async function GET(request: Request) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         max_tokens: 4096,
-        temperature: 0.1, // Temperatura baja para evitar alucinaciones en textos legales
+        temperature: 0.0, // Temperatura a 0 absoluto para evitar la falsificación o alucinación de contenido normativo
         messages: [
           {
             role: "system",
-            content: `Eres un asistente legal experto en el marco jurídico de Honduras y auditor legislativo de alta precisión. 
-            Tu trabajo es contrastar noticias de reformas con la biblioteca legal actual. 
-            Debes responder exclusivamente en HTML limpio usando estilos inline. 
-            Usa fondo #1a1a2e, texto blanco y acentos en #4CAF50 para los contenedores principales.`,
+            content: `Eres un auditor legislativo y asistente legal de élite experto en la legislación de la República de Honduras.
+Tu única tarea es contrastar información del Diario Oficial 'La Gaceta' y reformas del Congreso Nacional obtenidas de internet con los documentos presentes en el catálogo del sistema.
+Debes responder de forma EXCLUSIVA en HTML fragmentado limpio (sin envoltorios globales \`<html>\` ni \`<body>\`), aplicando estrictamente estilos CSS inline compatibles con clientes de correo electrónico.
+Esquema de colores requerido: fondo #1a1a2e para contenedores internos, acentos en #4CAF50 y textos legibles sobre fondo oscuro.`,
           },
           {
             role: "user",
-            content: `Analiza de forma rigurosa la siguiente información recopilada en los últimos 7 días sobre reformas legales en Honduras:
+            content: `Genera un reporte técnico minucioso cruzando las siguientes fuentes de datos extraídas esta semana:
 
-NOTICIAS Y RESUMEN DE INTERNET:
+========================================
+NOTICIAS Y RESUMEN LEGISLATIVO RECUPERADO:
 ${searchAnswer}
 
 FUENTES DETALLADAS:
 ${searchResults.map((r: any) => `- [${r.title}]: ${r.content}`).join("\n")}
 
-ESTA ES MI BIBLIOTECA LEGAL ACTUAL (Documentos disponibles):
+CATÁLOGO ACTUAL DE NUESTRA BIBLIOTECA LEGAL:
 ${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })), null, 2)}
+========================================
 
-Genera un reporte detallado estructurado estrictamente bajo los siguientes puntos (si un punto no tiene datos, indica "No se detectaron cambios"):
+Estructura el cuerpo del reporte siguiendo rigurosamente las siguientes secciones HTML. Si en una sección no se localizan datos fidedignos en las fuentes, añade un párrafo indicando explícitamente: "No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días".
 
-1. ⚠️ DOCUMENTOS DE LA BIBLIOTECA AFECTADOS:
-Para cada documento de mi biblioteca que sufra variaciones, detalla de forma obligatoria:
-- **Ley/Documento Afectado** (Indica el nombre y número de ley).
-- **Sustento del Cambio**: En base a qué se realiza (ej. Decreto No. XX-2026, Resolución XX).
-- **Fecha de Publicación en La Gaceta**: (Indica la fecha exacta o aproximada provista por las fuentes).
-- **Desglose de Artículos Modificados**: Crea una tabla o un bloque visual claro para cada artículo afectado que muestre:
-   • **Artículo número**: [Número]
-   • **[ANTES] Texto anterior / Estado previo**: (Lo que se infiere o reporta que cambia).
-   • **[DESPUÉS] Texto nuevo / Texto reformado**: (La nueva disposición legal vigente).
+### SECCIONES A DESARROLLAR:
 
-2. ➕ NUEVAS LEYES A AGREGAR:
-Leyes, decretos o reglamentos nuevos publicados en La Gaceta que no están en mi biblioteca pero que deberían incorporarse (especifica Nombre, Decreto, Fecha en La Gaceta y un breve resumen).
+1. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:20px;">⚠️ REFORMAS Y MODIFICACIONES DETECTADAS</h2>
+Identifica qué leyes de nuestra biblioteca han sufrido cambios. Por cada ley afectada, debes listar obligatoriamente:
+- <p><strong>Ley Afectada:</strong> [Nombre y número asignado en biblioteca]</p>
+- <p><strong>Sustento Jurídico del Cambio:</strong> [Número de Decreto Legislativo, Acuerdo Ejecutivo o Resolución institucional]</p>
+- <p><strong>Fecha de Publicación Oficial:</strong> [Fecha exacta o mes estimado de publicación en el Diario Oficial La Gaceta]</p>
+- <strong>Tabla Comparativa de Artículos:</strong> Crea una tabla HTML formateada con los siguientes estilos inline:
+  \`<table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #4CAF50; margin: 15px 0; background-color: #111122; font-size: 14px; border-collapse: collapse;">\`
+  Las cabeceras de la tabla (\`<th>\`) deben ser: 'Art.', '[ANTES] Estado Previo / Texto Anterior' y '[DESPUÉS] Disposición Nueva / Texto Reformado'. Las celdas deben tener un borde sutil (\`border: 1px solid #333;\`) y texto blanco. Sé sumamente preciso con la transcripción de las variaciones normativas.
 
-3. ❌ LEYES DEROGADAS:
-Documentos de mi biblioteca que quedan sin vigencia total, indicando mediante qué nuevo Decreto se derogan y su fecha de publicación.
+2. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:30px;">➕ NUEVAS LEYES PUBLICADAS PARA INCORPORAR</h2>
+Identifica cuerpos normativos de reciente creación (Leyes completas, reglamentos nuevos, amnistías) que no figuren en nuestro catálogo. Detalla:
+- Nombre completo de la nueva Ley.
+- Número de Decreto legislativo que le da origen.
+- Fecha de inserción/vigencia en La Gaceta.
+- Un resumen ejecutivo sucinto sobre su impacto o campo de aplicación.
 
-Exigencias de Formato:
-- Sé directo, formal y sumamente meticuloso. No inventes artículos si la fuente no los cita explícitamente, pero extrae hasta el último detalle de los textos provistos.
-- Utiliza etiquetas HTML claras (\`<h3>\`, \`<p>\`, \`<ul>\`, o estructuras de bloques con bordes de color #4CAF50 para separar visualmente el "Antes" y el "Después").`,
+3. <h2 style="color:#f44336; font-size:18px; border-bottom:1px solid #f44336; padding-bottom:5px; margin-top:30px;">❌ DEROGACIONES EXPRESAS O TOTALES</h2>
+Lista los documentos de nuestra biblioteca jurídica que pierden vigencia en su totalidad debido a un instrumento posterior. Indica con claridad el instrumento legal derogatorio y la fecha correspondiente.
+
+REGLAS ESTRICTAS DE RESPUESTA:
+- Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'Antes' o el 'Después', explica el cambio conceptualmente en la tabla en lugar de inventar la redacción literal.
+- No añadas bloques de código markdown (\`\`\`html) en el output. Devuelve el HTML plano.`,
           },
         ],
       }),
@@ -108,13 +115,21 @@ Exigencias de Formato:
     }
 
     const openaiData = await openaiRes.json();
-    const analysisHtml = openaiData.choices?.[0]?.message?.content?.trim() ?? "";
+    let analysisHtml = openaiData.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!analysisHtml) {
-      throw new Error("Respuesta vacia de OpenAI");
+      throw new Error("Respuesta vacía de OpenAI");
     }
 
-    // Paso 4: Enviar el correo electrónico
+    // Sanitización básica para remover posibles bloques contenedores de markdown que el modelo a veces concatena por inercia
+    if (analysisHtml.startsWith("```html")) {
+      analysisHtml = analysisHtml.replace(/^```html\s*|\s*```$/g, "");
+    } else if (analysisHtml.startsWith("```")) {
+      analysisHtml = analysisHtml.replace(/^
+```\s*|\s*```$/g, "");
+    }
+
+    // Paso 4: Construcción del cascarón de correo responsivo y despacho vía Resend
     await resend.emails.send({
       from: "Biblioteca Legal HN <noreply@bibliotecalegalhn.com>",
       to: "rafariveras10@gmail.com",
@@ -129,16 +144,16 @@ Exigencias de Formato:
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           </head>
-          <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
+          <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;-webkit-font-smoothing:antialiased;">
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:40px 0;">
               <tr>
                 <td align="center">
-                  <table width="650" cellpadding="0" cellspacing="0" style="background-color:#1a1a2e;border-radius:12px;overflow:hidden;">
+                  <table width="650" cellpadding="0" cellspacing="0" style="background-color:#1a1a2e;border-radius:12px;overflow:hidden;box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
                     <tr>
-                      <td style="background-color:#0f3460;padding:30px;text-align:center;">
-                        <h1 style="color:#4CAF50;margin:0;font-size:24px;">📚 Biblioteca Legal HN</h1>
-                        <p style="color:#ffffff;margin:8px 0 0;font-size:14px;">Reporte Crítico de Actualizaciones y Reformas</p>
-                        <p style="color:#aaaaaa;margin:4px 0 0;font-size:12px;">
+                      <td style="background-color:#0f3460;padding:35px 30px;text-align:center;">
+                        <h1 style="color:#4CAF50;margin:0;font-size:26px;font-weight:bold;letter-spacing:0.5px;">📚 Biblioteca Legal HN</h1>
+                        <p style="color:#ffffff;margin:10px 0 0;font-size:15px;opacity:0.95;">Reporte Crítico de Auditoría Legal y Reformas</p>
+                        <p style="color:#aaaaaa;margin:6px 0 0;font-size:12px;text-transform:capitalize;">
                           ${new Date().toLocaleDateString("es-HN", {
                             weekday: "long",
                             year: "numeric",
@@ -149,16 +164,16 @@ Exigencias de Formato:
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding:30px;color:#ffffff;line-height:1.6;font-size:15px;">
+                      <td style="padding:35px;color:#ffffff;line-height:1.6;font-size:15px;">
                         ${analysisHtml}
                       </td>
                     </tr>
                     <tr>
-                      <td style="background-color:#0f3460;padding:20px;text-align:center;">
-                        <p style="color:#aaaaaa;margin:0;font-size:12px;">
-                          Este correo fue generado automáticamente por el sistema de auditoría de Biblioteca Legal HN.
+                      <td style="background-color:#0f3460;padding:25px;text-align:center;border-top:1px solid #252545;">
+                        <p style="color:#aaaaaa;margin:0 0 8px;font-size:12px;">
+                          Este correo fue estructurado y generado automáticamente por el subsistema de auditoría de Biblioteca Legal HN.
                         </p>
-                        <a href="https://www.bibliotecalegalhn.com" style="color:#4CAF50;font-size:12px;text-decoration:none;font-weight:bold;">
+                        <a href="https://www.bibliotecalegalhn.com" style="color:#4CAF50;font-size:13px;text-decoration:none;font-weight:bold;">
                           www.bibliotecalegalhn.com
                         </a>
                       </td>
