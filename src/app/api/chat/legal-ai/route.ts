@@ -5,13 +5,18 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
 async function getRelevantArticles(query: string): Promise<string> {
   try {
-    const articles = await prisma.$queryRawUnsafe
-      { articleNumber: number; articleLabel: string | null; contentPlainText: string; documentName: string }[]
-    >(
+    type ArticleRaw = {
+      articleNumber: number;
+      articleLabel: string | null;
+      contentPlainText: string;
+      documentName: string;
+    };
+
+    const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
@@ -19,7 +24,7 @@ async function getRelevantArticles(query: string): Promise<string> {
        JOIN "Document" d ON s."documentId" = d.id
        WHERE a."contentPlainText" ILIKE $1
        ORDER BY d."viewCount" DESC
-       LIMIT 5`,
+       LIMIT 8`,
       `%${query.slice(0, 50)}%`
     );
 
@@ -99,8 +104,8 @@ export async function POST(req: NextRequest) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
-      message = formData.get("message") as string ?? "";
-      const historyRaw = formData.get("history") as string ?? "[]";
+      message = (formData.get("message") as string) ?? "";
+      const historyRaw = (formData.get("history") as string) ?? "[]";
       history = JSON.parse(historyRaw);
       file = formData.get("file") as File | null;
     } else {
@@ -113,18 +118,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
     }
 
-    const relevantArticles = message
-      ? await getRelevantArticles(message)
-      : "";
+    const relevantArticles = message ? await getRelevantArticles(message) : "";
 
-    const systemContent = `Eres un asistente legal especializado en legislacion hondurena. Tienes acceso a la base de datos completa de Biblioteca Legal HN que contiene las leyes, codigos y decretos de Honduras.
+    const systemPrompt = `Eres un asistente legal experto en legislacion hondurena, con conocimiento profundo de todos los codigos, leyes y decretos de Honduras.
 
-${relevantArticles ? `ARTICULOS RELEVANTES ENCONTRADOS EN LA BASE DE DATOS:\n${relevantArticles}\n\nResponde basandote en estos articulos cuando sean relevantes.` : ""}
+INSTRUCCIONES DE RAZONAMIENTO:
+- Antes de responder, analiza cuidadosamente la pregunta y razona paso a paso.
+- Identifica exactamente que ley, codigo o articulo aplica al caso.
+- Si hay articulos relevantes disponibles, citalos textualmente con su numero y nombre del documento.
+- Si la pregunta involucra multiples leyes o articulos, explica como se relacionan entre si.
+- Da respuestas precisas, completas y bien fundamentadas juridicamente.
+- Si no tienes certeza sobre algo, indicalo claramente en lugar de especular.
+- Cuando aplique, menciona excepciones, condiciones o requisitos especificos del articulo.
 
-Responde siempre en espanol de forma clara y concisa. Si el usuario sube un documento o imagen, analiza su contenido en el contexto legal hondureno.`;
+${
+  relevantArticles
+    ? `ARTICULOS ENCONTRADOS EN LA BASE DE DATOS DE BIBLIOTECA LEGAL HN:\n\n${relevantArticles}\n\nUsa estos articulos como base principal de tu respuesta cuando sean relevantes. Citalos con precision.`
+    : "No se encontraron articulos especificos en la base de datos para esta consulta. Responde con tu conocimiento general de la legislacion hondurena."
+}
 
-    let groqMessages: object[] = [
-      { role: "system", content: systemContent },
+Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza su contenido en el contexto legal hondureno con el mismo nivel de precision y detalle.`;
+
+    // Build messages for Anthropic API
+    const anthropicMessages: object[] = [
       ...history.slice(-8).map((h) => ({
         role: h.role === "assistant" ? "assistant" : "user",
         content: h.text,
@@ -133,14 +149,20 @@ Responde siempre en espanol de forma clara y concisa. Si el usuario sube un docu
 
     if (file) {
       const isImage = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf";
+
       if (isImage) {
         const base64 = await fileToBase64(file);
-        groqMessages.push({
+        anthropicMessages.push({
           role: "user",
           content: [
             {
-              type: "image_url",
-              image_url: { url: `data:${file.type};base64,${base64}` },
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: file.type,
+                data: base64,
+              },
             },
             {
               type: "text",
@@ -148,42 +170,60 @@ Responde siempre en espanol de forma clara y concisa. Si el usuario sube un docu
             },
           ],
         });
+      } else if (isPdf) {
+        const base64 = await fileToBase64(file);
+        anthropicMessages.push({
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: base64,
+              },
+            },
+            {
+              type: "text",
+              text: message || "Analiza este documento en el contexto legal hondureno.",
+            },
+          ],
+        });
       } else {
-        groqMessages.push({
+        anthropicMessages.push({
           role: "user",
           content: `${message || "Analiza este documento"} (Archivo: ${file.name})`,
         });
       }
     } else {
-      groqMessages.push({ role: "user", content: message });
+      anthropicMessages.push({ role: "user", content: message });
     }
 
-    const model = file?.type.startsWith("image/")
-      ? "llama-3.2-11b-vision-preview"
-      : "llama-3.3-70b-versatile";
-
-    const groqRes = await fetch(GROQ_API_URL, {
+    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model,
-        messages: groqMessages,
-        max_tokens: 800,
-        temperature: 0.3,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2000,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: anthropicMessages,
       }),
     });
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      console.error("[legal-ai] Groq error:", errText);
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      console.error("[legal-ai] Anthropic error:", errText);
       return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
     }
 
-    const groqData = await groqRes.json();
-    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
+    const anthropicData = await anthropicRes.json();
+    const reply =
+      anthropicData.content?.[0]?.text?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
