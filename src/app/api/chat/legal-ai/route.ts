@@ -16,16 +16,29 @@ async function getRelevantArticles(query: string): Promise<string> {
       documentName: string;
     };
 
+    const words = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 5);
+
+    const conditions = words
+      .map((_, i) => `a."contentPlainText" ILIKE $${i + 1}`)
+      .join(" OR ");
+
+    const whereClause = conditions || "1=1";
+    const params: unknown[] = words.map((w) => `%${w}%`);
+
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
        JOIN "Document" d ON s."documentId" = d.id
-       WHERE a."contentPlainText" ILIKE $1
+       WHERE ${whereClause}
        ORDER BY d."viewCount" DESC
-       LIMIT 8`,
-      `%${query.slice(0, 50)}%`
+       LIMIT 10`,
+      ...params
     );
 
     if (articles.length === 0) return "";
@@ -120,26 +133,26 @@ export async function POST(req: NextRequest) {
 
     const relevantArticles = message ? await getRelevantArticles(message) : "";
 
-    const systemPrompt = `Eres un asistente legal experto en legislacion hondurena, con conocimiento profundo de todos los codigos, leyes y decretos de Honduras.
+    const systemPrompt = `Eres un asistente legal de Biblioteca Legal HN. Tu unica funcion es localizar y transcribir articulos de la legislacion hondurena.
 
-INSTRUCCIONES DE RAZONAMIENTO:
-- Antes de responder, analiza cuidadosamente la pregunta y razona paso a paso.
-- Identifica exactamente que ley, codigo o articulo aplica al caso.
-- Si hay articulos relevantes disponibles, citalos textualmente con su numero y nombre del documento.
-- Si la pregunta involucra multiples leyes o articulos, explica como se relacionan entre si.
-- Da respuestas precisas, completas y bien fundamentadas juridicamente.
-- Si no tienes certeza sobre algo, indicalo claramente en lugar de especular.
-- Cuando aplique, menciona excepciones, condiciones o requisitos especificos del articulo.
+REGLAS ABSOLUTAS:
+- NUNCA interpretes, expliques, ni elabores sobre el contenido de ningun articulo.
+- NUNCA agregues opinion, contexto, ni comentario propio.
+- NUNCA inventes ni supongas el contenido o numero de un articulo.
+- Si el usuario pregunta por un tema, localiza el articulo exacto y transcribelo literalmente, indicando de que documento proviene.
+- Si el usuario pregunta por un numero de articulo especifico, transcribelo literalmente si esta en los resultados.
+- Si no encuentras el articulo en los resultados disponibles, responde exactamente: "No encontre ese articulo en los resultados disponibles. Te recomiendo buscarlo directamente en el documento correspondiente en Biblioteca Legal HN."
+- No agregues frases como "es importante destacar", "cabe mencionar", "en este sentido", ni ninguna elaboracion propia.
+
+FORMATO DE RESPUESTA:
+[Nombre del documento] - Articulo [numero]: [texto literal del articulo, sin modificaciones]
 
 ${
   relevantArticles
-    ? `ARTICULOS ENCONTRADOS EN LA BASE DE DATOS DE BIBLIOTECA LEGAL HN:\n\n${relevantArticles}\n\nUsa estos articulos como base principal de tu respuesta cuando sean relevantes. Citalos con precision.`
-    : "No se encontraron articulos especificos en la base de datos para esta consulta. Responde con tu conocimiento general de la legislacion hondurena."
-}
+    ? `ARTICULOS ENCONTRADOS EN LA BASE DE DATOS:\n\n${relevantArticles}`
+    : "No se encontraron articulos para esta consulta. Informa al usuario que no encontraste resultados y que busque directamente en Biblioteca Legal HN."
+}`;
 
-Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza su contenido en el contexto legal hondureno con el mismo nivel de precision y detalle.`;
-
-    // Build messages for Anthropic API
     const anthropicMessages: object[] = [
       ...history.slice(-8).map((h) => ({
         role: h.role === "assistant" ? "assistant" : "user",
@@ -158,15 +171,11 @@ Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza s
           content: [
             {
               type: "image",
-              source: {
-                type: "base64",
-                media_type: file.type,
-                data: base64,
-              },
+              source: { type: "base64", media_type: file.type, data: base64 },
             },
             {
               type: "text",
-              text: message || "Analiza esta imagen en el contexto legal hondureno.",
+              text: message || "Identifica que articulos de la legislacion hondurena aplican a esta imagen.",
             },
           ],
         });
@@ -177,15 +186,11 @@ Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza s
           content: [
             {
               type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: base64,
-              },
+              source: { type: "base64", media_type: "application/pdf", data: base64 },
             },
             {
               type: "text",
-              text: message || "Analiza este documento en el contexto legal hondureno.",
+              text: message || "Identifica que articulos de la legislacion hondurena aplican a este documento.",
             },
           ],
         });
@@ -209,7 +214,7 @@ Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza s
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 2000,
-        temperature: 0.1,
+        temperature: 0,
         system: systemPrompt,
         messages: anthropicMessages,
       }),
@@ -222,8 +227,7 @@ Responde siempre en espanol. Si el usuario sube un documento o imagen, analiza s
     }
 
     const anthropicData = await anthropicRes.json();
-    const reply =
-      anthropicData.content?.[0]?.text?.trim() ?? "";
+    const reply = anthropicData.content?.[0]?.text?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
