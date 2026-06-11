@@ -5,22 +5,41 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const DAILY_LIMIT = 20;
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
 async function getRelevantArticles(documentId: string, query: string): Promise<string> {
   try {
-    const articles = await prisma.$queryRawUnsafe
-      { articleNumber: number; articleLabel: string | null; contentPlainText: string }[]
-    >(
+    type ArticleRaw = {
+      articleNumber: number;
+      articleLabel: string | null;
+      contentPlainText: string;
+    };
+
+    // Split query into words and search each one for better recall
+    const words = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 5);
+
+    const conditions = words
+      .map((_, i) => `a."contentPlainText" ILIKE $${i + 2}`)
+      .join(" OR ");
+
+    const whereClause = conditions
+      ? `s."documentId" = $1 AND (${conditions})`
+      : `s."documentId" = $1`;
+
+    const params: unknown[] = [documentId, ...words.map((w) => `%${w}%`)];
+
+    const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
-       WHERE s."documentId" = $1
-       AND a."contentPlainText" ILIKE $2
-       LIMIT 5`,
-      documentId,
-      `%${query.slice(0, 50)}%`
+       WHERE ${whereClause}
+       LIMIT 10`,
+      ...params
     );
 
     if (articles.length === 0) return "";
@@ -98,17 +117,23 @@ export async function POST(req: NextRequest) {
       ? await getRelevantArticles(documentId, message)
       : "";
 
-    const systemContent = relevantArticles
-      ? `Eres un asistente legal especializado en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
+    const systemPrompt = relevantArticles
+      ? `Eres un asistente legal experto en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
 
-ARTICULOS RELEVANTES DEL DOCUMENTO:
-${relevantArticles}
+REGLAS CRITICAS:
+- Solo puedes citar articulos que aparezcan textualmente en la seccion "ARTICULOS ENCONTRADOS" de abajo.
+- NUNCA inventes numeros de articulos ni contenido que no este en esa seccion.
+- Si la respuesta no esta en los articulos encontrados, dilo claramente: "No encontre ese articulo especifico en los resultados disponibles. Te recomiendo buscar directamente en el documento."
+- Cita el numero de articulo exacto tal como aparece en los datos.
+- Razona paso a paso antes de responder.
 
-Responde basandote en los articulos anteriores cuando sean relevantes. Si la pregunta no esta cubierta por esos articulos, responde con tu conocimiento general de la legislacion hondurena. Responde siempre en espanol de forma clara y concisa.`
-      : `Eres un asistente legal especializado en legislacion hondurena. El usuario esta consultando el documento: "${documentName}". Responde de forma clara, concisa y en espanol.`;
+ARTICULOS ENCONTRADOS EN "${documentName}":
+${relevantArticles}`
+      : `Eres un asistente legal experto en legislacion hondurena. El usuario esta consultando el documento: "${documentName}".
 
-    const messages = [
-      { role: "system", content: systemContent },
+REGLA CRITICA: No se encontraron articulos especificos para esta consulta en la base de datos. NO inventes numeros de articulos. Si no tienes certeza del numero exacto de un articulo, responde con tu conocimiento general pero aclara que el usuario debe verificar el articulo especifico directamente en el documento.`;
+
+    const anthropicMessages = [
       ...history.slice(-8).map((h) => ({
         role: h.role === "model" ? "assistant" : "user",
         content: h.text,
@@ -116,28 +141,30 @@ Responde basandote en los articulos anteriores cuando sean relevantes. Si la pre
       { role: "user", content: message },
     ];
 
-    const groqRes = await fetch(GROQ_API_URL, {
+    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages,
-        max_tokens: 500,
-        temperature: 0.3,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1000,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: anthropicMessages,
       }),
     });
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      console.error("[chat/legal] Groq error:", errText);
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      console.error("[chat/legal] Anthropic error:", errText);
       return NextResponse.json({ error: "Error al contactar IA" }, { status: 500 });
     }
 
-    const groqData = await groqRes.json();
-    const reply = groqData.choices?.[0]?.message?.content?.trim() ?? "";
+    const anthropicData = await anthropicRes.json();
+    const reply = anthropicData.content?.[0]?.text?.trim() ?? "";
 
     if (!reply) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
