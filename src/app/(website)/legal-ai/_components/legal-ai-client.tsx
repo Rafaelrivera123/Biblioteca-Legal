@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Scale, Loader2, Paperclip, X, FileText, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -34,24 +34,10 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState<"image" | "pdf" | null>(null);
-  const [userSentMessage, setUserSentMessage] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isFirstRender = useRef(true);
   const router = useRouter();
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    if (userSentMessage) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      setUserSentMessage(false);
-    }
-  }, [messages, userSentMessage]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -95,7 +81,6 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setUserSentMessage(true);
     setInput("");
     setLoading(true);
 
@@ -278,7 +263,6 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
       </div>
 
