@@ -7,6 +7,39 @@ export const dynamic = "force-dynamic";
 const DAILY_LIMIT = 20;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
+// Extracts legal keywords from a natural language query using AI
+async function extractLegalKeywords(query: string): Promise<string[]> {
+  try {
+    const res = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 100,
+        temperature: 0,
+        system: `Eres un extractor de terminos juridicos hondurenos. Dado un texto, devuelve UNICAMENTE una lista de terminos legales en espanol separados por comas, sin explicacion, sin puntos, sin frases. Solo los terminos. Ejemplos de terminos: violacion, abuso sexual, menor de edad, homicidio, hurto, fraude, apropiacion indebida, nulidad, acto administrativo, competencia, contrato, despido, preaviso, pension, sociedad anonima, quiebra.`,
+        messages: [{ role: "user", content: query }],
+      }),
+    });
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text?.trim() ?? "";
+    return text
+      .split(",")
+      .map((k: string) => k.trim().toLowerCase())
+      .filter((k: string) => k.length > 2)
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
 async function getRelevantArticles(query: string): Promise<string> {
   try {
     type ArticleRaw = {
@@ -17,19 +50,26 @@ async function getRelevantArticles(query: string): Promise<string> {
       documentId: string;
     };
 
-    const words = query
+    // Step 1: extract legal keywords via AI
+    const aiKeywords = await extractLegalKeywords(query);
+
+    // Step 2: also use raw words from query as fallback
+    const rawWords = query
       .toLowerCase()
       .split(/\s+/)
       .filter((w) => w.length > 3)
       .slice(0, 5);
 
-    if (words.length === 0) return "";
+    // Merge and deduplicate
+    const allKeywords = Array.from(new Set([...aiKeywords, ...rawWords])).slice(0, 10);
 
-    const conditions = words
+    if (allKeywords.length === 0) return "";
+
+    const conditions = allKeywords
       .map((_, i) => `a."contentPlainText" ILIKE $${i + 1}`)
       .join(" OR ");
 
-    const params: unknown[] = words.map((w) => `%${w}%`);
+    const params: unknown[] = allKeywords.map((w) => `%${w}%`);
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
       `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."id" as "documentId"
@@ -45,6 +85,7 @@ async function getRelevantArticles(query: string): Promise<string> {
 
     if (articles.length === 0) return "";
 
+    // Max 2 articles per document to avoid monopolization
     const countPerDoc: Record<string, number> = {};
     const filtered = articles.filter((a) => {
       const count = countPerDoc[a.documentId] ?? 0;
