@@ -81,23 +81,28 @@ async function getRelevantArticles(query: string): Promise<string> {
     }
 
     // Strategy 1: search with unaccent on DB side + normalized keywords
-    const conditions = keywords
-      .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
-      .join(" OR ");
+   const conditions = keywords
+  .map((_, i) => `unaccent(a."contentPlainText") ILIKE $${i + 1}`)
+  .join(" OR ");
 
-    const params: unknown[] = keywords.map((w) => `%${w}%`);
+// Count how many keywords match per article to rank by relevance
+const scoreExpressions = keywords
+  .map((_, i) => `(CASE WHEN unaccent(a."contentPlainText") ILIKE $${i + 1} THEN 1 ELSE 0 END)`)
+  .join(" + ");
 
-    console.log("[legal-ai] RAG params:", params);
+const params: unknown[] = keywords.map((w) => `%${w}%`);
 
-    const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
-       FROM "Article" a
-       JOIN "Chapter" c ON a."chapterId" = c.id
-       JOIN "Section" s ON c."sectionId" = s.id
-       JOIN "Document" d ON s."documentId" = d.id
-       WHERE ${conditions}
-       LIMIT 15`,
-      ...params
+const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+  `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName",
+          (${scoreExpressions}) as score
+   FROM "Article" a
+   JOIN "Chapter" c ON a."chapterId" = c.id
+   JOIN "Section" s ON c."sectionId" = s.id
+   JOIN "Document" d ON s."documentId" = d.id
+   WHERE ${conditions}
+   ORDER BY score DESC
+   LIMIT 15`,
+  ...params, ...params  // params duplicated: once for WHERE, once for score
     );
 
     console.log("[legal-ai] articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
