@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 const DAILY_LIMIT = 20;
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
-// Extracts legal keywords from a natural language query using AI
 async function extractLegalKeywords(query: string): Promise<string[]> {
   try {
     const res = await fetch(ANTHROPIC_API_URL, {
@@ -47,20 +46,16 @@ async function getRelevantArticles(query: string): Promise<string> {
       articleLabel: string | null;
       contentPlainText: string;
       documentName: string;
-      documentId: string;
     };
 
-    // Step 1: extract legal keywords via AI
     const aiKeywords = await extractLegalKeywords(query);
 
-    // Step 2: also use raw words from query as fallback
     const rawWords = query
       .toLowerCase()
       .split(/\s+/)
       .filter((w) => w.length > 3)
       .slice(0, 5);
 
-    // Merge and deduplicate
     const allKeywords = Array.from(new Set([...aiKeywords, ...rawWords])).slice(0, 10);
 
     if (allKeywords.length === 0) return "";
@@ -72,30 +67,19 @@ async function getRelevantArticles(query: string): Promise<string> {
     const params: unknown[] = allKeywords.map((w) => `%${w}%`);
 
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."id" as "documentId"
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
        JOIN "Document" d ON s."documentId" = d.id
        WHERE ${conditions}
-       ORDER BY d."viewCount" DESC
-       LIMIT 50`,
+       LIMIT 15`,
       ...params
     );
 
     if (articles.length === 0) return "";
 
-    // Max 2 articles per document to avoid monopolization
-    const countPerDoc: Record<string, number> = {};
-    const filtered = articles.filter((a) => {
-      const count = countPerDoc[a.documentId] ?? 0;
-      if (count >= 2) return false;
-      countPerDoc[a.documentId] = count + 1;
-      return true;
-    });
-
-    return filtered
-      .slice(0, 10)
+    return articles
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
         return `[${a.documentName}] Articulo ${label}: ${a.contentPlainText}`;
