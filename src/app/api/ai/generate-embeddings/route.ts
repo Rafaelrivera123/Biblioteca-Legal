@@ -1,89 +1,135 @@
-import { prisma } from "@/lib/db";
-import { NextRequest, NextResponse } from "next/server";
+"use client";
+import { useState } from "react";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export default function GenerateEmbeddingsPage() {
+  const [running, setRunning] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
+  const [done, setDone] = useState(false);
+  const [cronSecret, setCronSecret] = useState("");
+  const [totalProcessed, setTotalProcessed] = useState(0);
 
-const OPENAI_API_URL = "https://api.openai.com/v1/embeddings";
-const BATCH_SIZE = 100;
+  const addLog = (msg: string) => {
+    setLog((prev) => [...prev.slice(-100), msg]);
+  };
 
-async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const res = await fetch(OPENAI_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: texts,
-      dimensions: 768,
-    }),
-  });
+  const runBatch = async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/ai/generate-embeddings", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cronSecret}`,
+        },
+      });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI embeddings error: ${err}`);
-  }
+      const data = await res.json();
 
-  const data = await res.json();
-  return data.data.map((d: { embedding: number[] }) => d.embedding);
-}
+      if (!res.ok) {
+        addLog(`❌ Error: ${data.error}`);
+        return false;
+      }
 
-export async function POST(req: NextRequest) {
-  try {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+      if (data.done && data.processed === 0) {
+        addLog("✅ Todos los artículos ya tienen embeddings.");
+        return false;
+      }
 
-    // Get articles without embeddings
-    type ArticleRaw = { id: string; contentPlainText: string };
-    const articles = await prisma.$queryRaw<ArticleRaw[]>`
-      SELECT id, "contentPlainText"
-      FROM "Article"
-      WHERE embedding IS NULL
-      AND "contentPlainText" != ''
-      LIMIT ${BATCH_SIZE}
-    `;
-
-    if (articles.length === 0) {
-      return NextResponse.json({ message: "Todos los articulos ya tienen embeddings", done: true });
-    }
-
-    console.log(`[embeddings] Processing ${articles.length} articles`);
-
-    const texts = articles.map((a) =>
-      a.contentPlainText.slice(0, 2000)
-    );
-
-    const embeddings = await generateEmbeddings(texts);
-
-    // Update each article with its embedding
-    for (let i = 0; i < articles.length; i++) {
-      const vectorStr = `[${embeddings[i].join(",")}]`;
-      await prisma.$executeRawUnsafe(
-        `UPDATE "Article" SET embedding = $1::vector WHERE id = $2`,
-        vectorStr,
-        articles[i].id
+      setTotalProcessed((prev) => prev + (data.processed ?? 0));
+      addLog(
+        `✅ Procesados: ${data.processed} | Restantes: ${data.remaining}`
       );
+
+      if (data.done) {
+        addLog("🎉 ¡Embeddings generados para todos los artículos!");
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      addLog(`❌ Error de conexión: ${String(err)}`);
+      return false;
+    }
+  };
+
+  const startLoop = async () => {
+    if (!cronSecret.trim()) {
+      alert("Ingresa el CRON_SECRET primero");
+      return;
     }
 
-    const remaining = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*) as count FROM "Article" WHERE embedding IS NULL AND "contentPlainText" != ''
-    `;
+    setRunning(true);
+    setDone(false);
+    setLog([]);
+    setTotalProcessed(0);
+    addLog("🚀 Iniciando generación de embeddings...");
 
-    const remainingCount = Number(remaining[0].count);
+    let shouldContinue = true;
+    while (shouldContinue) {
+      shouldContinue = await runBatch();
+      if (shouldContinue) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
 
-    console.log(`[embeddings] Done. Remaining: ${remainingCount}`);
+    setRunning(false);
+    setDone(true);
+  };
 
-    return NextResponse.json({
-      processed: articles.length,
-      remaining: remainingCount,
-      done: remainingCount === 0,
-    });
-  } catch (err) {
-    console.error("[embeddings] ERROR:", String(err));
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
+  const stop = () => {
+    setRunning(false);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-8">
+      <h1 className="text-2xl font-bold mb-6">Generar Embeddings</h1>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">CRON_SECRET</label>
+        <input
+          type="password"
+          value={cronSecret}
+          onChange={(e) => setCronSecret(e.target.value)}
+          placeholder="Ingresa tu CRON_SECRET"
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+        />
+      </div>
+
+      <div className="flex gap-3 mb-6">
+        <button
+          onClick={startLoop}
+          disabled={running}
+          className="bg-[#1E2A38] text-white px-6 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          {running ? "Procesando..." : "Iniciar"}
+        </button>
+        <button
+          onClick={stop}
+          disabled={!running}
+          className="bg-red-500 text-white px-6 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          Detener
+        </button>
+      </div>
+
+      {totalProcessed > 0 && (
+        <p className="text-sm text-gray-600 mb-3">
+          Total procesados esta sesión: <strong>{totalProcessed}</strong>
+        </p>
+      )}
+
+      {done && (
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4 text-green-800 text-sm">
+          ¡Proceso completado! Todos los artículos tienen embeddings.
+        </div>
+      )}
+
+      <div className="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto font-mono text-xs text-green-400">
+        {log.length === 0 && (
+          <p className="text-gray-500">Los logs aparecerán aquí...</p>
+        )}
+        {log.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+      </div>
+    </div>
+  );
 }
