@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Scale, Loader2, Paperclip, X, FileText, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Send, Scale, Loader2, Paperclip, X, FileText, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -34,41 +34,40 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState<"image" | "pdf" | null>(null);
+  const [userSentMessage, setUserSentMessage] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isFirstRender = useRef(true);
   const router = useRouter();
 
-  const isFirstRender = useRef(true);
-
-useEffect(() => {
-  if (isFirstRender.current) {
-    isFirstRender.current = false;
-    return;
-  }
-  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [messages, loading]);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (userSentMessage) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      setUserSentMessage(false);
+    }
+  }, [messages, userSentMessage]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
-
     const isImage = selected.type.startsWith("image/");
     const isPdf = selected.type === "application/pdf";
-
     if (!isImage && !isPdf) {
       toast.error("Solo se permiten imágenes o PDFs");
       return;
     }
-
     if (selected.size > 5 * 1024 * 1024) {
       toast.error("El archivo no puede superar 5MB");
       return;
     }
-
     setFile(selected);
     setFileType(isImage ? "image" : "pdf");
-
     if (isImage) {
       const reader = new FileReader();
       reader.onload = (ev) => setFilePreview(ev.target?.result as string);
@@ -96,6 +95,7 @@ useEffect(() => {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    setUserSentMessage(true);
     setInput("");
     setLoading(true);
 
@@ -268,7 +268,6 @@ useEffect(() => {
               </div>
             </div>
           ))}
-
           {loading && (
             <div className="flex justify-start">
               <div className="w-7 h-7 rounded-full bg-[#1E2A38]/10 flex items-center justify-center mr-2 mt-1 shrink-0">
@@ -306,7 +305,6 @@ useEffect(() => {
               </motion.div>
             </AnimatePresence>
           )}
-
           {limitReached ? (
             <p className="text-center text-sm text-gray-400 py-2">
               Límite diario alcanzado. Vuelve mañana.
