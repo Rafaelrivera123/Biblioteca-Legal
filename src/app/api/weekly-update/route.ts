@@ -86,21 +86,22 @@ Estructura el cuerpo del reporte siguiendo rigurosamente las siguientes seccione
 1. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:20px;">⚠️ REFORMAS Y MODIFICACIONES DETECTADAS</h2>
 Identifica qué leyes de nuestra biblioteca han sufrido cambios. Por cada ley afectada, debes listar obligatoriamente:
 - <p><strong>Ley Afectada:</strong> [Nombre y número asignado en biblioteca]</p>
-- <p><strong>Sustento Jurídico del Cambio:</strong> [Número de Decreto Legislativo, Acuerdo Ejecutivo o Resolución institucional]</p>
+- <p><strong>Sustento Jurídico del Cambio:</strong> [Número de Decreto Legislativo, Acuerdo Ejecutivo o Resolución institucional, e incluir obligatoriamente el Número de La Gaceta donde se publicó]</p>
 - <p><strong>Fecha de Publicación Oficial:</strong> [Fecha exacta o mes estimado de publicación en el Diario Oficial La Gaceta]</p>
 - <strong>Tabla Comparativa de Artículos:</strong> Crea una tabla HTML formateada con los siguientes estilos inline:
   \`<table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #4CAF50; margin: 15px 0; background-color: #111122; font-size: 14px; border-collapse: collapse;">\`
-  Las cabeceras de la tabla (\`<th>\`) deben ser: 'Art.', '[ANTES] Estado Previo / Texto Anterior' y '[DESPUÉS] Disposición Nueva / Texto Reformado'. Las celdas deben tener un borde sutil (\`border: 1px solid #333;\`) y texto blanco. Sé sumamente preciso con la transcripción de las variaciones normativas.
+  Las cabeceras de la tabla (\`<th>\`) deben ser: 'N° Gaceta', 'Art.', '[ANTES] Estado Previo / Texto Anterior' y '[DESPUÉS] Disposición Nueva / Texto Reformado'. Las celdas deben tener un borde sutil (\`border: 1px solid #333;\`) y texto blanco. Sé sumamente preciso con la transcripción de las variaciones normativas.
 
 2. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:30px;">➕ NUEVAS LEYES PUBLICADAS PARA INCORPORAR</h2>
 Identifica cuerpos normativos de reciente creación (Leyes completas, reglamentos nuevos, amnistías) que no figuren en nuestro catálogo. Detalla:
 - Nombre completo de la nueva Ley.
 - Número de Decreto legislativo que le da origen.
+- Número de La Gaceta donde fue publicada.
 - Fecha de inserción/vigencia en La Gaceta.
 - Un resumen ejecutivo sucinto sobre su impacto o campo de aplicación.
 
 3. <h2 style="color:#f44336; font-size:18px; border-bottom:1px solid #f44336; padding-bottom:5px; margin-top:30px;">❌ DEROGACIONES EXPRESAS O TOTALES</h2>
-Lista los documentos de nuestra biblioteca jurídica que pierden vigencia en su totalidad debido a un instrumento posterior. Indica con claridad el instrumento legal derogatorio y la fecha correspondiente.
+Lista los documentos de nuestra biblioteca jurídica que pierden vigencia en su totalidad debido a un instrumento posterior. Indica con claridad el instrumento legal derogatorio, el número de La Gaceta correspondiente y la fecha.
 
 REGLAS ESTRICTAS DE RESPUESTA:
 - Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'Antes' o el 'Después', explica el cambio conceptualmente en la tabla en lugar de inventar la redacción literal.
@@ -121,7 +122,7 @@ REGLAS ESTRICTAS DE RESPUESTA:
       throw new Error("Respuesta vacía de OpenAI");
     }
 
-    // [CORREGIDO] Sanitización segura utilizando métodos nativos de string sin expresiones regulares multilínea
+    // Sanitización segura utilizando métodos nativos de string sin expresiones regulares multilínea
     if (analysisHtml.startsWith("```html") && analysisHtml.endsWith("```")) {
       analysisHtml = analysisHtml.slice(7, -3).trim();
     } else if (analysisHtml.startsWith("```") && analysisHtml.endsWith("```")) {
