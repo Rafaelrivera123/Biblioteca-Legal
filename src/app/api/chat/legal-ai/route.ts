@@ -38,7 +38,7 @@ Consulta: "quiero disolver mi sociedad anonima" → disolucion, sociedad anonima
     });
 
     if (!res.ok) {
-      console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status);
+      console.error("[legal-ai] extractLegalKeywords HTTP error:", res.status, await res.text());
       return [];
     }
 
@@ -137,7 +137,6 @@ async function callGemini(
 ): Promise<string> {
   const contents: object[] = [];
 
-  // Build conversation history
   for (const msg of messages) {
     contents.push({
       role: msg.role === "assistant" ? "model" : "user",
@@ -145,18 +144,14 @@ async function callGemini(
     });
   }
 
-  // Add final user message with optional file
   if (file) {
     const isImage = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
-
     if (isImage || isPdf) {
       const base64 = await fileToBase64(file);
       contents.push({
         role: "user",
-        parts: [
-          { inlineData: { mimeType: file.type, data: base64 } },
-        ],
+        parts: [{ inlineData: { mimeType: file.type, data: base64 } }],
       });
     }
   }
@@ -190,6 +185,11 @@ export async function POST(req: NextRequest) {
     if (!cu?.user?.id) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
+
+    // DEBUG TEMPORAL - remover despues de confirmar
+    console.log("🔍 [DEBUG] Clave activa en Vercel:", process.env.GEMINI_API_KEY
+      ? `${process.env.GEMINI_API_KEY.slice(0, 6)}...${process.env.GEMINI_API_KEY.slice(-4)}`
+      : "¡No hay clave!");
 
     const userId = cu.user.id;
 
