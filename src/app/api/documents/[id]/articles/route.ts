@@ -45,13 +45,14 @@ export async function GET(
           articleLabel: a.articleLabel,
           display: a.articleLabel ?? String(a.articleNumber),
           section: s.title,
+          sectionId: s.id,
           chapter: c.title,
+          chapterId: c.id,
         }))
       )
     );
 
     const categoryIds = document?.categories.map((c) => c.categoryId) ?? [];
-
     return NextResponse.json({ success: true, data: articles, categoryIds });
   } catch (error) {
     console.error("Error fetching articles:", error);
