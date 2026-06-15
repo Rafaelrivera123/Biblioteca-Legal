@@ -2,26 +2,46 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageCircle, X, Send, Scale, Loader2, Minus } from "lucide-react";
+import { MessageCircle, X, Send, Scale, Loader2, Minus, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-
 const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
-
 interface Message {
   role: "user" | "model";
   text: string;
 }
-
 interface Props {
   documentName: string;
   documentId: string;
   isLoggedin: boolean;
   hasSubscription: boolean;
 }
-
 const DAILY_LIMIT = 20;
-
+const FREE_TRIAL_STORAGE_KEY = "blhn_chat_trial_used";
+function getUsedTrialDocumentIds(): string[] {
+  try {
+    const raw = localStorage.getItem(FREE_TRIAL_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function markTrialUsed(documentId: string) {
+  try {
+    const used = getUsedTrialDocumentIds();
+    if (!used.includes(documentId)) {
+      used.push(documentId);
+      localStorage.setItem(FREE_TRIAL_STORAGE_KEY, JSON.stringify(used));
+    }
+  } catch {
+    // ignore
+  }
+}
+function hasUsedTrial(documentId: string): boolean {
+  return getUsedTrialDocumentIds().includes(documentId);
+}
 const LegalChatbot = ({
   documentName,
   documentId,
@@ -33,24 +53,26 @@ const LegalChatbot = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [remaining, setRemaining] = useState<number>(DAILY_LIMIT);
+  const [remaining, setRemaining] = useState<number | null>(DAILY_LIMIT);
   const [limitReached, setLimitReached] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-
+  const [trialUsed, setTrialUsed] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
+  const canChat = hasSubscription || !trialUsed;
+  useEffect(() => {
+    if (!hasSubscription) {
+      setTrialUsed(hasUsedTrial(documentId));
+    }
+  }, [documentId, hasSubscription]);
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      setMessages([
-        {
-          role: "model",
-          text: `Hola, soy tu asistente legal para **${documentName}**. ¿Qué quieres saber?`,
-        },
-      ]);
+      const greeting = hasSubscription
+        ? `Hola, soy tu asistente legal para **${documentName}**. ¿Qué quieres saber?`
+        : `Hola, soy tu asistente legal para **${documentName}**. Como invitado tienes **1 pregunta gratis** sobre este documento. ¿Qué quieres saber?`;
+      setMessages([{ role: "model", text: greeting }]);
     }
-  }, [isOpen, documentName, messages.length]);
-
+  }, [isOpen, documentName, messages.length, hasSubscription]);
   useEffect(() => {
     if (!isMinimized && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
@@ -60,34 +82,29 @@ const LegalChatbot = ({
       }
     }
   }, [messages, isMinimized]);
-
   const handleOpen = () => {
-    if (!isLoggedin || !hasSubscription) {
+    if (!hasSubscription && hasUsedTrial(documentId)) {
       setShowSubscribeModal(true);
       return;
     }
     setIsOpen(true);
     setIsMinimized(false);
   };
-
   const handleMinimize = () => {
     setIsMinimized((prev) => !prev);
   };
-
   const handleClose = () => {
     setIsOpen(false);
     setIsMinimized(false);
   };
-
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || loading || limitReached) return;
-
+    if (!text || loading || limitReached || !canChat) return;
     const userMessage: Message = { role: "user", text };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
-
+    const isFreeTrial = !hasSubscription;
     try {
       const res = await fetch("/api/chat/legal", {
         method: "POST",
@@ -97,11 +114,10 @@ const LegalChatbot = ({
           documentName,
           documentId,
           history: messages.slice(-8),
+          isFreeTrial,
         }),
       });
-
       const data = await res.json();
-
       if (res.status === 429 || data.limitReached) {
         setLimitReached(true);
         setMessages((prev) => [
@@ -113,7 +129,6 @@ const LegalChatbot = ({
         ]);
         return;
       }
-
       if (!res.ok) {
         setMessages((prev) => [
           ...prev,
@@ -121,10 +136,20 @@ const LegalChatbot = ({
         ]);
         return;
       }
-
       setMessages((prev) => [...prev, { role: "model", text: data.reply }]);
       if (typeof data.remaining === "number") {
         setRemaining(data.remaining);
+      }
+      if (isFreeTrial) {
+        markTrialUsed(documentId);
+        setTrialUsed(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "model",
+            text: "Esa fue tu pregunta gratis para este documento. Con el **Plan Personal** tienes 20 consultas diarias en todos los documentos, además de resúmenes IA, marcadores y notas.",
+          },
+        ]);
       }
     } catch {
       setMessages((prev) => [
@@ -135,21 +160,18 @@ const LegalChatbot = ({
       setLoading(false);
     }
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
-
   const renderText = (text: string) => {
     if (!text) return "";
     return text
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n/g, "<br/>");
   };
-
   return (
     <>
       <SubscribeModal
@@ -167,7 +189,7 @@ const LegalChatbot = ({
             id="tour-chatbot"
             className={cn(
               "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors",
-              hasSubscription && isLoggedin
+              hasSubscription || !trialUsed
                 ? "bg-[#1E2A38] hover:bg-[#1E2A38]/90"
                 : "bg-gray-400 hover:bg-gray-500"
             )}
@@ -222,6 +244,14 @@ const LegalChatbot = ({
             </div>
             {!isMinimized && (
               <>
+                {!hasSubscription && !trialUsed && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 border-b border-purple-100">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                    <p className="text-[11px] text-purple-700">
+                      Tienes 1 pregunta gratis sobre este documento
+                    </p>
+                  </div>
+                )}
                 <div
                   ref={messagesContainerRef}
                   className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
@@ -258,6 +288,20 @@ const LegalChatbot = ({
                     <p className="text-center text-[12px] text-gray-400 py-1">
                       Límite diario alcanzado. Vuelve mañana.
                     </p>
+                  ) : !canChat ? (
+                    <div className="flex flex-col items-center gap-2 py-1">
+                      <p className="text-center text-[12px] text-gray-500">
+                        Ya usaste tu pregunta gratis para este documento.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="bg-[#1E2A38] hover:bg-[#1E2A38]/90"
+                        onClick={() => setShowSubscribeModal(true)}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                        Ver Plan Personal
+                      </Button>
+                    </div>
                   ) : (
                     <div className="flex items-end gap-2">
                       <textarea
@@ -280,7 +324,7 @@ const LegalChatbot = ({
                       </Button>
                     </div>
                   )}
-                  {!limitReached && (
+                  {!limitReached && hasSubscription && remaining !== null && (
                     <p className="text-right text-[11px] text-gray-400 mt-1">
                       {remaining} / {DAILY_LIMIT} consultas hoy
                     </p>
@@ -294,5 +338,4 @@ const LegalChatbot = ({
     </>
   );
 };
-
 export default LegalChatbot;
