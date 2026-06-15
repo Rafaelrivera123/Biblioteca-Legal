@@ -1,6 +1,7 @@
 "use client";
 import { deleteLegalUpdate } from "@/actions/legal-update/delete";
 import { publishLegalUpdate } from "@/actions/legal-update/publish";
+import { regenerateReformWithGaceta } from "@/actions/legal-update/regenerate-with-gaceta";
 import { unpublishLegalUpdate } from "@/actions/legal-update/unpublish";
 import { updateLegalUpdate } from "@/actions/legal-update/update";
 import AlertModal from "@/components/ui/alert-modal";
@@ -15,9 +16,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LegalUpdatePost, LegalUpdateType } from "@prisma/client";
-import { Pencil, Trash, Eye, EyeOff } from "lucide-react";
+import { Pencil, Trash, Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 const TYPE_LABEL: Record<LegalUpdateType, string> = {
   REFORM: "Reforma",
@@ -30,11 +31,16 @@ interface Props {
 const LegalUpdateCard = ({ data }: Props) => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [gacetaOpen, setGacetaOpen] = useState(false);
   const [title, setTitle] = useState(data.title);
   const [summary, setSummary] = useState(data.summary);
   const [content, setContent] = useState(data.content);
   const [pending, startTransition] = useTransition();
+  const [uploadingGaceta, setUploadingGaceta] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isPublished = data.status === "published";
+  const canUploadGaceta =
+    data.type === "REFORM" && !!data.relatedDocumentId;
   const onDelete = () => {
     startTransition(() => {
       deleteLegalUpdate(data.id).then((res) => {
@@ -73,6 +79,40 @@ const LegalUpdateCard = ({ data }: Props) => {
       });
     });
   };
+  const onSelectGacetaFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Selecciona un archivo PDF.");
+      return;
+    }
+    setUploadingGaceta(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const extractRes = await fetch("/api/legal-updates/extract-pdf", {
+        method: "POST",
+        body: formData,
+      });
+      const extractData = await extractRes.json();
+      if (!extractRes.ok || !extractData.success) {
+        toast.error(extractData.error ?? "No se pudo leer el PDF.");
+        return;
+      }
+      const result = await regenerateReformWithGaceta(data.id, extractData.text);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success(result.message);
+      setGacetaOpen(false);
+    } catch {
+      toast.error("Ocurrió un error procesando el PDF.");
+    } finally {
+      setUploadingGaceta(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
   return (
     <>
       <div className="border-[1px] border-[#1E2A3866]/40 py-[15px] px-[20px] rounded-[8px] bg-white flex items-center justify-between gap-x-[20px]">
@@ -105,6 +145,16 @@ const LegalUpdateCard = ({ data }: Props) => {
           )}
         </div>
         <div className="flex items-center gap-x-1 shrink-0">
+          {canUploadGaceta && (
+            <Button
+              size="icon"
+              variant="link"
+              title="Subir Gaceta (PDF)"
+              onClick={() => setGacetaOpen(true)}
+            >
+              <FileUp />
+            </Button>
+          )}
           <Button size="icon" variant="link" title="Ver / Vista previa" asChild>
             <Link href={`/actualizaciones/${data.slug}`} target="_blank">
               <Eye />
@@ -174,6 +224,42 @@ const LegalUpdateCard = ({ data }: Props) => {
             </Button>
             <Button onClick={onSaveEdit} disabled={pending}>
               Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={gacetaOpen} onOpenChange={setGacetaOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Subir La Gaceta (PDF)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sube el PDF de La Gaceta que contiene esta reforma. El sistema buscará el
+              texto actual de cada artículo en la biblioteca y generará el &quot;antes&quot;
+              y &quot;después&quot; comparando con el contenido del PDF.
+            </p>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={onSelectGacetaFile}
+              disabled={uploadingGaceta}
+            />
+            {uploadingGaceta && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Procesando PDF, esto puede tardar un momento...
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setGacetaOpen(false)}
+              disabled={uploadingGaceta}
+            >
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
