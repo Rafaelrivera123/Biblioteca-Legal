@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
-
 export default function OurServices() {
   return (
     <section className="bg-slate-800 py-16 px-4 sm:px-6 lg:px-8">
@@ -19,7 +18,6 @@ export default function OurServices() {
             práctica legal y proporcionarte la información más actualizada.
           </p>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
@@ -48,7 +46,6 @@ export default function OurServices() {
               </Button>
             </CardContent>
           </Card>
-
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
               <div className="mb-6 flex justify-between">
@@ -66,13 +63,15 @@ export default function OurServices() {
               <Button
                 variant="outline"
                 className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
+                asChild
               >
-                Ver Actualizaciones
-                <ArrowRight className="ml-2 w-4 h-4" />
+                <Link href="/actualizaciones">
+                  Ver Actualizaciones
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Link>
               </Button>
             </CardContent>
           </Card>
-
           <Card className="bg-transparent border-none shadow-none group hover:bg-white transition-all duration-300 ease-in-out">
             <CardContent className="p-8">
               <div className="mb-2 flex justify-between">
