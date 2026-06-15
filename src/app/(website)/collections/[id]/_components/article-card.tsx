@@ -16,40 +16,35 @@ import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import ColorPicker from "./tool/color-picker";
 import CommentPopover from "./tool/comment-provider";
-
 const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
-
-interface LockedSummaryProps {
-  aiSummary: string;
+interface PremiumTeaserProps {
   onUnlock: () => void;
 }
-
-const LockedSummary = ({ aiSummary, onUnlock }: LockedSummaryProps) => (
-  <div className="mb-4 relative">
-    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-      <div className="flex items-center gap-1 mb-1">
-        <Sparkles className="w-3 h-3 text-purple-600" />
-        <span className="text-xs font-semibold text-purple-700">Resumen generado por IA</span>
+const PremiumTeaser = ({ onUnlock }: PremiumTeaserProps) => (
+  <div className="mb-4">
+    <button
+      onClick={onUnlock}
+      className="w-full flex items-center justify-between gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-3 hover:from-purple-100 hover:to-indigo-100 transition-colors group"
+    >
+      <div className="flex items-center gap-2 text-left">
+        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+          <Crown className="w-4 h-4 text-purple-600" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-purple-700">
+            Resumen IA, marcadores y notas
+          </p>
+          <p className="text-[11px] text-purple-500">
+            Disponible con el Plan Personal — $5.99/mes
+          </p>
+        </div>
       </div>
-      <div className="relative">
-        <p className="text-sm text-purple-900 leading-relaxed line-clamp-2 select-none">
-          {aiSummary}
-        </p>
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-purple-50 to-transparent" />
-      </div>
-    </div>
-    <div className="absolute inset-0 flex items-center justify-center">
-      <button
-        onClick={onUnlock}
-        className="flex items-center gap-2 bg-white border border-purple-300 shadow-sm rounded-full px-4 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-50 transition-colors"
-      >
-        <Crown className="w-3 h-3" />
-        Ver resumen completo
-      </button>
-    </div>
+      <span className="text-[11px] font-semibold text-purple-600 border border-purple-300 rounded-full px-3 py-1 shrink-0 group-hover:bg-white transition-colors">
+        Ver plan
+      </span>
+    </button>
   </div>
 );
-
 interface Props {
   data: Article;
   index: number;
@@ -59,8 +54,8 @@ interface Props {
   highlightedArticle?: number | null;
   initialMeta: UserArticleMeta | null;
   isMetaLoading: boolean;
+  isFreeSummary: boolean;
 }
-
 const ArticleCard = ({
   data,
   index,
@@ -70,6 +65,7 @@ const ArticleCard = ({
   highlightedArticle,
   initialMeta,
   isMetaLoading,
+  isFreeSummary,
 }: Props) => {
   const [pending, startTransition] = useTransition();
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -82,18 +78,6 @@ const ArticleCard = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (hasSubscription) return;
-    const blockCopy = (e: ClipboardEvent) => { e.preventDefault(); };
-    document.addEventListener("copy", blockCopy);
-    document.addEventListener("cut", blockCopy);
-    return () => {
-      document.removeEventListener("copy", blockCopy);
-      document.removeEventListener("cut", blockCopy);
-    };
-  }, [hasSubscription]);
-
   useEffect(() => {
     if (initialMeta) {
       setSelectedColor(initialMeta.selectedColor ?? "");
@@ -101,17 +85,16 @@ const ArticleCard = ({
       setBookmarked(initialMeta.isBookmarked);
     }
   }, [initialMeta]);
-
   useOutsideClick(cardRef, () => {
     setIsColorPickerOpen(false);
     setIsCommentOpen(false);
   });
-
   if (!data?.id) return null;
-
   const displayLabel = data.articleLabel ?? String(data.articleNumber);
   const isFirstCard = index === 0;
-
+  // El resumen IA es visible para todos en los primeros 20 artículos del documento.
+  // Fuera de ese rango, requiere suscripción.
+  const canSeeSummary = hasSubscription || isFreeSummary;
   const handleArticleButtonClick = () => {
     if (!isLoggedin || !hasSubscription) {
       setShowSubscribeModal(true);
@@ -119,19 +102,16 @@ const ArticleCard = ({
     }
     setIsColorPickerOpen(true);
   };
-
   const handleSummaryClick = () => {
-    if (!isLoggedin || !hasSubscription) {
+    if (!canSeeSummary) {
       setShowSubscribeModal(true);
       return;
     }
     setShowSummary((prev) => !prev);
   };
-
   const invalidateMeta = () => {
     queryClient.invalidateQueries({ queryKey: ["meta-batch"] });
   };
-
   const onColorUpdate = (color: string) => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, selectedColor: color, documentId }).then((res) => {
@@ -141,7 +121,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onBookmark = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, isBookmarked: !bookmarked, documentId }).then((res) => {
@@ -151,7 +130,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onCommentSubmit = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment, documentId }).then((res) => {
@@ -162,7 +140,6 @@ const ArticleCard = ({
       });
     });
   };
-
   const onCommentDelete = () => {
     startTransition(() => {
       updateArticleMeta({ articleId: data.id, comment: "", documentId }).then((res) => {
@@ -173,7 +150,6 @@ const ArticleCard = ({
       });
     });
   };
-
   return (
     <>
       <SubscribeModal open={showSubscribeModal} onClose={() => setShowSubscribeModal(false)} />
@@ -203,7 +179,7 @@ const ArticleCard = ({
               >
                 Artículo {displayLabel}
               </Button>
-              {data.aiSummary && hasSubscription && (
+              {data.aiSummary && canSeeSummary && (
                 <Button
                   id={isFirstCard ? "tour-ai-summary" : undefined}
                   size="sm"
@@ -218,7 +194,7 @@ const ArticleCard = ({
                     : <ChevronDown className="w-3 h-3" />}
                 </Button>
               )}
-              {data.aiSummary && !hasSubscription && (
+              {data.aiSummary && !canSeeSummary && (
                 <button
                   id={isFirstCard ? "tour-ai-summary" : undefined}
                   onClick={() => setShowSubscribeModal(true)}
@@ -274,7 +250,7 @@ const ArticleCard = ({
           </CardHeader>
           <CardContent>
             <AnimatePresence>
-              {showSummary && hasSubscription && data.aiSummary && (
+              {showSummary && canSeeSummary && data.aiSummary && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
@@ -292,11 +268,8 @@ const ArticleCard = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            {data.aiSummary && !hasSubscription && (
-              <LockedSummary
-                aiSummary={data.aiSummary}
-                onUnlock={() => setShowSubscribeModal(true)}
-              />
+            {!hasSubscription && (
+              <PremiumTeaser onUnlock={() => setShowSubscribeModal(true)} />
             )}
             <ContentViewer content={data.content} />
           </CardContent>
@@ -305,5 +278,4 @@ const ArticleCard = ({
     </>
   );
 };
-
 export default memo(ArticleCard);
