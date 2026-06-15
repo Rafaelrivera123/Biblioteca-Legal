@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LegalUpdatePost, LegalUpdateType } from "@prisma/client";
 import { Pencil, Trash, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 const TYPE_LABEL: Record<LegalUpdateType, string> = {
@@ -104,6 +105,11 @@ const LegalUpdateCard = ({ data }: Props) => {
           )}
         </div>
         <div className="flex items-center gap-x-1 shrink-0">
+          <Button size="icon" variant="link" title="Ver / Vista previa" asChild>
+            <Link href={`/actualizaciones/${data.slug}`} target="_blank">
+              <Eye />
+            </Link>
+          </Button>
           <Button
             size="icon"
             variant="link"
