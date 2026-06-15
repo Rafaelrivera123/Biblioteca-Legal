@@ -5,7 +5,6 @@ import { useEffect, useMemo } from "react";
 import ArticleHeader from "./article-header";
 import ArticleWrapper from "./article-wrapper";
 import DocumentIndex from "./document-index";
-
 export type FullSectionResponse = Prisma.SectionGetPayload<{
   include: {
     chapters: {
@@ -15,14 +14,24 @@ export type FullSectionResponse = Prisma.SectionGetPayload<{
     };
   };
 }>;
-
 interface Props {
   documentId: string;
   isLoggedin: boolean;
   hasSubscription: boolean;
   sections: FullSectionResponse[];
 }
-
+function sortArticlesForOrder(articles: { id: string; articleNumber: number; articleLabel: string | null }[]) {
+  return [...articles].sort((a, b) => {
+    if (a.articleNumber !== b.articleNumber) {
+      return a.articleNumber - b.articleNumber;
+    }
+    const labelA = a.articleLabel ?? "";
+    const labelB = b.articleLabel ?? "";
+    if (!labelA && labelB) return -1;
+    if (labelA && !labelB) return 1;
+    return labelA.localeCompare(labelB);
+  });
+}
 const ArticleContainer = ({
   documentId,
   isLoggedin,
@@ -38,7 +47,22 @@ const ArticleContainer = ({
       ),
     [sections]
   );
-
+  // Calcula el orden global de cada artículo en todo el documento,
+  // para determinar cuáles caen dentro de los primeros N artículos gratis.
+  const globalOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let counter = 0;
+    sections.forEach((section) => {
+      section.chapters.forEach((chapter) => {
+        const sorted = sortArticlesForOrder(chapter.articles);
+        sorted.forEach((article) => {
+          map.set(article.id, counter);
+          counter += 1;
+        });
+      });
+    });
+    return map;
+  }, [sections]);
   const { data: metaMapRes, isLoading: isMetaLoading } = useQuery<{
     success: boolean;
     data: Record<string, UserArticleMeta>;
@@ -52,15 +76,12 @@ const ArticleContainer = ({
       }).then((res) => res.json()),
     enabled: hasSubscription && allArticleIds.length > 0,
   });
-
   const metaMap = metaMapRes?.data ?? {};
-
   useEffect(() => {
     if (documentId) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [documentId]);
-
   return (
     <div className="container min-h-[calc(100vh-600px)]">
       <div className="flex gap-8 items-start relative">
@@ -87,6 +108,7 @@ const ArticleContainer = ({
                         chapterId={chapter.id}
                         metaMap={metaMap}
                         isMetaLoading={isMetaLoading}
+                        globalOrderMap={globalOrderMap}
                       />
                     </div>
                   );
@@ -99,5 +121,4 @@ const ArticleContainer = ({
     </div>
   );
 };
-
 export default ArticleContainer;
