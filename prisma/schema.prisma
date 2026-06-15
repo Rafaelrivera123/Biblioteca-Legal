@@ -303,3 +303,29 @@ model BatchJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+enum LegalUpdateType {
+  REFORM
+  NEW_LAW
+  REPEAL
+}
+enum LegalUpdateStatus {
+  draft
+  published
+}
+model LegalUpdatePost {
+  id                String            @id @default(cuid())
+  slug              String            @unique
+  title             String
+  summary           String
+  content           String
+  type              LegalUpdateType
+  status            LegalUpdateStatus @default(draft)
+  gacetaNumber      String?
+  legalSource       String?
+  relatedDocumentId String?
+  relatedDocument   Document?         @relation(fields: [relatedDocumentId], references: [id])
+  sourceWeek        DateTime          @default(now())
+  publishedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
