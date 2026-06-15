@@ -288,4 +288,18 @@ model BatchJob {
 }
 model LegalUpdatePost {
   id                String            @id @default(cuid())
-  slug              String
+  slug              String            @unique
+  title             String
+  summary           String
+  content           String
+  type              LegalUpdateType
+  status            LegalUpdateStatus @default(draft)
+  gacetaNumber      String?
+  legalSource       String?
+  relatedDocumentId String?
+  relatedDocument   Document?         @relation(fields: [relatedDocumentId], references: [id])
+  sourceWeek        DateTime          @default(now())
+  publishedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
