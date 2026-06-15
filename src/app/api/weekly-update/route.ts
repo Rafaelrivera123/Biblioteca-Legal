@@ -1,143 +1,122 @@
 import { prisma } from "@/lib/db";
 import { resend } from "@/lib/resend";
 import { NextResponse } from "next/server";
-
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const TAVILY_API_URL = "https://api.tavily.com/search";
-
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    // Paso 1: Buscar actualizaciones legales con Tavily (Query especializada con operadores para forzar la captura de la Gaceta y decretos)
-    const tavilyRes = await fetch(TAVILY_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: process.env.TAVILY_API_KEY,
-        query: "reformas leyes Honduras 'La Gaceta' 'decreto' 'artículo' modificados 2026",
-        search_depth: "advanced",
-        max_results: 15,
-        include_answer: true,
-        days: 7,
-      }),
-    });
-
-    if (!tavilyRes.ok) {
-      throw new Error(`Tavily error: ${await tavilyRes.text()}`);
-    }
-
-    const tavilyData = await tavilyRes.json();
-    const searchResults = tavilyData.results ?? [];
-    const searchAnswer = tavilyData.answer ?? "";
-
-    // Paso 2: Obtener documentos vigentes de la Base de Datos
-    const documents = await prisma.document.findMany({
-      where: { published: true },
-      select: {
-        id: true,
-        name: true,
-        law_number: true,
-        slug: true,
-      },
-    });
-
-    // Paso 3: Análisis ultra estructurado y restrictivo con OpenAI (gpt-4o-mini)
-    const openaiRes = await fetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        max_tokens: 4096,
-        temperature: 0.0, // Temperatura a 0 absoluto para evitar la falsificación o alucinación de contenido normativo
-        messages: [
-          {
-            role: "system",
-            content: `Eres un auditor legislativo y asistente legal de élite experto en la legislación de la República de Honduras.
-Tu única tarea es contrastar información del Diario Oficial 'La Gaceta' y reformas del Congreso Nacional obtenidas de internet con los documentos presentes en el catálogo del sistema.
-Debes responder de forma EXCLUSIVA en HTML fragmentado limpio (sin envoltorios globales \`<html>\` ni \`<body>\`), aplicando estrictamente estilos CSS inline compatibles con clientes de correo electrónico.
-Esquema de colores requerido: fondo #1a1a2e para contenedores internos, acentos en #4CAF50 y textos legibles sobre fondo oscuro.`,
-          },
-          {
-            role: "user",
-            content: `Genera un reporte técnico minucioso cruzando las siguientes fuentes de datos extraídas esta semana:
-
-========================================
-NOTICIAS Y RESUMEN LEGISLATIVO RECUPERADO:
-${searchAnswer}
-
-FUENTES DETALLADAS:
-${searchResults.map((r: any) => `- [${r.title}]: ${r.content}`).join("\n")}
-
-CATÁLOGO ACTUAL DE NUESTRA BIBLIOTECA LEGAL:
-${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })), null, 2)}
-========================================
-
-Estructura el cuerpo del reporte siguiendo rigurosamente las siguientes secciones HTML. Si en una sección no se localizan datos fidedignos en las fuentes, añade un párrafo indicando explícitamente: "No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días".
-
-### SECCIONES A DESARROLLAR:
-
-1. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:20px;">⚠️ REFORMAS Y MODIFICACIONES DETECTADAS</h2>
-Identifica qué leyes de nuestra biblioteca han sufrido cambios. Por cada ley afectada, debes listar obligatoriamente:
-- <p><strong>Ley Afectada:</strong> [Nombre y número asignado en biblioteca]</p>
-- <p><strong>Sustento Jurídico del Cambio:</strong> [Número de Decreto Legislativo, Acuerdo Ejecutivo o Resolución institucional, e incluir obligatoriamente el Número de La Gaceta donde se publicó]</p>
-- <p><strong>Fecha de Publicación Oficial:</strong> [Fecha exacta o mes estimado de publicación en el Diario Oficial La Gaceta]</p>
-- <strong>Tabla Comparativa de Artículos:</strong> Crea una tabla HTML formateada con los siguientes estilos inline:
-  \`<table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #4CAF50; margin: 15px 0; background-color: #111122; font-size: 14px; border-collapse: collapse;">\`
-  Las cabeceras de la tabla (\`<th>\`) deben ser: 'N° Gaceta', 'Art.', '[ANTES] Estado Previo / Texto Anterior' y '[DESPUÉS] Disposición Nueva / Texto Reformado'. Las celdas deben tener un borde sutil (\`border: 1px solid #333;\`) y texto blanco. Sé sumamente preciso con la transcripción de las variaciones normativas.
-
-2. <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:30px;">➕ NUEVAS LEYES PUBLICADAS PARA INCORPORAR</h2>
-Identifica cuerpos normativos de reciente creación (Leyes completas, reglamentos nuevos, amnistías) que no figuren en nuestro catálogo. Detalla:
-- Nombre completo de la nueva Ley.
-- Número de Decreto legislativo que le da origen.
-- Número de La Gaceta donde fue publicada.
-- Fecha de inserción/vigencia en La Gaceta.
-- Un resumen ejecutivo sucinto sobre su impacto o campo de aplicación.
-
-3. <h2 style="color:#f44336; font-size:18px; border-bottom:1px solid #f44336; padding-bottom:5px; margin-top:30px;">❌ DEROGACIONES EXPRESAS O TOTALES</h2>
-Lista los documentos de nuestra biblioteca jurídica que pierden vigencia en su totalidad debido a un instrumento posterior. Indica con claridad el instrumento legal derogatorio, el número de La Gaceta correspondiente y la fecha.
-
-REGLAS ESTRICTAS DE RESPUESTA:
-- Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'Antes' o el 'Después', explica el cambio conceptualmente en la tabla en lugar de inventar la redacción literal.
-- No añadas bloques de código markdown (\`\`\`html) en el output. Devuelve el HTML plano.`,
-          },
-        ],
-      }),
-    });
-
-    if (!openaiRes.ok) {
-      throw new Error(`OpenAI error: ${await openaiRes.text()}`);
-    }
-
-    const openaiData = await openaiRes.json();
-    let analysisHtml = openaiData.choices?.[0]?.message?.content?.trim() ?? "";
-
-    if (!analysisHtml) {
-      throw new Error("Respuesta vacía de OpenAI");
-    }
-
-    // Sanitización segura utilizando métodos nativos de string sin expresiones regulares multilínea
-    if (analysisHtml.startsWith("```html") && analysisHtml.endsWith("```")) {
-      analysisHtml = analysisHtml.slice(7, -3).trim();
-    } else if (analysisHtml.startsWith("```") && analysisHtml.endsWith("```")) {
-      analysisHtml = analysisHtml.slice(3, -3).trim();
-    }
-
-    // Paso 4: Construcción del cascarón de correo responsivo y despacho vía Resend
-    await resend.emails.send({
-      from: "Biblioteca Legal HN <noreply@bibliotecalegalhn.com>",
-      to: "rafariveras10@gmail.com",
-      subject: `📋 Actualizaciones Legales Honduras - ${new Date().toLocaleDateString(
-        "es-HN",
-        { weekday: "long", year: "numeric", month: "long", day: "numeric" }
-      )}`,
-      html: `
+interface ReformArticleChange {
+  gacetaNumber: string;
+  articleLabel: string;
+  before: string;
+  after: string;
+}
+interface ReformItem {
+  type: "REFORM";
+  lawName: string;
+  lawNumber: string;
+  legalSource: string;
+  gacetaNumber: string;
+  publicationDate: string;
+  changes: ReformArticleChange[];
+}
+interface NewLawItem {
+  type: "NEW_LAW";
+  lawName: string;
+  decreeNumber: string;
+  gacetaNumber: string;
+  effectiveDate: string;
+  summary: string;
+}
+interface RepealItem {
+  type: "REPEAL";
+  lawName: string;
+  repealingInstrument: string;
+  gacetaNumber: string;
+  date: string;
+}
+type AnalysisItem = ReformItem | NewLawItem | RepealItem;
+interface AnalysisResult {
+  reforms: ReformItem[];
+  newLaws: NewLawItem[];
+  repeals: RepealItem[];
+}
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+function buildReformTable(changes: ReformArticleChange[]): string {
+  const rows = changes
+    .map(
+      (c) => `
+              <tr>
+                <td style="border: 1px solid #333; padding: 8px; color: #ffffff;">${c.gacetaNumber}</td>
+                <td style="border: 1px solid #333; padding: 8px; color: #ffffff;">${c.articleLabel}</td>
+                <td style="border: 1px solid #333; padding: 8px; color: #ffffff;">${c.before}</td>
+                <td style="border: 1px solid #333; padding: 8px; color: #ffffff;">${c.after}</td>
+              </tr>`
+    )
+    .join("");
+  return `
+            <table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #4CAF50; margin: 15px 0; background-color: #111122; font-size: 14px; border-collapse: collapse;">
+              <tr>
+                <th style="border: 1px solid #333; padding: 8px; color: #4CAF50; text-align: left;">N° Gaceta</th>
+                <th style="border: 1px solid #333; padding: 8px; color: #4CAF50; text-align: left;">Art.</th>
+                <th style="border: 1px solid #333; padding: 8px; color: #4CAF50; text-align: left;">[ANTES] Estado Previo / Texto Anterior</th>
+                <th style="border: 1px solid #333; padding: 8px; color: #4CAF50; text-align: left;">[DESPUÉS] Disposición Nueva / Texto Reformado</th>
+              </tr>${rows}
+            </table>`;
+}
+function buildEmailHtml(analysis: AnalysisResult): string {
+  const reformsHtml =
+    analysis.reforms.length > 0
+      ? analysis.reforms
+          .map(
+            (r) => `
+          <p><strong>Ley Afectada:</strong> ${r.lawName} (${r.lawNumber})</p>
+          <p><strong>Sustento Jurídico del Cambio:</strong> ${r.legalSource}, La Gaceta N° ${r.gacetaNumber}</p>
+          <p><strong>Fecha de Publicación Oficial:</strong> ${r.publicationDate}</p>
+          ${buildReformTable(r.changes)}`
+          )
+          .join("<hr style='border-color:#252545; margin: 20px 0;' />")
+      : `<p>No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días.</p>`;
+  const newLawsHtml =
+    analysis.newLaws.length > 0
+      ? analysis.newLaws
+          .map(
+            (l) => `
+          <p><strong>Nombre:</strong> ${l.lawName}</p>
+          <p><strong>Decreto:</strong> ${l.decreeNumber}</p>
+          <p><strong>La Gaceta N°:</strong> ${l.gacetaNumber}</p>
+          <p><strong>Vigencia:</strong> ${l.effectiveDate}</p>
+          <p><strong>Resumen:</strong> ${l.summary}</p>`
+          )
+          .join("<hr style='border-color:#252545; margin: 20px 0;' />")
+      : `<p>No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días.</p>`;
+  const repealsHtml =
+    analysis.repeals.length > 0
+      ? analysis.repeals
+          .map(
+            (r) => `
+          <p><strong>Ley Derogada:</strong> ${r.lawName}</p>
+          <p><strong>Instrumento Derogatorio:</strong> ${r.repealingInstrument}</p>
+          <p><strong>La Gaceta N°:</strong> ${r.gacetaNumber}</p>
+          <p><strong>Fecha:</strong> ${r.date}</p>`
+          )
+          .join("<hr style='border-color:#252545; margin: 20px 0;' />")
+      : `<p>No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días.</p>`;
+  const analysisHtml = `
+    <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:20px;">⚠️ REFORMAS Y MODIFICACIONES DETECTADAS</h2>
+    ${reformsHtml}
+    <h2 style="color:#4CAF50; font-size:18px; border-bottom:1px solid #4CAF50; padding-bottom:5px; margin-top:30px;">➕ NUEVAS LEYES PUBLICADAS PARA INCORPORAR</h2>
+    ${newLawsHtml}
+    <h2 style="color:#f44336; font-size:18px; border-bottom:1px solid #f44336; padding-bottom:5px; margin-top:30px;">❌ DEROGACIONES EXPRESAS O TOTALES</h2>
+    ${repealsHtml}
+  `;
+  return `
         <!DOCTYPE html>
         <html>
           <head>
@@ -184,10 +163,267 @@ REGLAS ESTRICTAS DE RESPUESTA:
             </table>
           </body>
         </html>
-      `,
+      `;
+}
+function buildPostFromItem(
+  item: AnalysisItem,
+  sourceWeek: Date,
+  matchedDocumentId: string | null
+): {
+  slug: string;
+  title: string;
+  summary: string;
+  content: string;
+  type: "REFORM" | "NEW_LAW" | "REPEAL";
+  gacetaNumber: string | null;
+  legalSource: string | null;
+  relatedDocumentId: string | null;
+  sourceWeek: Date;
+} | null {
+  const dateTag = sourceWeek.toISOString().slice(0, 10);
+  if (item.type === "REFORM") {
+    if (item.changes.length === 0) return null;
+    const title = `Reforma a ${item.lawName}`;
+    const summary = `La Gaceta N° ${item.gacetaNumber} (${item.publicationDate}) introduce reformas a ${item.lawName}. Se modifican ${item.changes.length} artículo(s).`;
+    const content = `
+      <p><strong>Ley Afectada:</strong> ${item.lawName} (${item.lawNumber})</p>
+      <p><strong>Sustento Jurídico del Cambio:</strong> ${item.legalSource}, La Gaceta N° ${item.gacetaNumber}</p>
+      <p><strong>Fecha de Publicación Oficial:</strong> ${item.publicationDate}</p>
+      ${buildReformTable(item.changes)}
+    `;
+    return {
+      slug: `${slugify(title)}-${dateTag}`,
+      title,
+      summary,
+      content,
+      type: "REFORM",
+      gacetaNumber: item.gacetaNumber,
+      legalSource: item.legalSource,
+      relatedDocumentId: matchedDocumentId,
+      sourceWeek,
+    };
+  }
+  if (item.type === "NEW_LAW") {
+    const title = item.lawName;
+    const summary = item.summary;
+    const content = `
+      <p><strong>Decreto:</strong> ${item.decreeNumber}</p>
+      <p><strong>La Gaceta N°:</strong> ${item.gacetaNumber}</p>
+      <p><strong>Vigencia:</strong> ${item.effectiveDate}</p>
+      <p>${item.summary}</p>
+    `;
+    return {
+      slug: `${slugify(title)}-${dateTag}`,
+      title,
+      summary,
+      content,
+      type: "NEW_LAW",
+      gacetaNumber: item.gacetaNumber,
+      legalSource: item.decreeNumber,
+      relatedDocumentId: null,
+      sourceWeek,
+    };
+  }
+  // REPEAL
+  const title = `Derogación de ${item.lawName}`;
+  const summary = `${item.lawName} ha sido derogada mediante ${item.repealingInstrument} (La Gaceta N° ${item.gacetaNumber}, ${item.date}).`;
+  const content = `
+    <p><strong>Ley Derogada:</strong> ${item.lawName}</p>
+    <p><strong>Instrumento Derogatorio:</strong> ${item.repealingInstrument}</p>
+    <p><strong>La Gaceta N°:</strong> ${item.gacetaNumber}</p>
+    <p><strong>Fecha:</strong> ${item.date}</p>
+  `;
+  return {
+    slug: `${slugify(title)}-${dateTag}`,
+    title,
+    summary,
+    content,
+    type: "REPEAL",
+    gacetaNumber: item.gacetaNumber,
+    legalSource: item.repealingInstrument,
+    relatedDocumentId: matchedDocumentId,
+    sourceWeek,
+  };
+}
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    // Paso 1: Buscar actualizaciones legales con Tavily
+    const tavilyRes = await fetch(TAVILY_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: process.env.TAVILY_API_KEY,
+        query: "reformas leyes Honduras 'La Gaceta' 'decreto' 'artículo' modificados 2026",
+        search_depth: "advanced",
+        max_results: 15,
+        include_answer: true,
+        days: 7,
+      }),
     });
-
-    return NextResponse.json({ success: true, results_found: searchResults.length });
+    if (!tavilyRes.ok) {
+      throw new Error(`Tavily error: ${await tavilyRes.text()}`);
+    }
+    const tavilyData = await tavilyRes.json();
+    const searchResults = tavilyData.results ?? [];
+    const searchAnswer = tavilyData.answer ?? "";
+    // Paso 2: Obtener documentos vigentes de la Base de Datos
+    const documents = await prisma.document.findMany({
+      where: { published: true },
+      select: {
+        id: true,
+        name: true,
+        law_number: true,
+        slug: true,
+      },
+    });
+    // Paso 3: Análisis estructurado en JSON (una sola llamada a OpenAI)
+    const openaiRes = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 4096,
+        temperature: 0.0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `Eres un auditor legislativo y asistente legal de élite experto en la legislación de la República de Honduras.
+Tu única tarea es contrastar información del Diario Oficial 'La Gaceta' y reformas del Congreso Nacional obtenidas de internet con los documentos presentes en el catálogo del sistema.
+Debes responder EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin explicaciones.
+Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas, decretos o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'antes' o el 'después', describe el cambio conceptualmente en esos campos en lugar de inventar la redacción literal.`,
+          },
+          {
+            role: "user",
+            content: `Analiza las siguientes fuentes de datos extraídas esta semana y devuelve un objeto JSON con la forma exacta:
+{
+  "reforms": [
+    {
+      "type": "REFORM",
+      "lawName": string,
+      "lawNumber": string,
+      "legalSource": string,
+      "gacetaNumber": string,
+      "publicationDate": string,
+      "changes": [
+        { "gacetaNumber": string, "articleLabel": string, "before": string, "after": string }
+      ]
+    }
+  ],
+  "newLaws": [
+    {
+      "type": "NEW_LAW",
+      "lawName": string,
+      "decreeNumber": string,
+      "gacetaNumber": string,
+      "effectiveDate": string,
+      "summary": string
+    }
+  ],
+  "repeals": [
+    {
+      "type": "REPEAL",
+      "lawName": string,
+      "repealingInstrument": string,
+      "gacetaNumber": string,
+      "date": string
+    }
+  ]
+}
+Si no hay datos fidedignos para una sección, devuelve un array vacío para esa sección. No agregues campos adicionales.
+========================================
+NOTICIAS Y RESUMEN LEGISLATIVO RECUPERADO:
+${searchAnswer}
+FUENTES DETALLADAS:
+${searchResults.map((r: any) => `- [${r.title}]: ${r.content}`).join("\n")}
+CATÁLOGO ACTUAL DE NUESTRA BIBLIOTECA LEGAL:
+${JSON.stringify(documents.map((d) => ({ id: d.id, name: d.name, law_number: d.law_number })), null, 2)}
+========================================`,
+          },
+        ],
+      }),
+    });
+    if (!openaiRes.ok) {
+      throw new Error(`OpenAI error: ${await openaiRes.text()}`);
+    }
+    const openaiData = await openaiRes.json();
+    const rawContent = openaiData.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!rawContent) {
+      throw new Error("Respuesta vacía de OpenAI");
+    }
+    let analysis: AnalysisResult;
+    try {
+      const parsed = JSON.parse(rawContent);
+      analysis = {
+        reforms: Array.isArray(parsed.reforms) ? parsed.reforms : [],
+        newLaws: Array.isArray(parsed.newLaws) ? parsed.newLaws : [],
+        repeals: Array.isArray(parsed.repeals) ? parsed.repeals : [],
+      };
+    } catch (err) {
+      throw new Error(`No se pudo parsear JSON de OpenAI: ${String(err)}`);
+    }
+    // Paso 4: Enviar email (idéntico al diseño actual, construido en código a partir del JSON)
+    await resend.emails.send({
+      from: "Biblioteca Legal HN <noreply@bibliotecalegalhn.com>",
+      to: "rafariveras10@gmail.com",
+      subject: `📋 Actualizaciones Legales Honduras - ${new Date().toLocaleDateString(
+        "es-HN",
+        { weekday: "long", year: "numeric", month: "long", day: "numeric" }
+      )}`,
+      html: buildEmailHtml(analysis),
+    });
+    // Paso 5: Guardar cada item detectado como borrador para revisión manual
+    const sourceWeek = new Date();
+    const allItems: AnalysisItem[] = [
+      ...analysis.reforms,
+      ...analysis.newLaws,
+      ...analysis.repeals,
+    ];
+    let draftsCreated = 0;
+    for (const item of allItems) {
+      let matchedDocumentId: string | null = null;
+      if (item.type !== "NEW_LAW") {
+        const match = documents.find(
+          (d) =>
+            d.name.toLowerCase() === item.lawName.toLowerCase() ||
+            d.law_number === (item.type === "REFORM" ? item.lawNumber : "")
+        );
+        matchedDocumentId = match?.id ?? null;
+      }
+      const post = buildPostFromItem(item, sourceWeek, matchedDocumentId);
+      if (!post) continue;
+      const existing = await prisma.legalUpdatePost.findUnique({
+        where: { slug: post.slug },
+      });
+      if (existing) continue;
+      await prisma.legalUpdatePost.create({
+        data: {
+          slug: post.slug,
+          title: post.title,
+          summary: post.summary,
+          content: post.content,
+          type: post.type,
+          gacetaNumber: post.gacetaNumber,
+          legalSource: post.legalSource,
+          relatedDocumentId: post.relatedDocumentId,
+          sourceWeek: post.sourceWeek,
+          status: "draft",
+        },
+      });
+      draftsCreated += 1;
+    }
+    return NextResponse.json({
+      success: true,
+      results_found: searchResults.length,
+      drafts_created: draftsCreated,
+    });
   } catch (error) {
     console.error("Error en weekly-update:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
