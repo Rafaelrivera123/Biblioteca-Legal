@@ -133,9 +133,21 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
         )}
       </div>
       <h1 className="font-bold text-[26px] md:text-[34px] leading-[125%] mb-4">{post.title}</h1>
-      <p className="text-muted-foreground text-base leading-relaxed mb-8">{post.summary}</p>
+      <p className="text-muted-foreground text-base leading-relaxed mb-8 border-l-4 border-primary/20 pl-4">
+        {post.summary}
+      </p>
       <div
-        className="prose prose-sm md:prose-base max-w-none [&_table]:border [&_table]:border-gray-200 [&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-2 [&_td]:border [&_td]:border-gray-200 [&_td]:p-2 [&_table]:w-full"
+        className="
+          space-y-5
+          [&_p]:text-[15px] [&_p]:leading-[1.8] [&_p]:text-gray-700
+          [&_p+p]:mt-5
+          [&_strong]:text-[#1E2A38] [&_strong]:font-semibold
+          [&_p:has(strong:only-child)]:inline-block
+          [&_table]:mt-6 [&_table]:border [&_table]:border-gray-200 [&_table]:rounded-lg [&_table]:overflow-hidden
+          [&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-3 [&_th]:text-left [&_th]:text-sm
+          [&_td]:border [&_td]:border-gray-200 [&_td]:p-3 [&_td]:text-sm [&_td]:align-top
+          [&_table]:w-full
+        "
         dangerouslySetInnerHTML={{ __html: post.content }}
       />
       {post.relatedDocument && (
