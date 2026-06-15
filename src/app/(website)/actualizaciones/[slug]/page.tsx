@@ -1,14 +1,25 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { FileText, PlusCircle, XCircle, ArrowLeft } from "lucide-react";
+import { FileText, PlusCircle, XCircle, ArrowLeft, Eye } from "lucide-react";
 const TYPE_CONFIG = {
   REFORM: { label: "Reforma", icon: FileText, color: "text-amber-600 bg-amber-50 border-amber-200" },
   NEW_LAW: { label: "Nueva Ley", icon: PlusCircle, color: "text-green-600 bg-green-50 border-green-200" },
   REPEAL: { label: "Derogación", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
-async function getPost(slug: string) {
+async function getPost(slug: string, isAdmin: boolean) {
+  if (isAdmin) {
+    return prisma.legalUpdatePost.findFirst({
+      where: { slug },
+      include: {
+        relatedDocument: {
+          select: { name: true, slug: true, id: true },
+        },
+      },
+    });
+  }
   return prisma.legalUpdatePost.findFirst({
     where: { slug, status: "published" },
     include: {
@@ -23,7 +34,9 @@ export async function generateMetadata({
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
-  const post = await getPost(params.slug);
+  const cu = await auth();
+  const isAdmin = cu?.user?.role === "admin";
+  const post = await getPost(params.slug, isAdmin);
   if (!post) {
     return { title: "Actualización no encontrada | Biblioteca Legal HN" };
   }
@@ -32,6 +45,7 @@ export async function generateMetadata({
     title: `${post.title} | Biblioteca Legal HN`,
     description: post.summary,
     alternates: { canonical: url },
+    robots: post.status === "draft" ? { index: false, follow: false } : undefined,
     openGraph: {
       title: post.title,
       description: post.summary,
@@ -50,33 +64,47 @@ export async function generateMetadata({
 }
 export const revalidate = 3600;
 const ActualizacionDetailPage = async ({ params }: { params: { slug: string } }) => {
-  const post = await getPost(params.slug);
+  const cu = await auth();
+  const isAdmin = cu?.user?.role === "admin";
+  const post = await getPost(params.slug, isAdmin);
   if (!post) notFound();
   const config = TYPE_CONFIG[post.type];
   const Icon = config.icon;
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
+  const isDraftPreview = post.status === "draft";
   return (
     <div className="container max-w-[800px] mt-28 mb-20">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Article",
-            headline: post.title,
-            description: post.summary,
-            url,
-            inLanguage: "es-HN",
-            datePublished: post.publishedAt?.toISOString(),
-            dateModified: post.updatedAt.toISOString(),
-            publisher: {
-              "@type": "Organization",
-              name: "Biblioteca Legal HN",
-              url: "https://www.bibliotecalegalhn.com",
-            },
-          }),
-        }}
-      />
+      {!isDraftPreview && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Article",
+              headline: post.title,
+              description: post.summary,
+              url,
+              inLanguage: "es-HN",
+              datePublished: post.publishedAt?.toISOString(),
+              dateModified: post.updatedAt.toISOString(),
+              publisher: {
+                "@type": "Organization",
+                name: "Biblioteca Legal HN",
+                url: "https://www.bibliotecalegalhn.com",
+              },
+            }),
+          }}
+        />
+      )}
+      {isDraftPreview && (
+        <div className="flex items-center gap-2 mb-6 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-2.5">
+          <Eye className="w-4 h-4 shrink-0" />
+          <p>
+            Vista previa de borrador. Esta página no es visible públicamente hasta que la
+            publiques desde el dashboard.
+          </p>
+        </div>
+      )}
       <Link
         href="/actualizaciones"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors"
