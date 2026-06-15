@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { resend } from "@/lib/resend";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const TAVILY_API_URL = "https://api.tavily.com/search";
 interface ReformArticleChange {
@@ -16,6 +17,7 @@ interface ReformItem {
   legalSource: string;
   gacetaNumber: string;
   publicationDate: string;
+  context: string;
   changes: ReformArticleChange[];
 }
 interface NewLawItem {
@@ -24,6 +26,7 @@ interface NewLawItem {
   decreeNumber: string;
   gacetaNumber: string;
   effectiveDate: string;
+  context: string;
   summary: string;
 }
 interface RepealItem {
@@ -32,6 +35,7 @@ interface RepealItem {
   repealingInstrument: string;
   gacetaNumber: string;
   date: string;
+  context: string;
 }
 type AnalysisItem = ReformItem | NewLawItem | RepealItem;
 interface AnalysisResult {
@@ -79,6 +83,7 @@ function buildEmailHtml(analysis: AnalysisResult): string {
           <p><strong>Ley Afectada:</strong> ${r.lawName} (${r.lawNumber})</p>
           <p><strong>Sustento Jurídico del Cambio:</strong> ${r.legalSource}, La Gaceta N° ${r.gacetaNumber}</p>
           <p><strong>Fecha de Publicación Oficial:</strong> ${r.publicationDate}</p>
+          <p>${r.context}</p>
           ${buildReformTable(r.changes)}`
           )
           .join("<hr style='border-color:#252545; margin: 20px 0;' />")
@@ -92,6 +97,7 @@ function buildEmailHtml(analysis: AnalysisResult): string {
           <p><strong>Decreto:</strong> ${l.decreeNumber}</p>
           <p><strong>La Gaceta N°:</strong> ${l.gacetaNumber}</p>
           <p><strong>Vigencia:</strong> ${l.effectiveDate}</p>
+          <p>${l.context}</p>
           <p><strong>Resumen:</strong> ${l.summary}</p>`
           )
           .join("<hr style='border-color:#252545; margin: 20px 0;' />")
@@ -104,7 +110,8 @@ function buildEmailHtml(analysis: AnalysisResult): string {
           <p><strong>Ley Derogada:</strong> ${r.lawName}</p>
           <p><strong>Instrumento Derogatorio:</strong> ${r.repealingInstrument}</p>
           <p><strong>La Gaceta N°:</strong> ${r.gacetaNumber}</p>
-          <p><strong>Fecha:</strong> ${r.date}</p>`
+          <p><strong>Fecha:</strong> ${r.date}</p>
+          <p>${r.context}</p>`
           )
           .join("<hr style='border-color:#252545; margin: 20px 0;' />")
       : `<p>No se identificaron novedades en este apartado basado en los reportes de los últimos 7 días.</p>`;
@@ -174,6 +181,7 @@ function buildPostFromItem(
   title: string;
   summary: string;
   content: string;
+  changesData: Prisma.InputJsonValue | undefined;
   type: "REFORM" | "NEW_LAW" | "REPEAL";
   gacetaNumber: string | null;
   legalSource: string | null;
@@ -186,6 +194,7 @@ function buildPostFromItem(
     const title = `Reforma a ${item.lawName}`;
     const summary = `La Gaceta N° ${item.gacetaNumber} (${item.publicationDate}) introduce reformas a ${item.lawName}. Se modifican ${item.changes.length} artículo(s).`;
     const content = `
+      <p>${item.context}</p>
       <p><strong>Ley Afectada:</strong> ${item.lawName} (${item.lawNumber})</p>
       <p><strong>Sustento Jurídico del Cambio:</strong> ${item.legalSource}, La Gaceta N° ${item.gacetaNumber}</p>
       <p><strong>Fecha de Publicación Oficial:</strong> ${item.publicationDate}</p>
@@ -196,6 +205,7 @@ function buildPostFromItem(
       title,
       summary,
       content,
+      changesData: item.changes as unknown as Prisma.InputJsonValue,
       type: "REFORM",
       gacetaNumber: item.gacetaNumber,
       legalSource: item.legalSource,
@@ -207,16 +217,18 @@ function buildPostFromItem(
     const title = item.lawName;
     const summary = item.summary;
     const content = `
+      <p>${item.context}</p>
       <p><strong>Decreto:</strong> ${item.decreeNumber}</p>
       <p><strong>La Gaceta N°:</strong> ${item.gacetaNumber}</p>
       <p><strong>Vigencia:</strong> ${item.effectiveDate}</p>
-      <p>${item.summary}</p>
+      <p><strong>Resumen:</strong> ${item.summary}</p>
     `;
     return {
       slug: `${slugify(title)}-${dateTag}`,
       title,
       summary,
       content,
+      changesData: undefined,
       type: "NEW_LAW",
       gacetaNumber: item.gacetaNumber,
       legalSource: item.decreeNumber,
@@ -228,6 +240,7 @@ function buildPostFromItem(
   const title = `Derogación de ${item.lawName}`;
   const summary = `${item.lawName} ha sido derogada mediante ${item.repealingInstrument} (La Gaceta N° ${item.gacetaNumber}, ${item.date}).`;
   const content = `
+    <p>${item.context}</p>
     <p><strong>Ley Derogada:</strong> ${item.lawName}</p>
     <p><strong>Instrumento Derogatorio:</strong> ${item.repealingInstrument}</p>
     <p><strong>La Gaceta N°:</strong> ${item.gacetaNumber}</p>
@@ -238,6 +251,7 @@ function buildPostFromItem(
     title,
     summary,
     content,
+    changesData: undefined,
     type: "REPEAL",
     gacetaNumber: item.gacetaNumber,
     legalSource: item.repealingInstrument,
@@ -298,7 +312,8 @@ export async function GET(request: Request) {
             content: `Eres un auditor legislativo y asistente legal de élite experto en la legislación de la República de Honduras.
 Tu única tarea es contrastar información del Diario Oficial 'La Gaceta' y reformas del Congreso Nacional obtenidas de internet con los documentos presentes en el catálogo del sistema.
 Debes responder EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin explicaciones.
-Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas, decretos o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'antes' o el 'después', describe el cambio conceptualmente en esos campos en lugar de inventar la redacción literal.`,
+Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas, decretos o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'antes' o el 'después', describe el cambio conceptualmente en esos campos en lugar de inventar la redacción literal.
+Para el campo "context" de cada item, escribe 1 a 2 párrafos en español (mínimo 80 palabras, máximo 180 palabras en total) explicando de forma clara y accesible, para un público de estudiantes de derecho y ciudadanos sin formación jurídica, qué significa este cambio, por qué es relevante y a quién afecta en la práctica. No repitas literalmente los datos técnicos (número de decreto, gaceta, fecha); esos van en campos separados. El "context" debe ser prosa explicativa basada estrictamente en la información de las fuentes, sin inventar implicaciones no respaldadas por el texto.`,
           },
           {
             role: "user",
@@ -312,6 +327,7 @@ Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas,
       "legalSource": string,
       "gacetaNumber": string,
       "publicationDate": string,
+      "context": string,
       "changes": [
         { "gacetaNumber": string, "articleLabel": string, "before": string, "after": string }
       ]
@@ -324,6 +340,7 @@ Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas,
       "decreeNumber": string,
       "gacetaNumber": string,
       "effectiveDate": string,
+      "context": string,
       "summary": string
     }
   ],
@@ -333,7 +350,8 @@ Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas,
       "lawName": string,
       "repealingInstrument": string,
       "gacetaNumber": string,
-      "date": string
+      "date": string,
+      "context": string
     }
   ]
 }
@@ -409,6 +427,7 @@ ${JSON.stringify(documents.map((d) => ({ id: d.id, name: d.name, law_number: d.l
           title: post.title,
           summary: post.summary,
           content: post.content,
+          changesData: post.changesData,
           type: post.type,
           gacetaNumber: post.gacetaNumber,
           legalSource: post.legalSource,
