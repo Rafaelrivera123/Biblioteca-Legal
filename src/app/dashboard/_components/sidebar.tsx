@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   ListRestart,
   LogOut,
+  Newspaper,
   Settings,
   ShieldCheck,
   TableOfContents,
@@ -21,7 +22,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-
 const routes = [
   { id: 1, label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
   { id: 2, label: "Users", icon: Users, href: "/dashboard/users" },
@@ -31,15 +31,14 @@ const routes = [
   { id: 6, label: "Content", icon: TableOfContents, href: "/dashboard/content" },
   { id: 7, label: "WaitList", icon: ListRestart, href: "/dashboard/waitlist" },
   { id: 8, label: "Validate Laws", icon: ShieldCheck, href: "/dashboard/validate" },
-  { id: 9, label: "Settings", icon: Settings, href: "/dashboard/settings" },
+  { id: 9, label: "Actualizaciones Legales", icon: Newspaper, href: "/dashboard/legal-updates" },
+  { id: 10, label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
-
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
-
   const onLogout = () => {
     setIsLoading(true);
     startTransition(() => {
@@ -52,11 +51,9 @@ const Sidebar = () => {
       });
     });
   };
-
   useEffect(() => {
     return () => { setIsLoading(false); };
   }, []);
-
   return (
     <>
       <div className="fixed inset-y-0 left-0 z-50 w-64 border-r bg-white">
@@ -67,7 +64,6 @@ const Sidebar = () => {
               <Image src={logoSrc} alt="logo" fill />
             </div>
           </div>
-
           {/* Navigation Links */}
           <nav className="flex-1 overflow-auto p-3">
             <ul className="space-y-2">
@@ -95,7 +91,6 @@ const Sidebar = () => {
               })}
             </ul>
           </nav>
-
           {/* Bottom actions */}
           <div className="border-t p-3 space-y-2">
             <Button
@@ -119,7 +114,6 @@ const Sidebar = () => {
           </div>
         </div>
       </div>
-
       <AlertModal
         isOpen={open}
         onClose={() => setOpen(false)}
@@ -131,5 +125,4 @@ const Sidebar = () => {
     </>
   );
 };
-
 export default Sidebar;
