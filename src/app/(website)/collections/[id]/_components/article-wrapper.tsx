@@ -3,11 +3,9 @@ import { useActiveChapterStore, useArticleSearchStore } from "@/store/collection
 import { Article, UserArticleMeta } from "@prisma/client";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ArticleCard from "./article-card";
-
 const ADSENSE_CLIENT = "ca-pub-5685390714020326";
 const ADSENSE_SLOT = "6259496363";
 const AD_EVERY_N_ARTICLES = 15;
-
 interface Props {
   data: Article[];
   isLoggedin: boolean;
@@ -16,8 +14,8 @@ interface Props {
   chapterId: string;
   metaMap: Record<string, UserArticleMeta>;
   isMetaLoading: boolean;
+  globalOrderMap: Map<string, number>;
 }
-
 function sortArticles(articles: Article[]): Article[] {
   return [...articles].sort((a, b) => {
     if (a.articleNumber !== b.articleNumber) {
@@ -30,7 +28,6 @@ function sortArticles(articles: Article[]): Article[] {
     return labelA.localeCompare(labelB);
   });
 }
-
 const AdBanner = () => {
   useEffect(() => {
     try {
@@ -40,7 +37,6 @@ const AdBanner = () => {
       // ignore
     }
   }, []);
-
   return (
     <div className="my-4 flex justify-center">
       <ins
@@ -54,7 +50,6 @@ const AdBanner = () => {
     </div>
   );
 };
-
 const ArticleWrapper = ({
   data,
   isLoggedin,
@@ -63,13 +58,13 @@ const ArticleWrapper = ({
   chapterId,
   metaMap,
   isMetaLoading,
+  globalOrderMap,
 }: Props) => {
   const { query, setQuery } = useArticleSearchStore();
   const { setActiveChapterId } = useActiveChapterStore();
   const [highlightedArticle, setHighlightedArticle] = useState<number | null>(null);
   const articleRefs = useRef<(HTMLDivElement | null)[]>([]);
   const sortedData = useMemo(() => sortArticles(data), [data]);
-
   useEffect(() => {
     if (!query) return;
     const searchNumber = parseInt(query.trim(), 10);
@@ -96,34 +91,37 @@ const ArticleWrapper = ({
       }
     }
   }, [query, sortedData, setQuery, chapterId, setActiveChapterId]);
-
   return (
     <div className="space-y-5">
-      {sortedData?.map((item, i) => (
-        <div key={item.id}>
-          <div
-            ref={(el) => {
-              articleRefs.current[i] = el;
-            }}
-          >
-            <ArticleCard
-              data={item}
-              index={i}
-              isLoggedin={isLoggedin}
-              hasSubscription={hasSubscription}
-              documentId={documentId}
-              highlightedArticle={highlightedArticle}
-              initialMeta={metaMap[item.id] ?? null}
-              isMetaLoading={isMetaLoading}
-            />
+      {sortedData?.map((item, i) => {
+        const globalIndex = globalOrderMap.get(item.id) ?? Infinity;
+        const isFreeSummary = globalIndex < 20;
+        return (
+          <div key={item.id}>
+            <div
+              ref={(el) => {
+                articleRefs.current[i] = el;
+              }}
+            >
+              <ArticleCard
+                data={item}
+                index={i}
+                isLoggedin={isLoggedin}
+                hasSubscription={hasSubscription}
+                documentId={documentId}
+                highlightedArticle={highlightedArticle}
+                initialMeta={metaMap[item.id] ?? null}
+                isMetaLoading={isMetaLoading}
+                isFreeSummary={isFreeSummary}
+              />
+            </div>
+            {!hasSubscription && (i + 1) % AD_EVERY_N_ARTICLES === 0 && (
+              <AdBanner key={`ad-${i}`} />
+            )}
           </div>
-          {!hasSubscription && (i + 1) % AD_EVERY_N_ARTICLES === 0 && (
-            <AdBanner key={`ad-${i}`} />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
-
 export default memo(ArticleWrapper);
