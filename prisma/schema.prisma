@@ -1,17 +1,23 @@
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 enum Role {
   admin
   user
 }
-
+enum LegalUpdateType {
+  REFORM
+  NEW_LAW
+  REPEAL
+}
+enum LegalUpdateStatus {
+  draft
+  published
+}
 model User {
   id               String    @id @default(cuid())
   first_name       String
@@ -42,7 +48,6 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
-
 model UserQue {
   id         String   @id @default(cuid())
   first_name String
@@ -53,7 +58,6 @@ model UserQue {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
-
 model Device {
   id        String   @id @default(cuid())
   userId    String
@@ -65,7 +69,6 @@ model Device {
   updatedAt DateTime @updatedAt
   @@unique([userId, deviceId])
 }
-
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -84,7 +87,6 @@ model Account {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
 }
-
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -94,7 +96,6 @@ model Session {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-
 model VerificationToken {
   id         String   @id @default(cuid())
   identifier String
@@ -102,7 +103,6 @@ model VerificationToken {
   expires    DateTime
   @@unique([identifier, token])
 }
-
 model ResetReq {
   id            String   @id @default(cuid())
   email         String
@@ -112,21 +112,18 @@ model ResetReq {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
-
 model NewsLetter {
   id        String   @id @default(cuid())
   email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Category {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Document {
   id                String            @id @default(cuid())
   name              String
@@ -140,11 +137,11 @@ model Document {
   watchLists        WatchLists[]
   categories        DocumentCategory[]
   sections          Section[]
+  legalUpdatePosts  LegalUpdatePost[]
   publishedAt       DateTime          @default(now())
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
-
 model DocumentCategory {
   id         String   @id @default(cuid())
   documentId String
@@ -153,7 +150,6 @@ model DocumentCategory {
   name       String
   createdAt  DateTime @default(now())
 }
-
 model WatchLists {
   id         String   @id @default(cuid())
   userId     String
@@ -161,7 +157,6 @@ model WatchLists {
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
-
 model Section {
   id         String    @id @default(cuid())
   title      String
@@ -171,7 +166,6 @@ model Section {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
-
 model Chapter {
   id        String    @id @default(cuid())
   title     String
@@ -181,7 +175,6 @@ model Chapter {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
-
 model Article {
   id               String            @id @default(cuid())
   content          String
@@ -197,7 +190,6 @@ model Article {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 }
-
 model UserArticleMeta {
   id            String   @id @default(cuid())
   userId        String
@@ -213,7 +205,6 @@ model UserArticleMeta {
   updatedAt     DateTime @updatedAt
   @@unique([userId, articleId])
 }
-
 model Company {
   id            String                @id @default(cuid())
   name          String
@@ -225,7 +216,6 @@ model Company {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 }
-
 model CompanySubscription {
   id                 String   @id @default(cuid())
   companyId          String   @unique
@@ -235,7 +225,6 @@ model CompanySubscription {
   currentPeriodStart DateTime @default(now())
   currentPeriodEnd   DateTime
 }
-
 model UserSubscription {
   id                 String   @id @default(cuid())
   userId             String   @unique
@@ -248,28 +237,24 @@ model UserSubscription {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
-
 model PrivacyPolicy {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model TermsOfService {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model RefundPolicy {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 model Setting {
   id           String   @id @default(cuid())
   adminId      String   @unique
@@ -281,7 +266,6 @@ model Setting {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-
 model ChatUsage {
   id        String   @id @default(cuid())
   userId    String
@@ -292,7 +276,6 @@ model ChatUsage {
   updatedAt DateTime @updatedAt
   @@unique([userId, date])
 }
-
 model BatchJob {
   id          String   @id @default(cuid())
   batchId     String   @unique
@@ -303,29 +286,6 @@ model BatchJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
-enum LegalUpdateType {
-  REFORM
-  NEW_LAW
-  REPEAL
-}
-enum LegalUpdateStatus {
-  draft
-  published
-}
 model LegalUpdatePost {
   id                String            @id @default(cuid())
-  slug              String            @unique
-  title             String
-  summary           String
-  content           String
-  type              LegalUpdateType
-  status            LegalUpdateStatus @default(draft)
-  gacetaNumber      String?
-  legalSource       String?
-  relatedDocumentId String?
-  relatedDocument   Document?         @relation(fields: [relatedDocumentId], references: [id])
-  sourceWeek        DateTime          @default(now())
-  publishedAt       DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-}
+  slug              String
