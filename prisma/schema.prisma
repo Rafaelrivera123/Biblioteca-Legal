@@ -292,6 +292,7 @@ model LegalUpdatePost {
   title             String
   summary           String
   content           String
+  changesData       Json?
   type              LegalUpdateType
   status            LegalUpdateStatus @default(draft)
   gacetaNumber      String?
