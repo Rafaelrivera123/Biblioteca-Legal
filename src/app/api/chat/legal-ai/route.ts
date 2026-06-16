@@ -28,23 +28,38 @@ async function getQueryEmbedding(query: string): Promise<number[]> {
   return data.data[0].embedding;
 }
 
-// Detecta si el usuario menciona un documento específico y retorna su ID
-async function detectDocumentFromQuery(query: string, history: { role: string; text: string }[]): Promise<string | null> {
-  try {
-    // Combinar historial reciente + mensaje actual para mejor detección
-    const recentContext = [
-      ...history.slice(-4).map((h) => h.text),
-      query,
-    ].join(" ");
+// Extrae números de artículo mencionados explícitamente en el texto
+function extractArticleNumbers(text: string): number[] {
+  const numbers: number[] = [];
+  const patterns = [
+    /art[ií]culo[s]?\s+(\d+)/gi,
+    /art\.\s*(\d+)/gi,
+    /art\s+(\d+)/gi,
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && !numbers.includes(num)) {
+        numbers.push(num);
+      }
+    }
+  }
+  return numbers;
+}
 
-    // Traer todos los documentos para hacer matching
+// Detecta si el usuario menciona un documento específico y retorna su ID
+async function detectDocumentFromQuery(
+  query: string,
+  history: { role: string; text: string }[]
+): Promise<string | null> {
+  try {
+    const recentContext = [...history.slice(-4).map((h) => h.text), query].join(" ");
+
     const documents = await prisma.document.findMany({
       select: { id: true, name: true, slug: true },
     });
 
-    const contextLower = recentContext.toLowerCase();
-
-    // Normalizar texto para comparación
     const normalize = (str: string) =>
       str
         .toLowerCase()
@@ -58,16 +73,12 @@ async function detectDocumentFromQuery(query: string, history: { role: string; t
 
     for (const doc of documents) {
       const nameNorm = normalize(doc.name);
-      const slugNorm = doc.slug.replace(/-/g, " ").replace("-honduras", "");
-
-      // Score basado en cuántas palabras del nombre del documento aparecen en el contexto
       const nameWords = nameNorm.split(" ").filter((w) => w.length > 3);
       if (nameWords.length === 0) continue;
 
       const matchCount = nameWords.filter((w) => contextNorm.includes(w)).length;
       const score = matchCount / nameWords.length;
 
-      // Solo considerar si al menos el 50% de las palabras clave coinciden
       if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
         bestMatch = { id: doc.id, score };
       }
@@ -76,32 +87,6 @@ async function detectDocumentFromQuery(query: string, history: { role: string; t
     if (bestMatch) {
       console.log("[legal-ai] document detected:", bestMatch.id, "score:", bestMatch.score);
       return bestMatch.id;
-    }
-
-    // Detección por patrones comunes en español
-    const patterns = [
-      { pattern: /ley\s+de\s+procedimiento\s+admin/i, keywords: ["procedimiento", "administrativo"] },
-      { pattern: /codigo\s+(civil|penal|comercio|trabajo|familia)/i, keywords: [] },
-      { pattern: /constituci[oó]n/i, keywords: ["constitucion"] },
-    ];
-
-    for (const { pattern } of patterns) {
-      if (pattern.test(contextLower)) {
-        // Buscar por slug o nombre
-        const match = pattern.exec(contextLower);
-        if (match) {
-          const matchedNorm = normalize(match[0]);
-          const matchWords = matchedNorm.split(" ").filter((w) => w.length > 3);
-          for (const doc of documents) {
-            const docNorm = normalize(doc.name);
-            const hits = matchWords.filter((w) => docNorm.includes(w)).length;
-            if (hits >= matchWords.length * 0.6) {
-              console.log("[legal-ai] document detected via pattern:", doc.id, doc.name);
-              return doc.id;
-            }
-          }
-        }
-      }
     }
 
     return null;
@@ -113,7 +98,7 @@ async function detectDocumentFromQuery(query: string, history: { role: string; t
 
 async function getRelevantArticles(
   query: string,
-  history: { role: string; text: string }[],
+  history: { role: string; text: string }[]
 ): Promise<string> {
   try {
     type ArticleRaw = {
@@ -124,26 +109,56 @@ async function getRelevantArticles(
       documentSlug: string;
     };
 
-    // Enriquecer la query con contexto del historial reciente
-    const recentHistory = history
-      .slice(-3)
-      .map((h) => h.text)
-      .join(" ");
+    const recentHistory = history.slice(-3).map((h) => h.text).join(" ");
     const enrichedQuery = recentHistory
       ? `${recentHistory} ${query}`.slice(0, 2000)
       : query;
 
+    const detectedDocumentId = await detectDocumentFromQuery(query, history);
+
+    // Buscar artículos por número explícito si el usuario los menciona
+    const mentionedArticleNumbers = extractArticleNumbers(enrichedQuery);
+    let exactArticles: ArticleRaw[] = [];
+
+    if (mentionedArticleNumbers.length > 0) {
+      if (detectedDocumentId) {
+        exactArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+           FROM "Article" a
+           JOIN "Chapter" c ON a."chapterId" = c.id
+           JOIN "Section" s ON c."sectionId" = s.id
+           JOIN "Document" d ON s."documentId" = d.id
+           WHERE s."documentId" = $1
+           AND a."articleNumber" = ANY($2::int[])
+           LIMIT 5`,
+          detectedDocumentId,
+          mentionedArticleNumbers
+        );
+      } else {
+        exactArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+           FROM "Article" a
+           JOIN "Chapter" c ON a."chapterId" = c.id
+           JOIN "Section" s ON c."sectionId" = s.id
+           JOIN "Document" d ON s."documentId" = d.id
+           WHERE a."articleNumber" = ANY($1::int[])
+           LIMIT 10`,
+          mentionedArticleNumbers
+        );
+      }
+      console.log("[legal-ai] exact article search found:", exactArticles.length, exactArticles.map((a) => `${a.documentName} art.${a.articleNumber}`));
+    }
+
+    // Búsqueda vectorial complementaria
     const embedding = await getQueryEmbedding(enrichedQuery);
     const vectorStr = `[${embedding.join(",")}]`;
 
-    // Intentar detectar documento específico
-    const detectedDocumentId = await detectDocumentFromQuery(query, history);
+    const exactIds = exactArticles.map((a) => a.articleNumber);
 
-    let articles: ArticleRaw[];
+    let vectorArticles: ArticleRaw[];
 
     if (detectedDocumentId) {
-      // Búsqueda filtrada por documento específico -- mucho más precisa
-      articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+      vectorArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
         `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
          FROM "Article" a
          JOIN "Chapter" c ON a."chapterId" = c.id
@@ -151,31 +166,37 @@ async function getRelevantArticles(
          JOIN "Document" d ON s."documentId" = d.id
          WHERE s."documentId" = $1
          AND a.embedding IS NOT NULL
+         AND NOT (a."articleNumber" = ANY($3::int[]))
          ORDER BY a.embedding <=> $2::vector
-         LIMIT 12`,
+         LIMIT 8`,
         detectedDocumentId,
-        vectorStr
+        vectorStr,
+        exactIds.length > 0 ? exactIds : [-1]
       );
-      console.log("[legal-ai] filtered search - articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
     } else {
-      // Búsqueda global cuando no se detecta documento específico
-      articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
+      vectorArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
         `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
          FROM "Article" a
          JOIN "Chapter" c ON a."chapterId" = c.id
          JOIN "Section" s ON c."sectionId" = s.id
          JOIN "Document" d ON s."documentId" = d.id
          WHERE a.embedding IS NOT NULL
+         AND NOT (a."articleNumber" = ANY($2::int[]))
          ORDER BY a.embedding <=> $1::vector
-         LIMIT 15`,
-        vectorStr
+         LIMIT 10`,
+        vectorStr,
+        exactIds.length > 0 ? exactIds : [-1]
       );
-      console.log("[legal-ai] global search - articles found:", articles.length, articles.map((a) => `${a.documentName} art.${a.articleNumber}`));
     }
 
-    if (articles.length === 0) return "";
+    console.log("[legal-ai] vector search found:", vectorArticles.length);
 
-    return articles
+    // Combinar: artículos exactos primero, luego vectoriales
+    const combined = [...exactArticles, ...vectorArticles];
+
+    if (combined.length === 0) return "";
+
+    return combined
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
         const url = `https://www.bibliotecalegalhn.com/collections/${a.documentSlug}`;
