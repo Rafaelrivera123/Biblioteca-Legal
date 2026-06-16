@@ -1,15 +1,40 @@
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 import HomeContact from "@/components/HomeContact";
 import OurServices from "@/components/OurServices";
 import ResearchTools from "@/components/ResearchTools";
 import CTA from "@/components/shared/sections/cta";
+import LegalAIChatbot from "@/components/LegalAIChatbot";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 
 export default async function Home() {
   const cu = await auth();
-  const isLoggedin = !!cu;
+  const isLoggedin = !!cu?.user?.id;
+  const userId = cu?.user?.id ?? null;
+
+  let hasSubscription = false;
+  let isAdmin = false;
+
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        userSubscription: {
+          select: { isActive: true, currentPeriodEnd: true },
+        },
+      },
+    });
+    isAdmin = user?.role === "admin";
+    hasSubscription =
+      isAdmin ||
+      !!(
+        user?.userSubscription?.isActive &&
+        new Date(user.userSubscription.currentPeriodEnd) > new Date()
+      );
+  }
 
   return (
     <>
@@ -52,6 +77,7 @@ export default async function Home() {
       <ResearchTools />
       {!isLoggedin && <CTA />}
       <HomeContact />
+      <LegalAIChatbot isLoggedin={isLoggedin} hasSubscription={hasSubscription} />
     </>
   );
 }
