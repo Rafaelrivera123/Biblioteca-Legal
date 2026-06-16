@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, Send, Scale, Loader2, Minus, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-const SubscribeModal = dynamic(() => import("./subscribe-modal"), { ssr: false });
+const SubscribeModal = dynamic(() => import("@/app/(website)/collections/[id]/_components/subscribe-modal"), { ssr: false });
 
 interface Message {
   role: "user" | "assistant";
@@ -150,7 +150,6 @@ const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
         onClose={() => setShowSubscribeModal(false)}
       />
 
-      {/* Botón flotante expandido con descripción */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -190,7 +189,6 @@ const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
             className="fixed bottom-6 right-6 z-50 w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
             style={{ height: isMinimized ? "56px" : "500px", transition: "height 0.2s ease" }}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-[#1E2A38]/10 flex items-center justify-center">
@@ -227,7 +225,6 @@ const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
 
             {!isMinimized && (
               <>
-                {/* Badge IA */}
                 <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 border-b border-purple-100">
                   <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
                   <p className="text-[11px] text-purple-700">
@@ -235,7 +232,6 @@ const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
                   </p>
                 </div>
 
-                {/* Messages */}
                 <div
                   ref={messagesContainerRef}
                   className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
@@ -276,7 +272,6 @@ const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
                   )}
                 </div>
 
-                {/* Input */}
                 <div className="px-3 py-3 border-t border-gray-100 shrink-0">
                   {limitReached ? (
                     <p className="text-center text-[12px] text-gray-400 py-1">
