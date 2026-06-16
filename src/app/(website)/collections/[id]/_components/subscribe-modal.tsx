@@ -1,13 +1,15 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Crown, Sparkles, Bookmark, MessageSquare } from "lucide-react";
+import { Crown, Sparkles, Bookmark, MessageSquare, Scale } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+
 interface Props {
   open: boolean;
   onClose: () => void;
 }
+
 const SubscribeModal = ({ open, onClose }: Props) => {
   const router = useRouter();
   return (
@@ -31,8 +33,11 @@ const SubscribeModal = ({ open, onClose }: Props) => {
           Entiende cada artículo en segundos con el{" "}
           <strong className="text-primary">Plan Personal</strong>
         </p>
-        {/* Beneficios */}
         <ul className="text-left space-y-2 mt-3">
+          <li className="flex items-start gap-2 text-[13px] text-gray-700">
+            <Scale className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
+            <span><strong>Asistente Legal IA</strong> — consulta cualquier ley hondureña al instante</span>
+          </li>
           <li className="flex items-start gap-2 text-[13px] text-gray-700">
             <Sparkles className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
             <span><strong>Resúmenes IA por artículo</strong> — entiende el contenido al instante</span>
@@ -70,4 +75,5 @@ const SubscribeModal = ({ open, onClose }: Props) => {
     </Dialog>
   );
 };
+
 export default SubscribeModal;
