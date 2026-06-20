@@ -4,42 +4,46 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { FileText, PlusCircle, XCircle, ArrowLeft, Eye } from "lucide-react";
+
 const TYPE_CONFIG = {
   REFORM: { label: "Reforma", icon: FileText, color: "text-amber-600 bg-amber-50 border-amber-200" },
   NEW_LAW: { label: "Nueva Ley", icon: PlusCircle, color: "text-green-600 bg-green-50 border-green-200" },
   REPEAL: { label: "Derogación", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
+
+function extractDespuesFromTables(html: string): string {
+  return html.replace(/<table[\s\S]*?<\/table>/gi, (table) => {
+    const rows = [...table.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => m[0]);
+    const dataRows = rows.slice(1);
+    const texts = dataRows
+      .map((row) => {
+        const cells = [...row.matchAll(/<td[\s\S]*?<\/td>/gi)].map((m) => m[0]);
+        const lastCell = cells[cells.length - 1] ?? "";
+        return lastCell.replace(/<[^>]+>/g, "").trim();
+      })
+      .filter(Boolean);
+    return texts.map((t) => `<p>${t}</p>`).join("");
+  });
+}
+
 async function getPost(slug: string, isAdmin: boolean) {
   if (isAdmin) {
     return prisma.legalUpdatePost.findFirst({
       where: { slug },
-      include: {
-        relatedDocument: {
-          select: { name: true, slug: true, id: true },
-        },
-      },
+      include: { relatedDocument: { select: { name: true, slug: true, id: true } } },
     });
   }
   return prisma.legalUpdatePost.findFirst({
     where: { slug, status: "published" },
-    include: {
-      relatedDocument: {
-        select: { name: true, slug: true, id: true },
-      },
-    },
+    include: { relatedDocument: { select: { name: true, slug: true, id: true } } },
   });
 }
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string };
-}): Promise<Metadata> {
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const cu = await auth();
   const isAdmin = cu?.user?.role === "admin";
   const post = await getPost(params.slug, isAdmin);
-  if (!post) {
-    return { title: "Actualización no encontrada | Biblioteca Legal HN" };
-  }
+  if (!post) return { title: "Actualización no encontrada | Biblioteca Legal HN" };
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
   return {
     title: `${post.title} | Biblioteca Legal HN`,
@@ -55,14 +59,12 @@ export async function generateMetadata({
       type: "article",
       publishedTime: post.publishedAt?.toISOString(),
     },
-    twitter: {
-      card: "summary_large_image",
-      title: post.title,
-      description: post.summary,
-    },
+    twitter: { card: "summary_large_image", title: post.title, description: post.summary },
   };
 }
+
 export const revalidate = 3600;
+
 const ActualizacionDetailPage = async ({ params }: { params: { slug: string } }) => {
   const cu = await auth();
   const isAdmin = cu?.user?.role === "admin";
@@ -72,6 +74,7 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
   const Icon = config.icon;
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
   const isDraftPreview = post.status === "draft";
+
   return (
     <div className="container max-w-[800px] mt-28 mb-20">
       {!isDraftPreview && (
@@ -87,11 +90,7 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
               inLanguage: "es-HN",
               datePublished: post.publishedAt?.toISOString(),
               dateModified: post.updatedAt.toISOString(),
-              publisher: {
-                "@type": "Organization",
-                name: "Biblioteca Legal HN",
-                url: "https://www.bibliotecalegalhn.com",
-              },
+              publisher: { "@type": "Organization", name: "Biblioteca Legal HN", url: "https://www.bibliotecalegalhn.com" },
             }),
           }}
         />
@@ -99,36 +98,22 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
       {isDraftPreview && (
         <div className="flex items-center gap-2 mb-6 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-2.5">
           <Eye className="w-4 h-4 shrink-0" />
-          <p>
-            Vista previa de borrador. Esta página no es visible públicamente hasta que la
-            publiques desde el dashboard.
-          </p>
+          <p>Vista previa de borrador. Esta página no es visible públicamente hasta que la publiques desde el dashboard.</p>
         </div>
       )}
-      <Link
-        href="/actualizaciones"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors"
-      >
+      <Link href="/actualizaciones" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" />
         Volver a actualizaciones
       </Link>
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <span
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${config.color}`}
-        >
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${config.color}`}>
           <Icon className="w-3.5 h-3.5" />
           {config.label}
         </span>
-        {post.gacetaNumber && (
-          <span className="text-xs text-muted-foreground">La Gaceta N° {post.gacetaNumber}</span>
-        )}
+        {post.gacetaNumber && <span className="text-xs text-muted-foreground">La Gaceta N° {post.gacetaNumber}</span>}
         {post.publishedAt && (
           <span className="text-xs text-muted-foreground">
-            {new Date(post.publishedAt).toLocaleDateString("es-HN", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {new Date(post.publishedAt).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}
           </span>
         )}
       </div>
@@ -143,20 +128,13 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
           [&_p+p]:mt-5
           [&_strong]:text-[#1E2A38] [&_strong]:font-semibold
           [&_p:has(strong:only-child)]:inline-block
-          [&_table]:mt-6 [&_table]:border [&_table]:border-gray-200 [&_table]:rounded-lg [&_table]:overflow-hidden
-          [&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-3 [&_th]:text-left [&_th]:text-sm
-          [&_td]:border [&_td]:border-gray-200 [&_td]:p-3 [&_td]:text-sm [&_td]:align-top
-          [&_table]:w-full
         "
-        dangerouslySetInnerHTML={{ __html: post.content }}
+        dangerouslySetInnerHTML={{ __html: extractDespuesFromTables(post.content) }}
       />
       {post.relatedDocument && (
         <div className="mt-10 border-t pt-6">
           <p className="text-sm text-muted-foreground mb-2">Documento relacionado:</p>
-          <Link
-            href={`/collections/${post.relatedDocument.slug || post.relatedDocument.id}`}
-            className="text-primary font-semibold hover:underline"
-          >
+          <Link href={`/collections/${post.relatedDocument.slug || post.relatedDocument.id}`} className="text-primary font-semibold hover:underline">
             {post.relatedDocument.name}
           </Link>
         </div>
@@ -164,4 +142,5 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
     </div>
   );
 };
+
 export default ActualizacionDetailPage;
