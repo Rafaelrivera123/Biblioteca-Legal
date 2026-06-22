@@ -1,25 +1,18 @@
 "use client";
-
 import { DataTable } from "@/components/ui/data-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import useDebounce from "@/hooks/useDebounce";
 import { useManageUserSearchStore } from "@/store/dashboard/users";
-import { User } from "@prisma/client";
-import { useQuery } from "@tanstack/react-query";
-import {
-  ColumnDef,
-  getCoreRowModel,
-  getPaginationRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, getPaginationRowModel, useReactTable } from "@tanstack/react-table";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { manageUsersColumn } from "./user-column";
+import { useQuery } from "@tanstack/react-query";
+import { manageUsersColumn, UserWithSubscription } from "./user-column";
 
 export interface UserPaginationResponse {
   success: boolean;
   message: string;
   data: {
-    users: User[];
+    users: UserWithSubscription[];
     pagination: {
       total: number;
       page: number;
@@ -32,7 +25,6 @@ export interface UserPaginationResponse {
 const ManageUserContainer = () => {
   const { query, page } = useManageUserSearchStore();
   const searchQuery = useDebounce(query, 500);
-
   const { data, isLoading, isError, error } = useQuery<UserPaginationResponse>({
     queryKey: ["users", searchQuery, page],
     queryFn: () =>
@@ -42,7 +34,6 @@ const ManageUserContainer = () => {
   });
 
   let content;
-
   if (isLoading) {
     content = (
       <div className="h-[400px] flex justify-center items-center flex-col">
@@ -76,8 +67,8 @@ const ManageUserContainer = () => {
 export default ManageUserContainer;
 
 interface TableProps {
-  data: User[];
-  columns: ColumnDef<User>[];
+  data: UserWithSubscription[];
+  columns: ColumnDef<UserWithSubscription>[];
   totalPages: number;
 }
 
@@ -85,17 +76,18 @@ const TableContainer = ({ data, columns, totalPages }: TableProps) => {
   const { page, setPage } = useManageUserSearchStore();
   const table = useReactTable({
     data,
-    columns: columns,
+    columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
+
   return (
     <>
       <div className="bg-white">
         <DataTable table={table} columns={columns} />
       </div>
       {totalPages > 1 && (
-        <div className="mt-4 w-full  flex justify-end">
+        <div className="mt-4 w-full flex justify-end">
           <div>
             <PaginationControls
               currentPage={page}
