@@ -1,12 +1,15 @@
 "use client";
-
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { User } from "@prisma/client";
+import { User, UserSubscription } from "@prisma/client";
 import { ColumnDef } from "@tanstack/react-table";
 import moment from "moment";
 
-export const manageUsersColumn: ColumnDef<User>[] = [
+export type UserWithSubscription = User & {
+  userSubscription: Pick<UserSubscription, "isActive"> | null;
+};
+
+export const manageUsersColumn: ColumnDef<UserWithSubscription>[] = [
   {
     accessorKey: "id",
     header: "ID",
@@ -29,13 +32,26 @@ export const manageUsersColumn: ColumnDef<User>[] = [
   },
   {
     header: "Sub_Type",
+    cell: ({ row }) => {
+      const isCompany = !!row.original.companyId;
+      const isIndividualActive = row.original.userSubscription?.isActive === true;
+      const isPaying = isCompany || isIndividualActive;
+      return (
+        <Badge className={cn(isPaying ? "bg-green-500" : "bg-red-500")}>
+          {isPaying ? "Pagando" : "No Pagando"}
+        </Badge>
+      );
+    },
+  },
+  {
+    header: "Account_Type",
     cell: ({ row }) => (
       <Badge
         className={cn(
-          row.original.companyId ? "bg-green-500" : "bg-orange-500"
+          row.original.companyId ? "bg-blue-500" : "bg-orange-500"
         )}
       >
-        {row.original.companyId ? "Company" : "Individual"}
+        {row.original.companyId ? "Empresarial" : "Individual"}
       </Badge>
     ),
   },
