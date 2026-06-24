@@ -32,29 +32,29 @@ export async function generateMetadata(): Promise<Metadata> {
   const data = await prisma.setting.findFirst();
   return {
     title: {
-      default: "Biblioteca Legal",
-      template: `%s - Biblioteca Legal`,
+      default: "Biblioteca Legal HN",
+      template: "%s | Biblioteca Legal HN",
     },
     description:
       data?.description ??
-      "Biblioteca Legal provides expert legal document services, including drafting, reviewing, and managing legal paperwork with accuracy and confidentiality.",
+      "Biblioteca Legal HN es la biblioteca jurídica virtual de Honduras. Accede a leyes, códigos, decretos y reglamentos actualizados — Código Penal, Código Civil, Constitución Política y más.",
     keywords: data?.keywords ?? [
-      "legal document services",
-      "legal drafting",
-      "contract creation",
-      "document review",
-      "legal paperwork",
-      "business legal documents",
-      "remote legal assistance",
-      "legal templates",
-      "freelance legal support",
-      "online legal document services",
-      "legal compliance documentation",
-      "legal writing services",
-      "privacy policy drafting",
-      "terms and conditions generator",
+      "biblioteca legal Honduras",
+      "leyes Honduras",
+      "códigos legales Honduras",
+      "legislación hondureña",
+      "Código Penal Honduras",
+      "Código Civil Honduras",
+      "Constitución Política Honduras",
+      "decretos Honduras",
+      "reglamentos Honduras",
+      "biblioteca jurídica virtual",
+      "derecho hondureño",
+      "leyes actualizadas Honduras",
     ],
     openGraph: {
+      siteName: "Biblioteca Legal HN",
+      locale: "es_HN",
       images: [
         "https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp",
       ],
@@ -77,7 +77,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <link rel="preconnect" href="https://files.edgestore.dev" />
         <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
