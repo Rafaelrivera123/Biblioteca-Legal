@@ -8,15 +8,43 @@ import LegalAIChatbot from "@/components/LegalAIChatbot";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Biblioteca Legal HN | Leyes y Códigos de Honduras",
+  description:
+    "La biblioteca jurídica virtual de Honduras. Consulta leyes, códigos, decretos y reglamentos actualizados. Accede al Código Penal, Código Civil, Constitución Política y más.",
+  keywords: [
+    "biblioteca legal Honduras",
+    "leyes Honduras",
+    "códigos legales Honduras",
+    "legislación hondureña",
+    "derecho hondureño",
+    "biblioteca jurídica virtual Honduras",
+    "leyes hondureñas actualizadas",
+    "Código Penal Honduras",
+    "Constitución Honduras",
+  ],
+  openGraph: {
+    title: "Biblioteca Legal HN | Leyes y Códigos de Honduras",
+    description:
+      "La biblioteca jurídica virtual de Honduras. Consulta leyes, códigos, decretos y reglamentos actualizados.",
+    url: "https://www.bibliotecalegalhn.com",
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.bibliotecalegalhn.com",
+  },
+};
 
 export default async function Home() {
   const cu = await auth();
   const isLoggedin = !!cu?.user?.id;
   const userId = cu?.user?.id ?? null;
-
   let hasSubscription = false;
   let isAdmin = false;
-
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -35,7 +63,6 @@ export default async function Home() {
         new Date(user.userSubscription.currentPeriodEnd) > new Date()
       );
   }
-
   return (
     <>
       <div className="h-screen md:h-[60vh] lg:h-screen w-full flex justify-start items-center relative overflow-hidden">
@@ -77,7 +104,10 @@ export default async function Home() {
       <ResearchTools />
       {!isLoggedin && <CTA />}
       <HomeContact />
-      <LegalAIChatbot isLoggedin={isLoggedin} hasSubscription={hasSubscription} />
+      <LegalAIChatbot
+        isLoggedin={isLoggedin}
+        hasSubscription={hasSubscription}
+      />
     </>
   );
 }
