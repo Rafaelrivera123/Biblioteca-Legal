@@ -3,7 +3,21 @@ import { Metadata } from "next";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "About",
+  title: "Sobre Nosotros | Biblioteca Legal HN",
+  description:
+    "Conoce la historia de Biblioteca Legal HN, la plataforma jurídica virtual de Honduras creada para acercar las leyes y códigos a estudiantes, abogados y ciudadanos.",
+  openGraph: {
+    title: "Sobre Nosotros | Biblioteca Legal HN",
+    description:
+      "Conoce la historia de Biblioteca Legal HN, la plataforma jurídica virtual de Honduras.",
+    url: "https://www.bibliotecalegalhn.com/about-us",
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.bibliotecalegalhn.com/about-us",
+  },
 };
 
 const page = () => {
@@ -15,7 +29,6 @@ const page = () => {
         description=""
       />
       <section className="w-full py-16 px-4 md:px-8 lg:px-16 ">
-        {/* Sección Acerca de */}
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 lg:gap-16">
             <div className="w-full md:w-1/2">
@@ -30,10 +43,10 @@ const page = () => {
                 Derecho.
               </p>
               <p className="text-[14px] md:text-[16px]">
-                La plataforma fue creada por un estudiante de Derecho 
-                que, basado en su propia experiencia, identificó las
-                deficiencias del sector y decidió convertirlas en una
-                oportunidad para mejorar el acceso al conocimiento legal.
+                La plataforma fue creada por un estudiante de Derecho que,
+                basado en su propia experiencia, identificó las deficiencias del
+                sector y decidió convertirlas en una oportunidad para mejorar el
+                acceso al conocimiento legal.
               </p>
             </div>
             <div className="w-full md:w-1/2 flex justify-center">
@@ -50,16 +63,13 @@ const page = () => {
             </div>
           </div>
         </div>
-
-        {/* Sección Visión y Misión */}
         <div className="max-w-7xl mx-auto mt-24">
           <h3 className="text-lg md:text-[20px] font-semibold text-[#D4AF37] text-center mb-6">
             Nuestra Visión y Misión
           </h3>
-          <h2 className="text-2xl md:text-[32px]  font-semibold text-[#1E2A38] text-center mb-16">
+          <h2 className="text-2xl md:text-[32px] font-semibold text-[#1E2A38] text-center mb-16">
             Lo que nos define
           </h2>
-
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 lg:gap-16">
             <div className="w-full md:w-1/2 order-2 md:order-1">
               <div className="relative w-full max-w-[684px] h-[542px]">
@@ -78,9 +88,9 @@ const page = () => {
                 <h3 className="text-2xl md:text-[25px] font-bold text-[#1E2A38] mb-4">
                   Declaración de Visión
                 </h3>
-                <p className="text-[16px] ">
+                <p className="text-[16px]">
                   Queremos que miles de personas en toda Centroamérica puedan
-                  decir: “Estudio y trabajo mejor gracias a Biblioteca Legal.”
+                  decir: &quot;Estudio y trabajo mejor gracias a Biblioteca Legal.&quot;
                   Nuestra meta es llegar a cada rincón de la región, ayudando a
                   formar profesionales mejor preparados y conectados con el
                   conocimiento legal que necesitan para crecer.
@@ -90,7 +100,7 @@ const page = () => {
                 <h3 className="text-2xl md:text-[25px] font-bold text-[#1E2A38] mb-4">
                   Declaración de Misión
                 </h3>
-                <p className="text-[16px] ">
+                <p className="text-[16px]">
                   En Biblioteca Legal creemos que todas las personas deberían
                   tener acceso fácil y asequible a las leyes y códigos que
                   necesitan. Por eso creamos una plataforma moderna y accesible
@@ -101,7 +111,7 @@ const page = () => {
               </div>
               <div className="mt-12">
                 <h3 className="text-2xl md:text-[25px] font-bold text-[#1E2A38] mb-4">
-                  💡 Nuestros Valores
+                  Nuestros Valores
                 </h3>
                 <ul>
                   <li>
@@ -121,14 +131,13 @@ const page = () => {
                     puedes contar con nosotros.
                   </li>
                   <li>
-                    <span className="font-semibold">Profesionalismo:</span>
+                    <span className="font-semibold">Profesionalismo:</span>{" "}
                     Trabajamos con pasión y responsabilidad.
                   </li>
                 </ul>
               </div>
             </div>
           </div>
-
           <p className="mt-12 max-w-[900px]">
             Creemos en un equipo flexible que aprende todos los días y colabora
             con entusiasmo. Nos apoyamos, compartimos ideas y crecemos juntos,
