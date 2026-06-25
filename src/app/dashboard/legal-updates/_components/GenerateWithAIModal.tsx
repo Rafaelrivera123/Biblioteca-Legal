@@ -11,31 +11,37 @@ import {
 } from "@/components/ui/dialog";
 import { Sparkles, UploadCloud, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useEdgeStore } from "@/lib/edgestore";
 
 export function GenerateWithAIModal() {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
   const [result, setResult] = useState<{ created: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { edgestore } = useEdgeStore();
 
   function reset() {
     setFile(null);
     setResult(null);
     setLoading(false);
+    setLoadingMsg("");
   }
 
   async function handleSubmit() {
     if (!file) return;
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      setLoadingMsg("Subiendo PDF...");
+      const uploaded = await edgestore.publicFiles.upload({ file });
 
+      setLoadingMsg("Analizando con IA...");
       const res = await fetch("/api/dashboard/generate-legal-updates", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: uploaded.url }),
       });
 
       if (!res.ok) {
@@ -50,6 +56,7 @@ export function GenerateWithAIModal() {
       toast.error(err.message ?? "Ocurrió un error inesperado");
     } finally {
       setLoading(false);
+      setLoadingMsg("");
     }
   }
 
@@ -62,7 +69,7 @@ export function GenerateWithAIModal() {
         </button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[480px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Generar actualizaciones con IA</DialogTitle>
         </DialogHeader>
@@ -83,17 +90,19 @@ export function GenerateWithAIModal() {
         ) : (
           <div className="space-y-5 pt-2">
             <p className="text-sm text-muted-foreground">
-              Sube el PDF de una Gaceta Oficial y la IA identificará entre 5 y 10 actualizaciones legales y las guardará como borradores.
+              Sube el PDF de una Gaceta Oficial y la IA identificará entre 5 y 10
+              actualizaciones legales y las guardará como borradores.
             </p>
 
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
+              disabled={loading}
               className={`w-full border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-2 transition-colors ${
                 file
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-gray-200 hover:border-gray-300 text-muted-foreground"
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <UploadCloud className="w-8 h-8" />
               {file ? (
@@ -118,7 +127,7 @@ export function GenerateWithAIModal() {
               className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Analizando gaceta...</>
+                <><Loader2 className="w-4 h-4 animate-spin" />{loadingMsg}</>
               ) : (
                 <><Sparkles className="w-4 h-4" />Generar borradores</>
               )}
