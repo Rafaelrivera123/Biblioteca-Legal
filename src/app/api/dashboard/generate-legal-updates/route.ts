@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function slugify(text: string): string {
   return text
@@ -22,56 +22,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-
-  if (!file || file.type !== "application/pdf") {
-    return NextResponse.json({ error: "Se requiere un archivo PDF" }, { status: 400 });
+  const { url } = await req.json();
+  if (!url) {
+    return NextResponse.json({ error: "Se requiere la URL del PDF" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const pdfParse = (await import("pdf-parse")).default;
-  const parsed = await pdfParse(buffer);
-  const text = parsed.text.slice(0, 40000);
-
-  if (text.trim().length < 100) {
-    return NextResponse.json(
-      { error: "No se pudo extraer texto del PDF. Asegúrate de que no sea un PDF de solo imágenes." },
-      { status: 400 }
-    );
+  // Descargar el PDF desde EdgeStore y convertir a base64
+  const pdfResponse = await fetch(url);
+  if (!pdfResponse.ok) {
+    return NextResponse.json({ error: "No se pudo descargar el PDF" }, { status: 400 });
   }
+  const pdfBuffer = await pdfResponse.arrayBuffer();
+  const base64 = Buffer.from(pdfBuffer).toString("base64");
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
+  // Llamar a Claude con el PDF como documento nativo
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 16000,
     messages: [
       {
-        role: "system",
-        content: `Eres un experto en derecho hondureño. Analiza el texto de La Gaceta Oficial de Honduras e identifica las actualizaciones legales más relevantes.
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: base64,
+            },
+          } as any,
+          {
+            type: "text",
+            text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 5 y 10 actualizaciones legales relevantes.
 
 Para cada actualización extrae:
 - title: título descriptivo claro (ej: "Reforma al Artículo 99 de la Ley de Tránsito")
 - summary: resumen de 1-2 oraciones para abogados y ciudadanos
-- content: explicación detallada en HTML de MÍNIMO 600 palabras usando etiquetas <p> y <strong>. Incluye: contexto de la ley reformada, qué artículo(s) cambiaron, el texto exacto antes y después si está disponible, implicaciones prácticas para ciudadanos y abogados, y cualquier otro detalle relevante del decreto.
+- content: explicación detallada en HTML de MÍNIMO 600 palabras usando etiquetas <p> y <strong>. Incluye: contexto de la ley reformada, qué artículo(s) cambiaron, el texto exacto del decreto si está disponible, implicaciones prácticas para ciudadanos y abogados, y cualquier detalle relevante.
 - type: "REFORM" si modifica una ley existente, "NEW_LAW" si crea una nueva ley, "REPEAL" si deroga algo
 - gacetaNumber: número de La Gaceta si aparece (solo el número, ej: "37,169")
 - legalSource: número de decreto y artículo (ej: "Decreto 31-2026, Art. 99")
 
-Responde con JSON en este formato exacto:
-{ "updates": [ { "title": "...", "summary": "...", "content": "...", "type": "REFORM", "gacetaNumber": "...", "legalSource": "..." } ] }`,
-      },
-      {
-        role: "user",
-        content: `Analiza el siguiente texto de La Gaceta e identifica entre 5 y 10 actualizaciones legales relevantes:\n\n${text}`,
+Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdown, sin bloques de código:
+[{"title":"...","summary":"...","content":"...","type":"REFORM","gacetaNumber":"...","legalSource":"..."}]`,
+          },
+        ],
       },
     ],
   });
 
+  const rawText = response.content[0].type === "text" ? response.content[0].text : "";
+
   let updates: any[] = [];
   try {
-    const result = JSON.parse(response.choices[0].message.content ?? "{}");
-    updates = Array.isArray(result) ? result : (result.updates ?? []);
+    // Limpiar por si Claude agrega markdown
+    const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    updates = JSON.parse(cleaned);
+    if (!Array.isArray(updates)) updates = [];
   } catch {
     return NextResponse.json({ error: "La IA devolvió una respuesta inesperada" }, { status: 500 });
   }
