@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
 import LegalUpdateCard from "@/components/shared/cards/legal-update-card";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { GenerateWithAIModal } from "./_components/GenerateWithAIModal";
+
 const Page = async () => {
   const allUpdates = await prisma.legalUpdatePost.findMany({
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -11,21 +15,29 @@ const Page = async () => {
   });
   const drafts = allUpdates.filter((u) => u.status === "draft");
   const published = allUpdates.filter((u) => u.status === "published");
+
   return (
     <div>
-      <div className="w-full flex justify-between mb-5">
+      <div className="w-full flex justify-between items-center mb-5">
         <h1 className="text-primary font-semibold text-[32px] leading-[120%]">
           Actualizaciones Legales
         </h1>
+        <div className="flex items-center gap-2">
+          <GenerateWithAIModal />
+          <Link
+            href="/dashboard/legal-updates/new"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva actualización
+          </Link>
+        </div>
       </div>
+
       <div className="mb-10">
-        <h2 className="text-[20px] font-semibold mb-4">
-          Borradores ({drafts.length})
-        </h2>
+        <h2 className="text-[20px] font-semibold mb-4">Borradores ({drafts.length})</h2>
         {drafts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay borradores pendientes de revisión.
-          </p>
+          <p className="text-sm text-muted-foreground">No hay borradores pendientes de revisión.</p>
         ) : (
           <div className="flex flex-col gap-y-[15px]">
             {drafts.map((item) => (
@@ -34,14 +46,11 @@ const Page = async () => {
           </div>
         )}
       </div>
+
       <div>
-        <h2 className="text-[20px] font-semibold mb-4">
-          Publicadas ({published.length})
-        </h2>
+        <h2 className="text-[20px] font-semibold mb-4">Publicadas ({published.length})</h2>
         {published.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Todavía no has publicado ninguna actualización.
-          </p>
+          <p className="text-sm text-muted-foreground">Todavía no has publicado ninguna actualización.</p>
         ) : (
           <div className="flex flex-col gap-y-[15px]">
             {published.map((item) => (
@@ -53,4 +62,5 @@ const Page = async () => {
     </div>
   );
 };
+
 export default Page;
