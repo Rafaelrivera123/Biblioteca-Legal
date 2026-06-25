@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 Para cada actualización extrae:
 - title: título descriptivo claro (ej: "Reforma al Artículo 99 de la Ley de Tránsito")
 - summary: resumen de 1-2 oraciones para abogados y ciudadanos
-- content: explicación detallada en HTML usando etiquetas <p> y <strong>. Explica qué cambió, qué artículo, qué dice el texto reformado.
+- content: explicación detallada en HTML de MÍNIMO 600 palabras usando etiquetas <p> y <strong>. Incluye: contexto de la ley reformada, qué artículo(s) cambiaron, el texto exacto antes y después si está disponible, implicaciones prácticas para ciudadanos y abogados, y cualquier otro detalle relevante del decreto.
 - type: "REFORM" si modifica una ley existente, "NEW_LAW" si crea una nueva ley, "REPEAL" si deroga algo
 - gacetaNumber: número de La Gaceta si aparece (solo el número, ej: "37,169")
 - legalSource: número de decreto y artículo (ej: "Decreto 31-2026, Art. 99")
