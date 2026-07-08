@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Se requiere la URL del PDF" }, { status: 400 });
   }
 
-  // Descargar el PDF desde EdgeStore y convertir a base64 (con timeout de 30s
-  // para que no se quede colgado si el archivo no responde)
+  // Descargar el PDF desde EdgeStore (con timeout de 30s para que no se
+  // quede colgado si el archivo no responde)
   let pdfBuffer: ArrayBuffer;
   try {
     const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(30_000) });
@@ -45,9 +45,43 @@ export async function POST(req: NextRequest) {
       : "Error al descargar el PDF";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
-  const base64 = Buffer.from(pdfBuffer).toString("base64");
 
-  // Llamar a Claude con el PDF como documento nativo
+  // Extraemos el texto del PDF en vez de mandarlo como documento nativo:
+  // Claude convierte cada página de un PDF en imágenes internamente, lo que
+  // dispara el conteo de tokens en Gacetas largas (por eso fallaba con
+  // "prompt is too long"). El texto plano es muchísimo más barato en tokens.
+  // Nota: en Gacetas de dos columnas el orden del texto puede salir un poco
+  // desordenado (pdf-parse no distingue columnas); para esos casos revisa el
+  // resultado antes de publicar.
+  let pdfText: string;
+  try {
+    const pdfParse = (await import("pdf-parse")).default;
+    const data = await pdfParse(Buffer.from(pdfBuffer));
+    pdfText = data.text?.trim() ?? "";
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: `No se pudo extraer el texto del PDF: ${err?.message ?? "desconocido"}` },
+      { status: 400 }
+    );
+  }
+  if (!pdfText) {
+    return NextResponse.json({ error: "No se pudo extraer texto del PDF" }, { status: 400 });
+  }
+
+  // Límite conservador para no exceder la ventana de contexto del modelo
+  // (~200k tokens). Si la Gaceta es más grande, mejor avisar que truncar en
+  // silencio y perder reformas.
+  const MAX_CHARS = 600_000;
+  if (pdfText.length > MAX_CHARS) {
+    return NextResponse.json(
+      {
+        error: `Esta Gaceta es demasiado larga para procesarla de una vez (${pdfText.length.toLocaleString()} caracteres). Divide el PDF en partes más pequeñas y súbelas por separado.`,
+      },
+      { status: 413 }
+    );
+  }
+
+  // Llamar a Claude con el texto extraído del PDF
   let response;
   try {
     response = await anthropic.messages.create(
@@ -59,13 +93,9 @@ export async function POST(req: NextRequest) {
             role: "user",
             content: [
               {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64,
-                },
-              } as any,
+                type: "text",
+                text: `Texto de la Gaceta Oficial (extraído del PDF):\n\n${pdfText}`,
+              },
               {
                 type: "text",
                 text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 5 y 10 actualizaciones legales relevantes.
