@@ -5,13 +5,14 @@ const HomeContact = () => {
   return (
     <section className="flex container flex-col lg:flex-row items-center justify-between gap-10 px-4 lg:px-16 py-10">
       {/* Izquierda: Imagen */}
-      <div className="flex-shrink-0">
+      <div className="w-full max-w-[450px] lg:flex-shrink-0">
         <Image
           src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/contactimg.webp"
-          height={300}
-          width={300}
+          height={635}
+          width={450}
           alt="Contacto"
-          className="w-[450px] h-[635px] rounded-[16px] object-cover"
+          sizes="(max-width: 1024px) 90vw, 450px"
+          className="w-full h-auto max-h-[635px] rounded-[16px] object-cover"
         />
       </div>
 
