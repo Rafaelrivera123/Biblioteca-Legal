@@ -12,13 +12,17 @@ const CTA = () => {
         biblioteca jurídica.
       </p>
 
-      <div className="w-full flex justify-center mt-[45px] gap-x-[30px]">
-        <Button className="bg-white text-primary hover:bg-white/80 transition-all duration-300">
+      <div className="w-full flex flex-wrap justify-center px-4 mt-[45px] gap-x-[30px] gap-y-4">
+        <Button
+          className="bg-white text-primary hover:bg-white/80 transition-all duration-300"
+          asChild
+        >
           <Link href="/sign-up">Regístrate ahora</Link>
         </Button>
         <Button
           variant="outline"
           className="bg-transparent text-white border-white hover:bg-white/5 hover:text-white transition-all duration-300"
+          asChild
         >
           <Link href="/login">Iniciar sesión</Link>
         </Button>
