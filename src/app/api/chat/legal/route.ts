@@ -164,7 +164,7 @@ REGLA ABSOLUTA: NUNCA inventes articulos ni contenido cuando no hay resultados d
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages: groqMessages,
         max_tokens: 1500,
         temperature: 0,
