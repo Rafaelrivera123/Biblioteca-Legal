@@ -7,9 +7,10 @@ import { useActiveChapterStore } from "@/store/collections";
 
 interface Props {
   sections: FullSectionResponse[];
+  onNavigate?: () => void;
 }
 
-const DocumentIndex = ({ sections }: Props) => {
+const DocumentIndex = ({ sections, onNavigate }: Props) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(sections.map((s) => s.id))
@@ -85,6 +86,7 @@ const DocumentIndex = ({ sections }: Props) => {
       window.scrollTo({ top: y, behavior: "smooth" });
       setActiveId(`chapter-${chapterId}`);
     }
+    onNavigate?.();
   };
 
   const toggleSection = (sectionId: string) => {
