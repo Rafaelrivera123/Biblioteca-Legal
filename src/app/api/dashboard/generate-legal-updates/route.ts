@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 
+// Le da hasta 5 minutos a la funcion en Vercel (ajusta segun tu plan: Hobby=60, Pro=300, Enterprise=900).
+export const maxDuration = 300;
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function slugify(text: string): string {
@@ -27,33 +30,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Se requiere la URL del PDF" }, { status: 400 });
   }
 
-  // Descargar el PDF desde EdgeStore y convertir a base64
-  const pdfResponse = await fetch(url);
-  if (!pdfResponse.ok) {
-    return NextResponse.json({ error: "No se pudo descargar el PDF" }, { status: 400 });
+  // Descargar el PDF desde EdgeStore y convertir a base64 (con timeout de 30s
+  // para que no se quede colgado si el archivo no responde)
+  let pdfBuffer: ArrayBuffer;
+  try {
+    const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!pdfResponse.ok) {
+      return NextResponse.json({ error: "No se pudo descargar el PDF" }, { status: 400 });
+    }
+    pdfBuffer = await pdfResponse.arrayBuffer();
+  } catch (err: any) {
+    const msg = err?.name === "TimeoutError" || err?.name === "AbortError"
+      ? "Tiempo de espera agotado al descargar el PDF"
+      : "Error al descargar el PDF";
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
-  const pdfBuffer = await pdfResponse.arrayBuffer();
   const base64 = Buffer.from(pdfBuffer).toString("base64");
 
   // Llamar a Claude con el PDF como documento nativo
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 16000,
-    messages: [
+  let response;
+  try {
+    response = await anthropic.messages.create(
       {
-        role: "user",
-        content: [
+        model: "claude-sonnet-4-5",
+        max_tokens: 16000,
+        messages: [
           {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: base64,
-            },
-          } as any,
-          {
-            type: "text",
-            text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 5 y 10 actualizaciones legales relevantes.
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: base64,
+                },
+              } as any,
+              {
+                type: "text",
+                text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 5 y 10 actualizaciones legales relevantes.
 
 Para cada actualización extrae:
 - title: título descriptivo claro (ej: "Reforma al Artículo 99 de la Ley de Tránsito")
@@ -65,11 +80,19 @@ Para cada actualización extrae:
 
 Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdown, sin bloques de código:
 [{"title":"...","summary":"...","content":"...","type":"REFORM","gacetaNumber":"...","legalSource":"..."}]`,
+              },
+            ],
           },
         ],
       },
-    ],
-  });
+      { timeout: 250_000 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: `Error al llamar a la IA: ${err?.message ?? "desconocido"}` },
+      { status: 502 }
+    );
+  }
 
   const rawText = response.content[0].type === "text" ? response.content[0].text : "";
 
