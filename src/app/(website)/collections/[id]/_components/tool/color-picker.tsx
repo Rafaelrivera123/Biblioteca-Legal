@@ -59,7 +59,7 @@ const ColorPicker = ({
   isBookmarked,
 }: Props) => (
   <motion.div
-    className="absolute left-24 top-0 bg-white rounded-lg shadow-lg p-2 z-20 flex items-center gap-2 border"
+    className="absolute left-0 sm:left-24 top-full sm:top-0 mt-2 sm:mt-0 max-w-[calc(100vw-2.5rem)] bg-white rounded-lg shadow-lg p-2 z-20 flex items-center gap-1.5 sm:gap-2 border flex-wrap"
     initial={{ opacity: 0, x: -20 }}
     animate={{ opacity: 1, x: 0 }}
     exit={{ opacity: 0, x: -20 }}
@@ -73,7 +73,7 @@ const ColorPicker = ({
         exit={{ scale: 0 }}
         transition={{ duration: 0.2 }}
         className={cn(
-          "w-6 h-6 rounded-full flex items-center justify-center",
+          "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
           color.bgClass,
           color.hoverClass
         )}
