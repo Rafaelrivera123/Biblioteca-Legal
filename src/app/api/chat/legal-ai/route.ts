@@ -351,8 +351,8 @@ ${
       },
       body: JSON.stringify({
         model: file?.type.startsWith("image/")
-          ? "llama-3.2-11b-vision-preview"
-          : "llama-3.3-70b-versatile",
+          ? "qwen/qwen3.6-27b"
+          : "openai/gpt-oss-120b",
         messages: groqMessages,
         max_tokens: 2000,
         temperature: 0,
