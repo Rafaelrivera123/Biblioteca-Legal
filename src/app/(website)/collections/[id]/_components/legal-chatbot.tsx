@@ -206,7 +206,7 @@ const LegalChatbot = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 z-50 w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
+            className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 w-auto sm:w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
             style={{ height: isMinimized ? "56px" : "500px", transition: "height 0.2s ease" }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
