@@ -35,7 +35,15 @@ export function GenerateWithAIModal() {
     setLoading(true);
     try {
       setLoadingMsg("Subiendo PDF...");
-      const uploaded = await edgestore.publicFiles.upload({ file });
+      // Subimos como "temporary": si el procesamiento se corta por el límite
+      // de 60s de Vercel (o falla por cualquier otra razón), EdgeStore borra
+      // este archivo solo a las 24h aunque nuestro código nunca llegue a
+      // ejecutar su propia limpieza. Así el storage no se vuelve a llenar
+      // con PDFs huérfanos de intentos que se cortaron a la mitad.
+      const uploaded = await edgestore.publicFiles.upload({
+        file,
+        options: { temporary: true },
+      });
 
       setLoadingMsg("Analizando con IA...");
       const res = await fetch("/api/dashboard/generate-legal-updates", {
