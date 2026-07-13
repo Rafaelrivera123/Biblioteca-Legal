@@ -4,12 +4,11 @@ import { prisma } from "@/lib/db";
 import { backendClient } from "@/lib/edgestore-server";
 import Anthropic from "@anthropic-ai/sdk";
 
-// IMPORTANTE: esta app está en Vercel Hobby, que tiene un tope DURO de 60
-// segundos por función serverless (Vercel corta la ejecución ahí, sin
-// importar lo que digamos acá). Antes decía 300, que ya estaba mal para
-// este plan. Si en algún momento subís a Pro (300s) o Enterprise (900s),
-// subí este número también.
-export const maxDuration = 60;
+// Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
+// hasta 300 segundos de duración máxima — no 60. (Corregido: antes decía 60
+// acá por una suposición desactualizada sobre los límites de Hobby, y eso
+// fue lo que causó el timeout real que viste, no el plan en sí).
+export const maxDuration = 300;
 
 // claude-sonnet-5 tiene ventana de contexto de 1M tokens (vs. 200k de
 // claude-sonnet-4-5), lo que nos deja subir el límite de caracteres de la
@@ -39,12 +38,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Descargar el PDF desde EdgeStore. Timeout corto (15s) porque en Hobby
-    // solo tenemos 60s en total para todo el proceso, y la mayor parte del
-    // presupuesto de tiempo tiene que quedar para la llamada a la IA.
+    // Descargar el PDF desde EdgeStore (timeout de 30s para que no se quede
+    // colgado si el archivo no responde).
     let pdfBuffer: ArrayBuffer;
     try {
-      const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(30_000) });
       if (!pdfResponse.ok) {
         return NextResponse.json({ error: "No se pudo descargar el PDF" }, { status: 400 });
       }
@@ -81,9 +79,8 @@ export async function POST(req: NextRequest) {
     // Límite de caracteres de entrada. Con claude-sonnet-5 (1M tokens de
     // contexto) esto ya no es el cuello de botella real — lo triplicamos
     // respecto al límite anterior (600,000 → 1,800,000) porque el modelo
-    // puede con Gacetas mucho más grandes sin problema de contexto.
-    // El verdadero límite ahora es el tiempo (60s totales en Hobby), no el
-    // tamaño del documento.
+    // puede con Gacetas mucho más grandes sin problema de contexto, y con
+    // Fluid Compute tenemos hasta 300s reales para procesarlas.
     const MAX_CHARS = 1_800_000;
     if (pdfText.length > MAX_CHARS) {
       return NextResponse.json(
@@ -95,19 +92,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Llamar a Claude con el texto extraído del PDF.
-    // Pedimos MENOS actualizaciones (1 a 3 en vez de 5 a 10) pero CADA UNA
-    // el doble de detallada (mínimo 1200 palabras en vez de 600). Es un
-    // trade-off deliberado: en Vercel Hobby solo tenemos 60s en total, y
-    // generar contenido más largo para muchas actualizaciones a la vez no
-    // entra en ese tiempo. Si necesitás más de 3 actualizaciones por Gaceta,
-    // corré "Generar con IA" varias veces, o subí a Vercel Pro/Enterprise
-    // para poder subir maxDuration y este rango de nuevo.
+    // Cada actualización ahora tiene el doble de contenido (mínimo 1200
+    // palabras en vez de 600), así que bajamos un poco el rango de cantidad
+    // (3 a 6 en vez de 5 a 10) para no disparar el total de tokens de salida
+    // más de lo razonable. Con los 300s reales que da Hobby (Fluid Compute)
+    // esto entra cómodo.
     let response;
     try {
       response = await anthropic.messages.create(
         {
           model: "claude-sonnet-5",
-          max_tokens: 8000,
+          max_tokens: 20000,
           messages: [
             {
               role: "user",
@@ -118,7 +113,7 @@ export async function POST(req: NextRequest) {
                 },
                 {
                   type: "text",
-                  text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 1 y 3 actualizaciones legales más relevantes (prioriza las más importantes, no todas las que encuentres).
+                  text: `Eres un experto en derecho hondureño. Analiza esta Gaceta Oficial de Honduras e identifica entre 3 y 6 actualizaciones legales relevantes (prioriza las más importantes).
 
 Para cada actualización extrae:
 - title: título descriptivo claro (ej: "Reforma al Artículo 99 de la Ley de Tránsito")
@@ -135,7 +130,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
             },
           ],
         },
-        { timeout: 35_000 }
+        { timeout: 250_000 }
       );
     } catch (err: any) {
       return NextResponse.json(
@@ -161,7 +156,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
     }
 
     const created = [];
-    for (const update of updates.slice(0, 3)) {
+    for (const update of updates.slice(0, 6)) {
       if (!update.title || !update.summary || !update.content || !update.type) continue;
 
       const baseSlug = slugify(update.title);
@@ -190,7 +185,9 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
   } finally {
     // El PDF de la Gaceta ya cumplió su función (se le extrajo el texto).
     // Lo borramos de EdgeStore sin importar si el procesamiento tuvo éxito
-    // o falló, para no dejar archivos huérfanos ocupando storage.
+    // o falló, para no dejar archivos huérfanos ocupando storage. (Además,
+    // el upload en el modal ahora se marca como "temporary", así que aunque
+    // este borrado no llegue a correr, EdgeStore lo limpia solo en 24h.)
     try {
       await backendClient.publicFiles.deleteFile({ url });
     } catch (err) {
