@@ -90,8 +90,10 @@ export function GenerateWithAIModal() {
         ) : (
           <div className="space-y-5 pt-2">
             <p className="text-sm text-muted-foreground">
-              Sube el PDF de una Gaceta Oficial y la IA identificará entre 5 y 10
-              actualizaciones legales y las guardará como borradores.
+              Sube el PDF de una Gaceta Oficial y la IA identificará entre 1 y 3
+              actualizaciones legales (las más relevantes) con contenido detallado,
+              y las guardará como borradores. Gacetas muy grandes pueden tardar;
+              si se corta por tiempo, intenta con un PDF más pequeño.
             </p>
 
             <button
