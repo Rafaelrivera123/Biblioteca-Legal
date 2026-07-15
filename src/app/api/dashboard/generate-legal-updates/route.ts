@@ -44,13 +44,16 @@ export async function POST(req: NextRequest) {
     try {
       const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(30_000) });
       if (!pdfResponse.ok) {
+        console.error("[generate-legal-updates] descarga falló, status:", pdfResponse.status, url);
         return NextResponse.json({ error: "No se pudo descargar el PDF" }, { status: 400 });
       }
       pdfBuffer = await pdfResponse.arrayBuffer();
+      console.log("[generate-legal-updates] PDF descargado, bytes:", pdfBuffer.byteLength);
     } catch (err: any) {
       const msg = err?.name === "TimeoutError" || err?.name === "AbortError"
         ? "Tiempo de espera agotado al descargar el PDF"
         : "Error al descargar el PDF";
+      console.error("[generate-legal-updates] error descargando PDF:", err);
       return NextResponse.json({ error: msg }, { status: 502 });
     }
 
@@ -66,13 +69,16 @@ export async function POST(req: NextRequest) {
       const pdfParse = (await import("pdf-parse")).default;
       const data = await pdfParse(Buffer.from(pdfBuffer));
       pdfText = data.text?.trim() ?? "";
+      console.log("[generate-legal-updates] texto extraído, caracteres:", pdfText.length, "páginas:", data.numpages);
     } catch (err: any) {
+      console.error("[generate-legal-updates] error en pdf-parse:", err);
       return NextResponse.json(
         { error: `No se pudo extraer el texto del PDF: ${err?.message ?? "desconocido"}` },
         { status: 400 }
       );
     }
     if (!pdfText) {
+      console.error("[generate-legal-updates] pdf-parse devolvió texto vacío");
       return NextResponse.json({ error: "No se pudo extraer texto del PDF" }, { status: 400 });
     }
 
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
     // Fluid Compute tenemos hasta 300s reales para procesarlas.
     const MAX_CHARS = 1_800_000;
     if (pdfText.length > MAX_CHARS) {
+      console.error("[generate-legal-updates] texto excede MAX_CHARS:", pdfText.length);
       return NextResponse.json(
         {
           error: `Esta Gaceta es demasiado larga para procesarla de una vez (${pdfText.length.toLocaleString()} caracteres). Divide el PDF en partes más pequeñas y súbelas por separado.`,
@@ -132,7 +139,9 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
         },
         { timeout: 250_000 }
       );
+      console.log("[generate-legal-updates] respuesta de la IA recibida, stop_reason:", response.stop_reason, "tokens de salida:", response.usage?.output_tokens);
     } catch (err: any) {
+      console.error("[generate-legal-updates] error llamando a la IA:", err?.status, err?.message, err);
       return NextResponse.json(
         { error: `Error al llamar a la IA: ${err?.message ?? "desconocido"}` },
         { status: 502 }
@@ -140,6 +149,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
     }
 
     const rawText = response.content[0].type === "text" ? response.content[0].text : "";
+    console.log("[generate-legal-updates] largo de la respuesta de texto:", rawText.length, "primeros 300 caracteres:", rawText.slice(0, 300));
 
     let updates: any[] = [];
     try {
@@ -147,17 +157,33 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
       const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       updates = JSON.parse(cleaned);
       if (!Array.isArray(updates)) updates = [];
-    } catch {
+    } catch (err) {
+      console.error("[generate-legal-updates] no se pudo parsear el JSON de la IA:", err, "rawText:", rawText.slice(0, 1000));
       return NextResponse.json({ error: "La IA devolvió una respuesta inesperada" }, { status: 500 });
     }
 
+    console.log("[generate-legal-updates] actualizaciones parseadas:", updates.length);
+
     if (updates.length === 0) {
+      console.error("[generate-legal-updates] la IA devolvió un array vacío");
       return NextResponse.json({ error: "No se identificaron actualizaciones en este PDF" }, { status: 422 });
     }
 
     const created = [];
     for (const update of updates.slice(0, 6)) {
-      if (!update.title || !update.summary || !update.content || !update.type) continue;
+      if (!update.title || !update.summary || !update.content || !update.type) {
+        console.error(
+          "[generate-legal-updates] actualización descartada por campos faltantes:",
+          {
+            hasTitle: !!update.title,
+            hasSummary: !!update.summary,
+            hasContent: !!update.content,
+            hasType: !!update.type,
+            rawUpdate: update,
+          }
+        );
+        continue;
+      }
 
       const baseSlug = slugify(update.title);
       let slug = baseSlug;
@@ -180,6 +206,8 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
       });
       created.push(post.id);
     }
+
+    console.log("[generate-legal-updates] borradores creados:", created.length, "de", updates.length, "identificados");
 
     return NextResponse.json({ created: created.length });
   } finally {
