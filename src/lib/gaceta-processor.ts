@@ -178,14 +178,9 @@ function buildPostFromItem(
   };
 }
 
-async function extractPdfText(url: string): Promise<string> {
-  const pdfResponse = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!pdfResponse.ok) {
-    throw new Error(`No se pudo descargar el PDF (status ${pdfResponse.status})`);
-  }
-  const pdfBuffer = await pdfResponse.arrayBuffer();
+async function extractPdfText(pdfData: Buffer): Promise<string> {
   const pdfParse = (await import("pdf-parse")).default;
-  const data = await pdfParse(Buffer.from(pdfBuffer));
+  const data = await pdfParse(pdfData);
   const text = data.text?.trim() ?? "";
   if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
   if (text.length > MAX_CHARS) {
@@ -291,7 +286,12 @@ export async function processPendingGacetas(
     if (claimed.count === 0) continue;
 
     try {
-      const text = await extractPdfText(next.pdfUrl);
+      if (!next.pdfData) {
+        throw new Error(
+          "Esta Gaceta no tiene archivo guardado (se borró o nunca se subió bien). Vuelve a subirla."
+        );
+      }
+      const text = await extractPdfText(Buffer.from(next.pdfData));
       const analysis = await analyzeGacetaText(next.number, text, documents);
       const sourceWeek = new Date();
       const allItems: AnalysisItem[] = [
@@ -344,6 +344,10 @@ export async function processPendingGacetas(
           updatesCreated: createdCount,
           processedAt: new Date(),
           errorMessage: null,
+          // Ya no necesitamos el archivo — lo borramos de Neon para no
+          // acumular peso muerto en la base de datos.
+          pdfData: null,
+          fileAvailable: false,
         },
       });
       summaries.push({
