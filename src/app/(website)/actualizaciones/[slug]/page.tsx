@@ -4,6 +4,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { FileText, PlusCircle, XCircle, ArrowLeft, Eye } from "lucide-react";
+import { SITE_OG_IMAGE, buildSeoDescription, buildSeoTitle } from "@/lib/seo";
 
 const TYPE_CONFIG = {
   REFORM: { label: "Reforma", icon: FileText, color: "text-amber-600 bg-amber-50 border-amber-200" },
@@ -45,21 +46,29 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const post = await getPost(params.slug, isAdmin);
   if (!post) return { title: "Actualización no encontrada | Biblioteca Legal HN" };
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
+  const title = buildSeoTitle(post.title);
+  const description = buildSeoDescription(post.summary);
   return {
-    title: `${post.title} | Biblioteca Legal HN`,
-    description: post.summary,
+    title,
+    description,
     alternates: { canonical: url },
     robots: post.status === "draft" ? { index: false, follow: false } : undefined,
     openGraph: {
       title: post.title,
-      description: post.summary,
+      description,
       url,
       siteName: "Biblioteca Legal HN",
       locale: "es_HN",
       type: "article",
       publishedTime: post.publishedAt?.toISOString(),
+      images: [SITE_OG_IMAGE],
     },
-    twitter: { card: "summary_large_image", title: post.title, description: post.summary },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description,
+      images: [SITE_OG_IMAGE],
+    },
   };
 }
 
