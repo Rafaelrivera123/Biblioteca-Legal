@@ -304,3 +304,19 @@ model LegalUpdatePost {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
+enum GacetaStatus {
+  pending
+  processing
+  processed
+  failed
+}
+model Gaceta {
+  id             String       @id @default(cuid())
+  number         String       @unique
+  pdfUrl         String
+  status         GacetaStatus @default(pending)
+  updatesCreated Int          @default(0)
+  errorMessage   String?
+  uploadedAt     DateTime     @default(now())
+  processedAt    DateTime?
+}
