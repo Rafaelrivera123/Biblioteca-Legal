@@ -10,13 +10,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { UploadCloud, Loader2, CheckCircle2, X, FileText } from "lucide-react";
+import { UploadCloud, Loader2, CheckCircle2, X, FileText, AlertCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { createGacetaFromFile } from "../actions";
+
+type FileStatus = "idle" | "uploading" | "done" | "error";
 
 interface PendingFile {
   file: File;
   number: string;
+  status: FileStatus;
+  message?: string;
 }
 
 /**
@@ -31,27 +35,34 @@ function guessGacetaNumber(filename: string): string {
   return `${match[1]},${match[2]}`;
 }
 
+// Con lotes grandes (100+ Gacetas) un solo blip de red no debe tumbar la
+// subida entera: cada archivo se reintenta hasta 3 veces antes de marcarse
+// como fallido de verdad.
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1500;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function UploadGacetasModal() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-  const [result, setResult] = useState<{ created: number; failed: string[] } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   function reset() {
     setFiles([]);
-    setResult(null);
     setLoading(false);
-    setLoadingMsg("");
   }
 
   function handleFilesSelected(fileList: FileList | null) {
     if (!fileList) return;
-    const newFiles = Array.from(fileList).map((file) => ({
+    const newFiles: PendingFile[] = Array.from(fileList).map((file) => ({
       file,
       number: guessGacetaNumber(file.name),
+      status: "idle",
     }));
     setFiles((prev) => [...prev, ...newFiles]);
   }
@@ -66,41 +77,75 @@ export function UploadGacetasModal() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function setFileState(index: number, patch: Partial<PendingFile>) {
+    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
+  }
+
+  // Sube un archivo con reintentos automáticos. Un fallo "de negocio" (ej.
+  // número duplicado) no se reintenta, se marca de una vez. Un fallo por
+  // excepción (red, timeout) sí se reintenta hasta MAX_ATTEMPTS veces.
+  async function uploadWithRetry(index: number, file: PendingFile) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const formData = new FormData();
+        formData.set("number", file.number.trim());
+        formData.set("file", file.file);
+        const res = await createGacetaFromFile(formData);
+        if (res.ok) {
+          setFileState(index, { status: "done", message: res.message });
+        } else {
+          setFileState(index, { status: "error", message: res.message });
+        }
+        return;
+      } catch (err: any) {
+        if (attempt < MAX_ATTEMPTS) {
+          setFileState(index, {
+            status: "uploading",
+            message: `Reintentando (${attempt}/${MAX_ATTEMPTS})...`,
+          });
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        setFileState(index, {
+          status: "error",
+          message: err?.message ?? "Error de red al subir el archivo.",
+        });
+      }
+    }
+  }
+
+  // Sube todo lo que no esté ya "done", una Gaceta a la vez. Nunca se
+  // detiene por completo: si una falla (número duplicado, PDF corrupto,
+  // o se agotan los reintentos por red) simplemente sigue con la
+  // siguiente, para que un lote de 100+ nunca se caiga entero por un
+  // solo archivo problemático.
   async function handleSubmit() {
-    if (files.length === 0) return;
-    if (files.some((f) => !f.number.trim())) {
+    const pending = files
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.status !== "done");
+
+    if (pending.length === 0) return;
+    if (pending.some(({ f }) => !f.number.trim())) {
       toast.error("Ponle el número de Gaceta a cada archivo antes de subir.");
       return;
     }
 
     setLoading(true);
-    let created = 0;
-    const failed: string[] = [];
     try {
-      // Un archivo a la vez: cada Gaceta puede pesar varios MB y así
-      // evitamos mandar todo junto en un solo request.
-      for (let i = 0; i < files.length; i++) {
-        setLoadingMsg(`Subiendo Gaceta ${i + 1} de ${files.length} (${files[i].number})...`);
-        const formData = new FormData();
-        formData.set("number", files[i].number.trim());
-        formData.set("file", files[i].file);
-        const res = await createGacetaFromFile(formData);
-        if (res.ok) {
-          created += 1;
-        } else {
-          failed.push(`${files[i].number}: ${res.message}`);
-        }
+      for (const { f, i } of pending) {
+        setFileState(i, { status: "uploading", message: undefined });
+        await uploadWithRetry(i, f);
       }
-
-      setResult({ created, failed });
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message ?? "Ocurrió un error inesperado subiendo las Gacetas");
     } finally {
       setLoading(false);
-      setLoadingMsg("");
     }
   }
+
+  const doneCount = files.filter((f) => f.status === "done").length;
+  const errorCount = files.filter((f) => f.status === "error").length;
+  const finished =
+    !loading && files.length > 0 && files.every((f) => f.status === "done" || f.status === "error");
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
@@ -116,94 +161,106 @@ export function UploadGacetasModal() {
           <DialogTitle>Subir Gacetas Oficiales</DialogTitle>
         </DialogHeader>
 
-        {result ? (
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-green-500" />
-            <p className="font-semibold text-lg">
-              {result.created} Gaceta{result.created !== 1 ? "s" : ""} agregada{result.created !== 1 ? "s" : ""} a la cola
-            </p>
-            {result.failed.length > 0 && (
-              <div className="text-sm text-red-500 space-y-1">
-                {result.failed.map((f, i) => <p key={i}>{f}</p>)}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">
-              Se procesarán automáticamente en el próximo ciclo (o dale a &quot;Procesar ahora&quot;).
-            </p>
-            <button onClick={() => setOpen(false)} className="mt-2 text-sm text-primary hover:underline">
-              Cerrar
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              Sube uno o varios PDFs de La Gaceta. El sistema intenta adivinar el
-              número desde el nombre del archivo — revísalo y corrígelo si hace falta.
-            </p>
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Sube uno o varios PDFs de La Gaceta. El sistema intenta adivinar el
+            número desde el nombre del archivo — revísalo y corrígelo si hace falta.
+            Se suben de a uno en una cola: si alguno falla, los demás siguen sin problema.
+          </p>
 
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={loading}
-              className="w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <UploadCloud className="w-7 h-7" />
-              <span className="text-sm">Haz clic para seleccionar uno o varios PDFs</span>
-              <span className="text-xs">Solo archivos .pdf</span>
-            </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                handleFilesSelected(e.target.files);
-                e.target.value = "";
-              }}
-            />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={loading}
+            className="w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <UploadCloud className="w-7 h-7" />
+            <span className="text-sm">Haz clic para seleccionar uno o varios PDFs</span>
+            <span className="text-xs">Solo archivos .pdf</span>
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleFilesSelected(e.target.files);
+              e.target.value = "";
+            }}
+          />
 
-            {files.length > 0 && (
-              <div className="max-h-[280px] overflow-auto space-y-2 border rounded-lg p-3">
+          {files.length > 0 && (
+            <>
+              {(loading || finished) && (
+                <p className="text-sm font-medium">
+                  {doneCount} de {files.length} subidas
+                  {errorCount > 0 ? ` — ${errorCount} con error` : ""}
+                </p>
+              )}
+              <div className="max-h-[320px] overflow-auto space-y-2 border rounded-lg p-3">
                 {files.map((f, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm truncate flex-1" title={f.file.name}>
-                      {f.file.name}
-                    </span>
+                    {f.status === "uploading" && <Loader2 className="w-4 h-4 shrink-0 animate-spin text-blue-500" />}
+                    {f.status === "done" && <CheckCircle2 className="w-4 h-4 shrink-0 text-green-500" />}
+                    {f.status === "error" && <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                    {f.status === "idle" && <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm truncate block" title={f.file.name}>
+                        {f.file.name}
+                      </span>
+                      {f.message && (
+                        <span className={`text-xs block truncate ${f.status === "error" ? "text-red-500" : "text-muted-foreground"}`}>
+                          {f.message}
+                        </span>
+                      )}
+                    </div>
                     <Input
                       value={f.number}
                       onChange={(e) => updateNumber(i, e.target.value)}
                       placeholder="N° Gaceta"
-                      className="w-28 h-8 text-sm"
-                      disabled={loading}
+                      className="w-28 h-8 text-sm shrink-0"
+                      disabled={loading || f.status === "done"}
                     />
                     <button
                       type="button"
                       onClick={() => removeFile(i)}
                       disabled={loading}
-                      className="text-muted-foreground hover:text-red-500"
+                      className="text-muted-foreground hover:text-red-500 shrink-0"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
               </div>
-            )}
+            </>
+          )}
 
+          <div className="flex gap-2">
+            {finished && errorCount > 0 && (
+              <button
+                onClick={handleSubmit}
+                className="flex-1 inline-flex items-center justify-center gap-2 border text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-muted transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reintentar {errorCount} fallida{errorCount !== 1 ? "s" : ""}
+              </button>
+            )}
             <button
-              onClick={handleSubmit}
+              onClick={finished ? () => setOpen(false) : handleSubmit}
               disabled={files.length === 0 || loading}
-              className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />{loadingMsg}</>
+                <><Loader2 className="w-4 h-4 animate-spin" />Subiendo...</>
+              ) : finished ? (
+                <><CheckCircle2 className="w-4 h-4" />Cerrar</>
               ) : (
                 <><UploadCloud className="w-4 h-4" />Agregar {files.length > 0 ? `${files.length} ` : ""}a la cola</>
               )}
             </button>
           </div>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   );
