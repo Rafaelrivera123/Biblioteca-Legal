@@ -4,6 +4,7 @@ import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
 import { logoSrc } from "@/helper/assets";
 import {
+  Archive,
   Building,
   ExternalLink,
   FileStack,
@@ -32,7 +33,8 @@ const routes = [
   { id: 7, label: "WaitList", icon: ListRestart, href: "/dashboard/waitlist" },
   { id: 8, label: "Validate Laws", icon: ShieldCheck, href: "/dashboard/validate" },
   { id: 9, label: "Actualizaciones Legales", icon: Newspaper, href: "/dashboard/legal-updates" },
-  { id: 10, label: "Settings", icon: Settings, href: "/dashboard/settings" },
+  { id: 10, label: "Gacetas", icon: Archive, href: "/dashboard/gacetas" },
+  { id: 11, label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
