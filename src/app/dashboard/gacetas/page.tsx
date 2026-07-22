@@ -18,8 +18,23 @@ const STATUS_CONFIG = {
 } as const;
 
 const GacetasPage = async () => {
+  // No seleccionamos pdfData aquí a propósito: son bytes pesados que no
+  // hacen falta para listar, y traerlos todos de una vez en cada carga de
+  // esta página sería carísimo. Se leen aparte solo al abrir el PDF
+  // (ver /api/dashboard/gacetas/[id]/pdf).
   const gacetas = await prisma.gaceta.findMany({
     orderBy: { uploadedAt: "desc" },
+    select: {
+      id: true,
+      number: true,
+      fileName: true,
+      fileAvailable: true,
+      status: true,
+      updatesCreated: true,
+      errorMessage: true,
+      uploadedAt: true,
+      processedAt: true,
+    },
   });
   const hasPending = gacetas.some((g) => g.status === "pending");
 
@@ -65,9 +80,18 @@ const GacetasPage = async () => {
                 return (
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
-                      <a href={g.pdfUrl} target="_blank" rel="noreferrer" className="hover:underline text-primary">
-                        {g.number}
-                      </a>
+                      {g.fileAvailable ? (
+                        
+                          href={`/api/dashboard/gacetas/${g.id}/pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline text-primary"
+                        >
+                          {g.number}
+                        </a>
+                      ) : (
+                        <span title="El PDF ya se borró tras procesarse">{g.number}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${config.color}`}>
