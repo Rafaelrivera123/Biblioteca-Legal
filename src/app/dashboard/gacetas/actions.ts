@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { backendClient } from "@/lib/edgestore-server";
 import { processPendingGacetas } from "@/lib/gaceta-processor";
 import { revalidatePath } from "next/cache";
 
@@ -11,34 +10,51 @@ async function requireAdmin() {
   if (session?.user?.role !== "admin") throw new Error("No autorizado");
 }
 
-export async function createGacetas(items: { number: string; url: string }[]) {
+/**
+ * Sube una Gaceta directo a Neon (Postgres) como bytea. Se hace un archivo
+ * a la vez desde el cliente (ver UploadGacetasModal) para no pegarle a los
+ * límites de tamaño de body de los Server Actions con varios PDFs juntos.
+ */
+export async function createGacetaFromFile(
+  formData: FormData
+): Promise<{ ok: boolean; message: string }> {
   await requireAdmin();
 
-  let created = 0;
-  const skipped: string[] = [];
+  const number = (formData.get("number") as string | null)?.trim();
+  const file = formData.get("file") as File | null;
 
-  for (const item of items) {
-    const number = item.number.trim();
-    if (!number || !item.url) continue;
+  if (!number) return { ok: false, message: "Falta el número de Gaceta." };
+  if (!file) return { ok: false, message: "Falta el archivo." };
 
-    const existing = await prisma.gaceta.findUnique({ where: { number } });
-    if (existing) {
-      skipped.push(number);
-      continue;
-    }
-
-    await prisma.gaceta.create({
-      data: { number, pdfUrl: item.url, status: "pending" },
-    });
-    created += 1;
+  const existing = await prisma.gaceta.findUnique({ where: { number } });
+  if (existing) {
+    return { ok: false, message: `Ya existe una Gaceta con el número ${number}.` };
   }
 
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfData = Buffer.from(arrayBuffer);
+
+  await prisma.gaceta.create({
+    data: {
+      number,
+      fileName: file.name,
+      pdfData,
+      fileAvailable: true,
+      status: "pending",
+    },
+  });
+
   revalidatePath("/dashboard/gacetas");
-  return { created, skipped };
+  return { ok: true, message: "Gaceta agregada a la cola." };
 }
 
 export async function retryGaceta(id: string) {
   await requireAdmin();
+  const gaceta = await prisma.gaceta.findUnique({ where: { id } });
+  if (!gaceta) throw new Error("Gaceta no encontrada.");
+  if (!gaceta.pdfData) {
+    throw new Error("Esta Gaceta ya no tiene el archivo guardado — bórrala y súbela de nuevo.");
+  }
   await prisma.gaceta.update({
     where: { id },
     data: { status: "pending", errorMessage: null },
@@ -48,19 +64,7 @@ export async function retryGaceta(id: string) {
 
 export async function deleteGaceta(id: string) {
   await requireAdmin();
-  const gaceta = await prisma.gaceta.findUnique({ where: { id } });
-  if (!gaceta) return;
-
   await prisma.gaceta.delete({ where: { id } });
-
-  try {
-    await backendClient.publicFiles.deleteFile({ url: gaceta.pdfUrl });
-  } catch (err) {
-    // El PDF puede haber sido borrado ya (ej. por la limpieza de EdgeStore);
-    // no es crítico si esto falla, la fila ya se eliminó.
-    console.error("No se pudo borrar el PDF de EdgeStore:", gaceta.pdfUrl, err);
-  }
-
   revalidatePath("/dashboard/gacetas");
 }
 
