@@ -10,6 +10,14 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    // Por defecto Next.js limita el body de un Server Action a 1MB. Los PDF
+    // de La Gaceta suben directo a Neon (Postgres) vía Server Action, y
+    // fácilmente pesan varios MB, así que subimos el límite.
+    serverActions: {
+      bodySizeLimit: "25mb",
+    },
+  },
   images: {
     remotePatterns: [
       {
