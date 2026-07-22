@@ -5,13 +5,6 @@ export const dynamic = "force-dynamic";
 
 const BASE_URL = "https://www.bibliotecalegalhn.com";
 
-function truncateSlug(slug: string, maxLength = 70): string {
-  if (slug.length <= maxLength) return slug;
-  const truncated = slug.substring(0, maxLength);
-  const lastDash = truncated.lastIndexOf("-");
-  return lastDash > 40 ? truncated.substring(0, lastDash) : truncated;
-}
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let documentEntries: MetadataRoute.Sitemap = [];
   let updateEntries: MetadataRoute.Sitemap = [];
@@ -29,10 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ]);
 
     documentEntries = documents.map((doc) => {
-      const rawSlug = doc.slug || doc.id;
-      const safeSlug = truncateSlug(rawSlug);
+      // Importante: usar el slug completo tal como está guardado. Cortarlo
+      // aquí generaba una URL que no coincidía con ningún documento real
+      // (causaba los 404 reportados por Ahrefs).
+      const slug = doc.slug || doc.id;
       return {
-        url: `${BASE_URL}/collections/${safeSlug}`,
+        url: `${BASE_URL}/collections/${slug}`,
         lastModified: new Date(doc.updatedAt),
         changeFrequency: "monthly" as const,
         priority: 0.8,
