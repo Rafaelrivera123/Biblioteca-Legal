@@ -5,6 +5,11 @@ import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
 import LegalChatbot from "./_components/legal-chatbot";
+import {
+  SITE_OG_IMAGE,
+  buildSeoDescription,
+  buildSeoTitle,
+} from "@/lib/seo";
 
 async function getDocument(id: string) {
   return prisma.document.findFirst({
@@ -27,12 +32,22 @@ export async function generateMetadata({
   const nameWithHonduras = name.toLowerCase().includes("honduras")
     ? name
     : `${name} de Honduras`;
+
+  const title = buildSeoTitle(nameWithHonduras);
   const description = document.short_description
-    ? `${document.short_description.trim()} Consulta el texto completo en Biblioteca Legal HN.`
-    : `Consulta el texto completo del ${nameWithHonduras} actualizado. Leyes y códigos de Honduras accesibles para abogados, estudiantes y ciudadanos.`;
+    ? buildSeoDescription(
+        document.short_description,
+        "Consulta el texto completo en Biblioteca Legal HN."
+      )
+    : buildSeoDescription(
+        `Consulta el texto completo del ${nameWithHonduras} actualizado. Leyes y códigos de Honduras accesibles para abogados, estudiantes y ciudadanos.`
+      );
+  const ogDescription = buildSeoDescription(
+    document.short_description?.trim() || `Texto completo del ${nameWithHonduras}`
+  );
   const url = `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`;
   return {
-    title: `${nameWithHonduras} | Biblioteca Legal HN`,
+    title,
     description,
     keywords: [
       nameWithHonduras,
@@ -46,17 +61,19 @@ export async function generateMetadata({
       "Biblioteca Legal HN",
     ],
     openGraph: {
-      title: `${nameWithHonduras} | Biblioteca Legal HN`,
-      description: document.short_description?.trim() || `Texto completo del ${nameWithHonduras}`,
+      title,
+      description: ogDescription,
       url,
       siteName: "Biblioteca Legal HN",
       locale: "es_HN",
       type: "article",
+      images: [SITE_OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${nameWithHonduras} | Biblioteca Legal HN`,
-      description: document.short_description?.trim() || `Texto completo del ${nameWithHonduras}`,
+      title,
+      description: ogDescription,
+      images: [SITE_OG_IMAGE],
     },
     alternates: {
       canonical: url,
