@@ -12,18 +12,50 @@ const TYPE_CONFIG = {
   REPEAL: { label: "Derogación", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
 
-function extractDespuesFromTables(html: string): string {
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "").trim();
+}
+
+/**
+ * Antes esta función descartaba todas las columnas de la tabla de cambios
+ * (N° Gaceta, Artículo, Antes) y solo dejaba el texto de "Después" como
+ * párrafos sueltos y sin contexto — eso reducía cada reforma a 1-2 frases
+ * inconexas, la causa principal del "thin content" que reporta AdSense.
+ *
+ * Ahora se conserva la comparación completa (artículo + antes + después)
+ * para cada cambio, que es justo el contenido más valioso y único que
+ * tenemos para cada reforma.
+ */
+function renderChangesComparison(html: string): string {
   return html.replace(/<table[\s\S]*?<\/table>/gi, (table) => {
     const rows = [...table.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => m[0]);
-    const dataRows = rows.slice(1);
-    const texts = dataRows
+    const dataRows = rows.slice(1); // la primera fila es el encabezado
+
+    const blocks = dataRows
       .map((row) => {
-        const cells = [...row.matchAll(/<td[\s\S]*?<\/td>/gi)].map((m) => m[0]);
-        const lastCell = cells[cells.length - 1] ?? "";
-        return lastCell.replace(/<[^>]+>/g, "").trim();
+        const cells = [...row.matchAll(/<td[\s\S]*?<\/td>/gi)].map((m) =>
+          stripTags(m[0])
+        );
+        const [gacetaNumber, articleLabel, before, after] = cells;
+        if (!after) return "";
+
+        const heading = articleLabel || "Artículo modificado";
+        const gacetaTag = gacetaNumber
+          ? ` <span class="font-normal text-muted-foreground">— La Gaceta N° ${gacetaNumber}</span>`
+          : "";
+
+        return `
+          <p class="text-base font-semibold text-primary mt-8 mb-1">${heading}${gacetaTag}</p>
+          ${
+            before
+              ? `<p><span class="font-semibold">Antes:</span> ${before}</p>`
+              : ""
+          }
+          <p><span class="font-semibold">Después:</span> ${after}</p>`;
       })
       .filter(Boolean);
-    return texts.map((t) => `<p>${t}</p>`).join("");
+
+    return blocks.join("");
   });
 }
 
@@ -138,7 +170,7 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
           [&_strong]:text-[#1E2A38] [&_strong]:font-semibold
           [&_p:has(strong:only-child)]:inline-block
         "
-        dangerouslySetInnerHTML={{ __html: extractDespuesFromTables(post.content) }}
+        dangerouslySetInnerHTML={{ __html: renderChangesComparison(post.content) }}
       />
       {post.relatedDocument && (
         <div className="mt-10 border-t pt-6">
