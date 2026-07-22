@@ -313,7 +313,15 @@ enum GacetaStatus {
 model Gaceta {
   id             String       @id @default(cuid())
   number         String       @unique
-  pdfUrl         String
+  fileName       String
+  // El PDF se guarda directamente en Neon (Postgres) como bytea, no en
+  // EdgeStore — así evitamos el límite de storage de EdgeStore, que ya se
+  // alcanzó con archivos de otras partes del sitio. Se limpia (null) justo
+  // después de procesar la Gaceta con éxito, para no acumular peso muerto
+  // en la base de datos; mientras esté pending/failed se conserva para
+  // poder reintentar.
+  pdfData        Bytes?
+  fileAvailable  Boolean      @default(true)
   status         GacetaStatus @default(pending)
   updatesCreated Int          @default(0)
   errorMessage   String?
