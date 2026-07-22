@@ -24,15 +24,33 @@ interface PendingFile {
 }
 
 /**
- * Intenta adivinar el número de Gaceta a partir del nombre del archivo
- * (ej. "gaceta-37169.pdf", "La Gaceta 37,169.pdf") buscando una secuencia de
- * 4 a 6 dígitos, con o sin coma como separador de miles. El admin puede
- * corregirlo a mano antes de subir si el archivo no sigue este patrón.
+ * Intenta adivinar el número de Gaceta a partir del nombre del archivo.
+ *
+ * Caso 1: el nombre ya trae el número con separador de miles, ej.
+ * "La Gaceta 37,169.pdf" o "Gaceta 37.169.pdf".
+ *
+ * Caso 2: nombres como "20260202 - 37059.pdf", donde la fecha va primero
+ * (8 dígitos, YYYYMMDD) y el número de Gaceta al final, sin separador. Se
+ * descartan los grupos de 7-8 dígitos (fechas) y se toma el último grupo
+ * restante de 4 a 6 dígitos, que es el número de Gaceta real.
+ *
+ * El admin puede corregirlo a mano antes de subir si el archivo no sigue
+ * ninguno de estos dos patrones.
  */
 function guessGacetaNumber(filename: string): string {
-  const match = filename.match(/(\d{2,3})[,.]?(\d{3})/);
-  if (!match) return "";
-  return `${match[1]},${match[2]}`;
+  const withoutExt = filename.replace(/\.pdf$/i, "");
+
+  const withSeparator = withoutExt.match(/(\d{2,3})[.,](\d{3})(?!\d)/);
+  if (withSeparator) {
+    return `${withSeparator[1]},${withSeparator[2]}`;
+  }
+
+  const digitGroups = withoutExt.match(/\d+/g) ?? [];
+  const candidates = digitGroups.filter((g) => g.length >= 4 && g.length <= 6);
+  const raw = candidates.length > 0 ? candidates[candidates.length - 1] : digitGroups[digitGroups.length - 1];
+  if (!raw) return "";
+
+  return raw.length > 3 ? `${raw.slice(0, raw.length - 3)},${raw.slice(-3)}` : raw;
 }
 
 // Con lotes grandes (100+ Gacetas) un solo blip de red no debe tumbar la
