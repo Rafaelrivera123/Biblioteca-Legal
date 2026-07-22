@@ -101,32 +101,3 @@ const GacetasPage = async () => {
                       {g.status === "failed" && g.errorMessage && (
                         <p className="text-xs text-red-500 mt-1 max-w-[280px]">{g.errorMessage}</p>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {g.status === "processed" ? g.updatesCreated : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {g.uploadedAt.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {g.processedAt
-                        ? g.processedAt.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        <GacetaRowActions id={g.id} status={g.status} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default GacetasPage;
