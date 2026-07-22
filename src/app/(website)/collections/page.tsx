@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import CollectionFilter from "./_components/collection-filter";
 import CollectionContainer from "./_components/collection-container";
 import { Metadata } from "next";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export const metadata: Metadata = {
 const LIMIT = 12;
 
 const Page = async () => {
-  const [categories, documents, totalCount] = await Promise.all([
+  const [categories, documents, totalCount, allPublishedDocuments] = await Promise.all([
     prisma.category.findMany(),
     prisma.document.findMany({
       take: LIMIT,
@@ -46,6 +47,16 @@ const Page = async () => {
       include: { categories: true },
     }),
     prisma.document.count(),
+    // Se usa solo para renderizar un índice completo con enlaces internos
+    // reales (server-rendered) hacia cada documento. El grid de arriba es
+    // interactivo (búsqueda/paginación client-side) y por sí solo deja sin
+    // ningún enlace interno rastreable a los documentos que no caen en la
+    // primera página — este índice soluciona ese problema de "orphan pages".
+    prisma.document.findMany({
+      where: { published: true },
+      select: { id: true, slug: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const initialData = {
@@ -68,6 +79,28 @@ const Page = async () => {
         <CollectionFilter categories={categories} />
       </div>
       <CollectionContainer initialData={initialData} />
+
+      {allPublishedDocuments.length > 0 && (
+        <section
+          aria-label="Índice completo de leyes y códigos"
+          className="container py-16 border-t"
+        >
+          <h2 className="text-xl font-semibold mb-6">
+            Índice completo de leyes y códigos
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
+            {allPublishedDocuments.map((doc) => (
+              <Link
+                key={doc.id}
+                href={`/collections/${doc.slug || doc.id}`}
+                className="text-sm text-muted-foreground hover:text-primary hover:underline truncate"
+              >
+                {doc.name}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };
