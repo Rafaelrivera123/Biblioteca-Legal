@@ -303,8 +303,8 @@ export async function GET(request: Request) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        max_tokens: 4096,
-        temperature: 0.0,
+        max_tokens: 8192,
+        temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -313,7 +313,9 @@ export async function GET(request: Request) {
 Tu única tarea es contrastar información del Diario Oficial 'La Gaceta' y reformas del Congreso Nacional obtenidas de internet con los documentos presentes en el catálogo del sistema.
 Debes responder EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin explicaciones.
 Bajo ninguna circunstancia inventes o deduzcas números de artículos, reformas, decretos o textos de leyes que no estén explícitamente citados o detallados en los textos provistos. Si un artículo se reformó pero la fuente no detalla el texto exacto del 'antes' o el 'después', describe el cambio conceptualmente en esos campos en lugar de inventar la redacción literal.
-Para el campo "context" de cada item, escribe 1 a 2 párrafos en español (mínimo 80 palabras, máximo 180 palabras en total) explicando de forma clara y accesible, para un público de estudiantes de derecho y ciudadanos sin formación jurídica, qué significa este cambio, por qué es relevante y a quién afecta en la práctica. No repitas literalmente los datos técnicos (número de decreto, gaceta, fecha); esos van en campos separados. El "context" debe ser prosa explicativa basada estrictamente en la información de las fuentes, sin inventar implicaciones no respaldadas por el texto.`,
+Para el campo "context" de cada item, escribe entre 3 y 5 párrafos en español (mínimo 280 palabras, máximo 500 palabras en total). Estructura el contenido así: (1) qué cambia exactamente y en qué consiste, con el mayor detalle concreto que permitan las fuentes; (2) el marco legal o institucional relevante (qué ley, secretaría u órgano está involucrado y por qué tiene competencia); (3) antecedentes o motivo del cambio si las fuentes lo mencionan; (4) implicaciones prácticas concretas, diferenciando el impacto para ciudadanos, empresas y/o abogados según corresponda al caso.
+No repitas literalmente los datos técnicos (número de decreto, gaceta, fecha); esos van en campos separados. El "context" debe ser prosa explicativa basada estrictamente en la información de las fuentes, sin inventar implicaciones no respaldadas por el texto — si las fuentes no dan suficiente detalle para llegar al mínimo de palabras con contenido real, escribe lo que sí esté respaldado aunque quede más corto; nunca rellenes con relleno genérico.
+Evita reutilizar las mismas frases de transición en items distintos (por ejemplo "Este cambio es relevante porque...", "Afecta a todos los ciudadanos, ya que..."): cada "context" debe leerse como un texto redactado de forma independiente, con su propia estructura y vocabulario, no como una plantilla rellenada.`,
           },
           {
             role: "user",
