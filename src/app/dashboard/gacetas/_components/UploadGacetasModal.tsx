@@ -12,8 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { UploadCloud, Loader2, CheckCircle2, X, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { useEdgeStore } from "@/lib/edgestore";
-import { createGacetas } from "../actions";
+import { createGacetaFromFile } from "../actions";
 
 interface PendingFile {
   file: File;
@@ -37,10 +36,9 @@ export function UploadGacetasModal() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
-  const [result, setResult] = useState<{ created: number; skipped: string[] } | null>(null);
+  const [result, setResult] = useState<{ created: number; failed: string[] } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { edgestore } = useEdgeStore();
 
   function reset() {
     setFiles([]);
@@ -76,17 +74,25 @@ export function UploadGacetasModal() {
     }
 
     setLoading(true);
+    let created = 0;
+    const failed: string[] = [];
     try {
-      const uploaded: { number: string; url: string }[] = [];
+      // Un archivo a la vez: cada Gaceta puede pesar varios MB y así
+      // evitamos mandar todo junto en un solo request.
       for (let i = 0; i < files.length; i++) {
-        setLoadingMsg(`Subiendo PDF ${i + 1} de ${files.length}...`);
-        const res = await edgestore.publicFiles.upload({ file: files[i].file });
-        uploaded.push({ number: files[i].number.trim(), url: res.url });
+        setLoadingMsg(`Subiendo Gaceta ${i + 1} de ${files.length} (${files[i].number})...`);
+        const formData = new FormData();
+        formData.set("number", files[i].number.trim());
+        formData.set("file", files[i].file);
+        const res = await createGacetaFromFile(formData);
+        if (res.ok) {
+          created += 1;
+        } else {
+          failed.push(`${files[i].number}: ${res.message}`);
+        }
       }
 
-      setLoadingMsg("Guardando en la biblioteca de Gacetas...");
-      const summary = await createGacetas(uploaded);
-      setResult(summary);
+      setResult({ created, failed });
       router.refresh();
     } catch (err: any) {
       toast.error(err.message ?? "Ocurrió un error inesperado subiendo las Gacetas");
@@ -116,10 +122,10 @@ export function UploadGacetasModal() {
             <p className="font-semibold text-lg">
               {result.created} Gaceta{result.created !== 1 ? "s" : ""} agregada{result.created !== 1 ? "s" : ""} a la cola
             </p>
-            {result.skipped.length > 0 && (
-              <p className="text-sm text-amber-600">
-                Se omitieron {result.skipped.length} por número repetido: {result.skipped.join(", ")}
-              </p>
+            {result.failed.length > 0 && (
+              <div className="text-sm text-red-500 space-y-1">
+                {result.failed.map((f, i) => <p key={i}>{f}</p>)}
+              </div>
             )}
             <p className="text-sm text-muted-foreground">
               Se procesarán automáticamente en el próximo ciclo (o dale a &quot;Procesar ahora&quot;).
