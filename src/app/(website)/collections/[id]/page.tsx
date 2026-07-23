@@ -5,6 +5,7 @@ import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
 import LegalChatbot from "./_components/legal-chatbot";
+import { getDocumentSections } from "@/lib/document-content";
 import {
   SITE_OG_IMAGE,
   buildSeoDescription,
@@ -116,19 +117,11 @@ const Page = async ({ params }: { params: { id: string } }) => {
     }
   }
 
-  const sections = await prisma.section.findMany({
-    where: { documentId: document.id },
-    include: {
-      chapters: {
-        include: {
-          articles: {
-            orderBy: [{ articleNumber: "asc" }, { articleLabel: "asc" }],
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  // El texto completo del documento (secciones, capítulos y artículos) se
+  // cachea con unstable_cache (ver @/lib/document-content). Antes se volvía
+  // a pedir a Neon en cada visita; ahora se comparte entre visitas y solo
+  // se refresca cada 10 minutos o cuando se invalida la tag del documento.
+  const sections = await getDocumentSections(document.id);
 
   const name = document.name.trim();
   const nameWithHonduras = name.toLowerCase().includes("honduras")
