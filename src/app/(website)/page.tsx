@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import HomeContact from "@/components/HomeContact";
 import OurServices from "@/components/OurServices";
+import PlatformStats from "@/components/PlatformStats";
 import ResearchTools from "@/components/ResearchTools";
 import CTA from "@/components/shared/sections/cta";
 import LegalAIChatbot from "@/components/LegalAIChatbot";
@@ -101,6 +102,7 @@ export default async function Home() {
         </div>
       </div>
       <OurServices />
+      <PlatformStats />
       <ResearchTools />
       {!isLoggedin && <CTA />}
       <HomeContact />
