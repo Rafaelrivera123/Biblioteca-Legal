@@ -199,7 +199,12 @@ async function analyzeGacetaText(
   const response = await anthropic.messages.create(
     {
       model: "claude-sonnet-5",
-      max_tokens: 16000,
+      // Antes en 16000: con Gacetas que traen varias reformas grandes (texto
+      // "antes"/"después" transcrito literalmente por artículo) la respuesta
+      // se cortaba antes de cerrar el JSON, y JSON.parse reventaba con
+      // "Unexpected end of JSON input" en vez de un error entendible. Se
+      // sube el techo bastante para que eso deje de pasar en la práctica.
+      max_tokens: 64000,
       messages: [
         {
           role: "user",
@@ -245,7 +250,25 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
 
   const rawText = response.content[0].type === "text" ? response.content[0].text : "";
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  const parsed = JSON.parse(cleaned);
+
+  // Si la IA se quedó sin tokens a mitad del JSON, el mensaje real del
+  // problema es "se cortó la respuesta", no "JSON inválido". Lo detectamos
+  // aparte para que el error que se guarda en la Gaceta sea entendible.
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(
+      `La respuesta de la IA se cortó por el límite de tokens (la Gaceta ${gacetaNumber} tiene demasiado contenido para analizarla de una sola vez).`
+    );
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(
+      `La IA no devolvió JSON válido para la Gaceta ${gacetaNumber} (${cleaned.length} caracteres recibidos, stop_reason: ${response.stop_reason}).`
+    );
+  }
+
   return {
     reforms: Array.isArray(parsed.reforms) ? parsed.reforms : [],
     newLaws: Array.isArray(parsed.newLaws) ? parsed.newLaws : [],
