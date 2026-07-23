@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Archive } from "lucide-react";
 import Link from "next/link";
 export default function OurServices() {
   return (
@@ -76,26 +76,26 @@ export default function OurServices() {
             <CardContent className="p-8">
               <div className="mb-2 flex justify-between">
                 <h4 className="text-white group-hover:text-slate-800 text-xl md:text-2xl font-bold mb-4 transition-colors duration-300">
-                  Análisis Legal IA
+                  Gacetas Oficiales
                 </h4>
-                <Sparkles className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
+                <Archive className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
               </div>
               <span className="inline-block mb-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white group-hover:bg-purple-100 group-hover:text-purple-800 transition-colors duration-300">
                 Nuevo
               </span>
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Consulta nuestro asistente con acceso a toda la legislación hondureña de Biblioteca Legal HN
+                Accede directo a los PDFs originales de La Gaceta de la República de Honduras
               </p>
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
-                Haz preguntas legales, sube documentos o imágenes y obtén respuestas basadas en las leyes y códigos de Honduras.
+                Busca por número de Gaceta y descarga el documento oficial, sin tener que buscarlo en otro lado.
               </p>
               <Button
                 variant="outline"
                 className="bg-white rounded-full text-slate-800 border-white hover:bg-slate-100 group-hover:bg-slate-800 group-hover:text-white group-hover:border-slate-800 transition-all duration-300"
                 asChild
               >
-                <Link href="/legal-ai">
-                  Consultar Ahora
+                <Link href="/gacetas">
+                  Ver Gacetas
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Link>
               </Button>
