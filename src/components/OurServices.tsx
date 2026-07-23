@@ -80,9 +80,6 @@ export default function OurServices() {
                 </h4>
                 <Archive className="h-7 w-7 md:w-10 md:h-10 text-white group-hover:text-slate-800 transition-colors duration-300" />
               </div>
-              <span className="inline-block mb-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white group-hover:bg-purple-100 group-hover:text-purple-800 transition-colors duration-300">
-                Nuevo
-              </span>
               <p className="text-gray-300 group-hover:text-gray-600 text-[14px] md:text-lg font-medium mb-6 transition-colors duration-300">
                 Accede directo a los PDFs originales de La Gaceta de la República de Honduras
               </p>
