@@ -7,6 +7,13 @@ import { NextResponse } from "next/server";
 // procesador de Gacetas corte antes de que Vercel mate la función.
 export const maxDuration = 300;
 
+// Tope de Gacetas por corrida del cron. Antes no tenía límite, así que con
+// una cola grande (ej. 100+ Gacetas subidas de golpe) cada corrida procesaba
+// todas las que le cupieran en los 260s de margen — podían ser muchas más de
+// las esperadas. Con este tope, cada corrida (lunes/miércoles/viernes)
+// procesa como máximo 5, igual que el botón "Procesar ahora".
+const MAX_GACETAS_PER_RUN = 5;
+
 function buildSummaryEmailHtml(summary: GacetaRunSummary[]): string {
   const rows = summary
     .map((s) => {
@@ -80,7 +87,7 @@ export async function GET(request: Request) {
   try {
     // Deja ~40s de margen sobre los 300s de maxDuration para que la función
     // alcance a responder antes de que Vercel la corte a la fuerza.
-    const summary = await processPendingGacetas(260_000);
+    const summary = await processPendingGacetas(260_000, MAX_GACETAS_PER_RUN);
 
     await resend.emails.send({
       from: "Biblioteca Legal HN <noreply@bibliotecalegalhn.com>",
