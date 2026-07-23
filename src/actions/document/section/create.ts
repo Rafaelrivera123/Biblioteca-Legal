@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { sectionTitleSchema, SectionTitleSchemaType } from "@/schemas/document";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function createDocumentSectionTitle(data: SectionTitleSchemaType) {
   const parsedData = sectionTitleSchema.safeParse(data);
@@ -24,6 +24,9 @@ export async function createDocumentSectionTitle(data: SectionTitleSchemaType) {
     });
 
     revalidatePath(`/dashboard/documents/${parsedData.data.documentId}`);
+    // Reforma visible al instante en /collections/[id]: invalida la cache
+    // pública del documento en vez de esperar los 10 min de revalidate.
+    revalidateTag(`document-${parsedData.data.documentId}`);
 
     return {
       success: true,
