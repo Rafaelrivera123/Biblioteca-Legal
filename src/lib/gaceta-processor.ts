@@ -196,7 +196,14 @@ async function analyzeGacetaText(
   gacetaText: string,
   documents: { id: string; name: string; law_number: string }[]
 ): Promise<AnalysisResult> {
-  const response = await anthropic.messages.create(
+  // Con max_tokens tan alto (64000, ver comentario abajo), la API de
+  // Anthropic estima que algunas Gacetas grandes pueden tardar más de 10
+  // minutos y exige usar streaming para esas peticiones (si no, el SDK
+  // tira un error antes de intentarlo, para no dejar al cliente colgado
+  // esperando). Por eso la llamada va en modo stream y esperamos a
+  // finalMessage(), que devuelve el mismo objeto que .create() (mismo
+  // content, stop_reason, usage) una vez termina de generarse todo.
+  const stream = anthropic.messages.stream(
     {
       model: "claude-sonnet-5",
       // Antes en 16000: con Gacetas que traen varias reformas grandes (texto
@@ -248,6 +255,8 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
     { timeout: 250_000 }
   );
 
+  const response = await stream.finalMessage();
+
   const rawText = response.content[0].type === "text" ? response.content[0].text : "";
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
@@ -278,13 +287,21 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
 
 /**
  * Procesa Gacetas pendientes de la biblioteca (subidas en /dashboard/gacetas)
- * hasta agotar la cola o el presupuesto de tiempo dado. Cada Gaceta se marca
- * "processing" antes de analizarla y "processed"/"failed" al terminar, así
- * nunca se vuelve a procesar la misma Gaceta dos veces y una Gaceta con
- * error no bloquea a las demás.
+ * hasta agotar la cola, el presupuesto de tiempo dado, o el tope de
+ * `maxGacetas` (si se pasa). Cada Gaceta se marca "processing" antes de
+ * analizarla y "processed"/"failed" al terminar, así nunca se vuelve a
+ * procesar la misma Gaceta dos veces y una Gaceta con error no bloquea a
+ * las demás.
+ *
+ * `maxGacetas` es opcional: el cron (weekly-update) no lo usa, así procesa
+ * todo lo que le quepa en el tiempo. El botón "Procesar ahora" del
+ * dashboard sí lo usa (con 5) para que cada click tenga un costo y un
+ * tiempo de espera acotados y predecibles, en vez de vaciar de un jalón
+ * una cola de 100+ Gacetas.
  */
 export async function processPendingGacetas(
-  maxDurationMs = 260_000
+  maxDurationMs = 260_000,
+  maxGacetas?: number
 ): Promise<GacetaRunSummary[]> {
   const startedAt = Date.now();
   const summaries: GacetaRunSummary[] = [];
@@ -295,6 +312,8 @@ export async function processPendingGacetas(
   });
 
   while (Date.now() - startedAt < maxDurationMs) {
+    if (maxGacetas !== undefined && summaries.length >= maxGacetas) break;
+
     const next = await prisma.gaceta.findFirst({
       where: { status: "pending" },
       orderBy: { uploadedAt: "asc" },
