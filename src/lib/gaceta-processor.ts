@@ -386,10 +386,9 @@ export async function processPendingGacetas(
           updatesCreated: createdCount,
           processedAt: new Date(),
           errorMessage: null,
-          // Ya no necesitamos el archivo — lo borramos de Neon para no
-          // acumular peso muerto en la base de datos.
-          pdfData: null,
-          fileAvailable: false,
+          // El PDF YA NO se borra tras procesar: ahora también se muestra
+          // públicamente en /gacetas, así que tiene que quedarse disponible
+          // para todos los usuarios, no solo mientras esté pendiente/failed.
         },
       });
       summaries.push({
