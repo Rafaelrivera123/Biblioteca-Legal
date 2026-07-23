@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { extractTextFromTipTap } from "@/lib/utils";
 import { articleSchema, articleSchemaType } from "@/schemas/document/index";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 interface Props {
   articleId: string;
@@ -50,6 +50,9 @@ export async function editArticle({
     revalidatePath(
       `/dashboard/documents/${documentId}/${sectionId}/${parsedData.data.chapterId}`
     );
+    // Reforma visible al instante en /collections/[id]: invalida la cache
+    // pública del documento en vez de esperar los 10 min de revalidate.
+    revalidateTag(`document-${documentId}`);
 
     return {
       success: true,
