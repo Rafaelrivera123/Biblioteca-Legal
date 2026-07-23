@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 // Delete Document Chapter Server Action
 export async function deleteDocumentChapter(
@@ -26,6 +26,9 @@ export async function deleteDocumentChapter(
     });
 
     revalidatePath(`/dashboard/documents/${documentId}`);
+    // Reforma visible al instante en /collections/[id]: invalida la cache
+    // pública del documento en vez de esperar los 10 min de revalidate.
+    revalidateTag(`document-${documentId}`);
 
     return {
       success: true,
