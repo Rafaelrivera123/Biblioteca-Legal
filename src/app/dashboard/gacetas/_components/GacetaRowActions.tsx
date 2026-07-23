@@ -45,28 +45,33 @@ export function GacetaRowActions({
     });
   }
 
+  // "processing" atascado (la función que la procesaba se cortó por un
+  // timeout o un deploy a mitad de camino) no se arregla solo — se queda en
+  // ese estado para siempre si no hay forma de resetearla a mano. Por eso
+  // el botón de reintentar/resetear también aparece en "processing", no
+  // solo en "failed", y eliminar ya no se esconde en ese estado.
+  const canRetry = status === "failed" || status === "processing";
+
   return (
     <div className="flex items-center gap-2">
-      {status === "failed" && (
+      {canRetry && (
         <button
           onClick={handleRetry}
           disabled={isPending}
-          title="Reintentar"
+          title={status === "processing" ? "Resetear (se quedó atascada procesando)" : "Reintentar"}
           className="text-muted-foreground hover:text-primary disabled:opacity-50"
         >
           {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
         </button>
       )}
-      {status !== "processing" && (
-        <button
-          onClick={() => setConfirmDelete(true)}
-          disabled={isPending}
-          title="Eliminar"
-          className="text-muted-foreground hover:text-red-500 disabled:opacity-50"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
+      <button
+        onClick={() => setConfirmDelete(true)}
+        disabled={isPending}
+        title="Eliminar"
+        className="text-muted-foreground hover:text-red-500 disabled:opacity-50"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
       <AlertModal
         isOpen={confirmDelete}
         onClose={() => setConfirmDelete(false)}
