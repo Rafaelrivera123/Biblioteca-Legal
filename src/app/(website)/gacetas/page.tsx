@@ -42,14 +42,21 @@ const TYPE_LABEL: Record<string, string> = {
   REPEAL: "Derogación",
 };
 
+// Convierte "37,169" -> 37169 para poder ordenar numéricamente. No usamos
+// el orderBy de Prisma sobre "number" porque ese campo es texto: un sort
+// alfabético puede fallar apenas haya números con distinta cantidad de
+// dígitos (ej. "9,878" quedaría antes que "37,169", que es incorrecto).
+function numberValue(raw: string): number {
+  return Number(raw.replace(/[^\d]/g, "")) || 0;
+}
+
 async function getGacetasWithContext() {
   // Sin filtro de status: una Gaceta aparece aquí apenas se sube desde el
   // dashboard, esté pendiente, procesándose, procesada o incluso si falló
   // el análisis con IA. El PDF oficial es público de todas formas; lo único
   // que cambia según el status es si ya tiene "actualizaciones legales"
   // vinculadas o no.
-  const gacetas = await prisma.gaceta.findMany({
-    orderBy: { number: "desc" },
+  const gacetasRaw = await prisma.gaceta.findMany({
     select: {
       id: true,
       number: true,
@@ -57,6 +64,12 @@ async function getGacetasWithContext() {
       fileAvailable: true,
     },
   });
+
+  // Orden estrictamente por número de Gaceta, de más nueva (número más
+  // alto) a más vieja. No se usa la fecha de subida para nada aquí.
+  const gacetas = [...gacetasRaw].sort(
+    (a, b) => numberValue(b.number) - numberValue(a.number)
+  );
 
   const numbers = gacetas.map((g) => g.number);
 
@@ -125,10 +138,11 @@ const GacetasPage = async () => {
             Actualizaciones Legales
           </Link>
           . Aquí puedes consultar el listado de ediciones que hemos subido
-          {gacetas.length > 0 ? ` (${gacetas.length} hasta ahora)` : ""} y, mientras el
-          PDF original siga disponible, descargarlo directamente sin buscarlo en otro
-          lado. Las que todavía no tienen actualizaciones legales listadas abajo están
-          en proceso de revisión.
+          {gacetas.length > 0 ? ` (${gacetas.length} hasta ahora)` : ""}, ordenadas de la
+          más nueva a la más vieja según su número de Gaceta, y mientras el PDF original
+          siga disponible, descargarlo directamente sin buscarlo en otro lado. Las que
+          todavía no tienen actualizaciones legales listadas abajo están en proceso de
+          revisión.
         </p>
 
         <GacetasPublicList
