@@ -43,8 +43,12 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 async function getGacetasWithContext() {
+  // Sin filtro de status: una Gaceta aparece aquí apenas se sube desde el
+  // dashboard, esté pendiente, procesándose, procesada o incluso si falló
+  // el análisis con IA. El PDF oficial es público de todas formas; lo único
+  // que cambia según el status es si ya tiene "actualizaciones legales"
+  // vinculadas o no.
   const gacetas = await prisma.gaceta.findMany({
-    where: { status: "processed" },
     orderBy: { number: "desc" },
     select: {
       id: true,
@@ -120,10 +124,11 @@ const GacetasPage = async () => {
           <Link href="/actualizaciones" className="text-primary underline">
             Actualizaciones Legales
           </Link>
-          . Aquí puedes consultar el listado de ediciones que hemos procesado
+          . Aquí puedes consultar el listado de ediciones que hemos subido
           {gacetas.length > 0 ? ` (${gacetas.length} hasta ahora)` : ""} y, mientras el
           PDF original siga disponible, descargarlo directamente sin buscarlo en otro
-          lado.
+          lado. Las que todavía no tienen actualizaciones legales listadas abajo están
+          en proceso de revisión.
         </p>
 
         <GacetasPublicList
