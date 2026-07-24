@@ -76,7 +76,7 @@ export default function Footer() {
             <div className="flex items-center space-x-2">
               <Mail className="w-4 h-4 text-slate-400" />
               <a
-                href="mailto:rrivera@bibliotecalegalthn.com"
+                href="mailto:rrivera@bibliotecalegalhn.com"
                 className="text-slate-300 hover:text-white transition-colors duration-200 text-sm"
               >
                 soporte@bibliotecalegalhn.com
