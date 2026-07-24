@@ -255,9 +255,20 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
     { timeout: 250_000 }
   );
 
+  // Acumulamos el texto nosotros mismos a partir del evento "text" del
+  // stream, en vez de leerlo de response.content[0].text después de
+  // finalMessage(): se detectó que a veces finalMessage() devuelve
+  // stop_reason correcto (ej. "end_turn", osea que la IA sí terminó de
+  // generar todo) pero con el array "content" vacío, dejando el texto en
+  // 0 caracteres aunque la respuesta real sí se generó completa. Leer el
+  // texto directo del stream evita depender de esa reconstrucción.
+  let rawText = "";
+  stream.on("text", (textDelta) => {
+    rawText += textDelta;
+  });
+
   const response = await stream.finalMessage();
 
-  const rawText = response.content[0].type === "text" ? response.content[0].text : "";
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
   // Si la IA se quedó sin tokens a mitad del JSON, el mensaje real del
@@ -266,6 +277,12 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
   if (response.stop_reason === "max_tokens") {
     throw new Error(
       `La respuesta de la IA se cortó por el límite de tokens (la Gaceta ${gacetaNumber} tiene demasiado contenido para analizarla de una sola vez).`
+    );
+  }
+
+  if (!cleaned) {
+    throw new Error(
+      `La IA no devolvió contenido para la Gaceta ${gacetaNumber} (stop_reason: ${response.stop_reason}).`
     );
   }
 
