@@ -5,9 +5,6 @@ import { GacetaRowActions } from "./_components/GacetaRowActions";
 import { ProcessNowButton } from "./_components/ProcessNowButton";
 import { ArrowDown, ArrowUp, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 
-// Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
-// hasta 300 segundos de duración — necesario porque "Procesar ahora" corre
-// el mismo análisis con IA que el cron.
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
@@ -18,9 +15,6 @@ const STATUS_CONFIG = {
   failed: { label: "Falló", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
 
-// Convierte "37,169" -> 37169 para poder ordenar numéricamente. Ordenar el
-// campo "number" como texto en Prisma daría resultados incorrectos apenas
-// hubiera longitudes distintas (ej. "9,878" antes que "37,169").
 function numberValue(raw: string): number {
   return Number(raw.replace(/[^\d]/g, "")) || 0;
 }
@@ -30,10 +24,6 @@ const GacetasPage = async ({
 }: {
   searchParams: { sort?: string };
 }) => {
-  // No seleccionamos pdfData aquí a propósito: son bytes pesados que no
-  // hacen falta para listar, y traerlos todos de una vez en cada carga de
-  // esta página sería carísimo. Se leen aparte solo al abrir el PDF
-  // (ver /api/dashboard/gacetas/[id]/pdf).
   const gacetas = await prisma.gaceta.findMany({
     select: {
       id: true,
@@ -90,26 +80,10 @@ const GacetasPage = async ({
                   <div className="flex items-center gap-1.5">
                     <span>N° Gaceta</span>
                     <div className="flex flex-col">
-                      <Link
-                        href="?sort=asc"
-                        title="Ordenar ascendente"
-                        className={
-                          sortParam === "asc"
-                            ? "text-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                        }
-                      >
+                      <Link href="?sort=asc" title="Ordenar ascendente" className={sortParam === "asc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
                         <ArrowUp className="w-3 h-3" />
                       </Link>
-                      <Link
-                        href="?sort=desc"
-                        title="Ordenar descendente"
-                        className={
-                          sortParam === "desc"
-                            ? "text-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                        }
-                      >
+                      <Link href="?sort=desc" title="Ordenar descendente" className={sortParam === "desc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
                         <ArrowDown className="w-3 h-3" />
                       </Link>
                     </div>
@@ -130,12 +104,7 @@ const GacetasPage = async ({
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
                       {g.fileAvailable ? (
-                        
-                          href={`/api/dashboard/gacetas/${g.id}/pdf`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="hover:underline text-primary"
-                        >
+                        <a href={`/api/dashboard/gacetas/${g.id}/pdf`} target="_blank" rel="noreferrer" className="hover:underline text-primary">
                           {g.number}
                         </a>
                       ) : (
