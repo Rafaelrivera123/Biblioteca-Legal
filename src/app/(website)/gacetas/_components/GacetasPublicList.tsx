@@ -49,13 +49,7 @@ export default function GacetasPublicList({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((g) =>
             g.fileAvailable ? (
-              
-                key={g.id}
-                href={`/api/gacetas/${g.id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 border rounded-xl p-4 hover:border-primary hover:bg-primary/5 transition-colors"
-              >
+              <a key={g.id} href={`/api/gacetas/${g.id}/pdf`} target="_blank" rel="noreferrer" className="flex items-center gap-3 border rounded-xl p-4 hover:border-primary hover:bg-primary/5 transition-colors">
                 <FileText className="w-8 h-8 text-primary shrink-0" />
                 <div className="min-w-0">
                   <p className="font-semibold truncate">La Gaceta N° {g.number}</p>
@@ -77,11 +71,7 @@ export default function GacetasPublicList({
                 </div>
               </a>
             ) : (
-              <div
-                key={g.id}
-                className="flex items-center gap-3 border rounded-xl p-4 opacity-60"
-                title="El PDF original ya no está disponible, pero puedes ver el análisis en Actualizaciones"
-              >
+              <div key={g.id} className="flex items-center gap-3 border rounded-xl p-4 opacity-60" title="El PDF original ya no está disponible, pero puedes ver el análisis en Actualizaciones">
                 <FileX className="w-8 h-8 text-muted-foreground shrink-0" />
                 <div className="min-w-0">
                   <p className="font-semibold truncate">La Gaceta N° {g.number}</p>
