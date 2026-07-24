@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { processPendingGacetas } from "@/lib/gaceta-processor";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 async function requireAdmin() {
   const session = await auth();
@@ -15,32 +16,28 @@ async function requireAdmin() {
  * a la vez desde el cliente (ver UploadGacetasModal) para no pegarle a los
  * límites de tamaño de body de los Server Actions con varios PDFs juntos.
  *
- * Todo el cuerpo (después de validar admin) va envuelto en try/catch: con
- * lotes de 100+ Gacetas, un solo archivo con problema (PDF corrupto, blip
- * de conexión a Neon, número duplicado) no debe tumbar el Server Action
- * entero con un error opaco — siempre devolvemos { ok, message } para que
- * el cliente pueda seguir con el resto de la cola.
+ * Antes esto hacía un findUnique() para revisar el número duplicado y
+ * DESPUÉS el create(): dos viajes a Neon por cada archivo. Ahora se intenta
+ * crear directo y, si Postgres rechaza por el número duplicado (constraint
+ * único), se atrapa ese error puntual (P2002) y se devuelve el mismo
+ * mensaje de antes. Un viaje menos a la base de datos por cada Gaceta que
+ * subes, sin cambiar el comportamiento para el usuario.
  */
 export async function createGacetaFromFile(
   formData: FormData
 ): Promise<{ ok: boolean; message: string }> {
   await requireAdmin();
 
+  const number = (formData.get("number") as string | null)?.trim();
+  const file = formData.get("file") as File | null;
+
+  if (!number) return { ok: false, message: "Falta el número de Gaceta." };
+  if (!file) return { ok: false, message: "Falta el archivo." };
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfData = Buffer.from(arrayBuffer);
+
   try {
-    const number = (formData.get("number") as string | null)?.trim();
-    const file = formData.get("file") as File | null;
-
-    if (!number) return { ok: false, message: "Falta el número de Gaceta." };
-    if (!file) return { ok: false, message: "Falta el archivo." };
-
-    const existing = await prisma.gaceta.findUnique({ where: { number } });
-    if (existing) {
-      return { ok: false, message: `Ya existe una Gaceta con el número ${number}.` };
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const pdfData = Buffer.from(arrayBuffer);
-
     await prisma.gaceta.create({
       data: {
         number,
@@ -50,16 +47,18 @@ export async function createGacetaFromFile(
         status: "pending",
       },
     });
-
-    revalidatePath("/dashboard/gacetas");
-    return { ok: true, message: "Gaceta agregada a la cola." };
   } catch (error) {
-    console.error("Error subiendo Gaceta:", error);
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : "Error inesperado al subir el archivo.",
-    };
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { ok: false, message: `Ya existe una Gaceta con el número ${number}.` };
+    }
+    throw error;
   }
+
+  revalidatePath("/dashboard/gacetas");
+  return { ok: true, message: "Gaceta agregada a la cola." };
 }
 
 export async function retryGaceta(id: string) {
@@ -82,14 +81,21 @@ export async function deleteGaceta(id: string) {
   revalidatePath("/dashboard/gacetas");
 }
 
+// Tope de Gacetas por click en "Procesar ahora". Con colas de 100+ Gacetas,
+// sin este tope un solo click podía consumirse el rato entero de cómputo
+// procesando decenas de golpe; con esto cada click es corto, predecible en
+// costo, y se puede ir dando seguimiento de a poco.
+const MAX_GACETAS_PER_CLICK = 5;
+
 /**
  * Dispara el mismo procesamiento que corre el cron, pero al toque, para que
  * el admin no tenga que esperar al próximo horario programado para probar
- * que una Gaceta recién subida se procesa bien.
+ * que una Gaceta recién subida se procesa bien. A diferencia del cron, cada
+ * click procesa como máximo MAX_GACETAS_PER_CLICK Gacetas.
  */
 export async function processGacetasNow() {
   await requireAdmin();
-  const summary = await processPendingGacetas(250_000);
+  const summary = await processPendingGacetas(250_000, MAX_GACETAS_PER_CLICK);
   revalidatePath("/dashboard/gacetas");
   revalidatePath("/dashboard/legal-updates");
   return summary;
