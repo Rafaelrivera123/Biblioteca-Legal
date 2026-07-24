@@ -1,158 +1,181 @@
 import { prisma } from "@/lib/db";
+import { Metadata } from "next";
 import Link from "next/link";
-import { UploadGacetasModal } from "./_components/UploadGacetasModal";
-import { GacetaRowActions } from "./_components/GacetaRowActions";
-import { ProcessNowButton } from "./_components/ProcessNowButton";
-import { ArrowDown, ArrowUp, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import HeaderSection from "@/components/shared/sections/header";
+import GacetasPublicList from "./_components/GacetasPublicList";
+import { buildSeoDescription, buildSeoTitle } from "@/lib/seo";
 
-// Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
-// hasta 300 segundos de duración — necesario porque "Procesar ahora" corre
-// el mismo análisis con IA que el cron.
-export const maxDuration = 300;
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
-const STATUS_CONFIG = {
-  pending: { label: "Pendiente", icon: Clock, color: "text-amber-600 bg-amber-50 border-amber-200" },
-  processing: { label: "Procesando", icon: Loader2, color: "text-blue-600 bg-blue-50 border-blue-200" },
-  processed: { label: "Procesada", icon: CheckCircle2, color: "text-green-600 bg-green-50 border-green-200" },
-  failed: { label: "Falló", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
-} as const;
+const BASE_URL = "https://www.bibliotecalegalhn.com";
 
-// Convierte "37,169" -> 37169 para poder ordenar numéricamente. Ordenar el
-// campo "number" como texto en Prisma daría resultados incorrectos apenas
-// hubiera longitudes distintas (ej. "9,878" antes que "37,169").
+export const metadata: Metadata = {
+  title: buildSeoTitle("Gacetas Oficiales de Honduras"),
+  description: buildSeoDescription(
+    "Listado de ediciones de La Gaceta de Honduras que hemos revisado, con las reformas, nuevas leyes y derogaciones que contiene cada una."
+  ),
+  keywords: [
+    "La Gaceta Honduras",
+    "Gaceta oficial Honduras",
+    "diario oficial Honduras",
+    "decretos Honduras",
+    "publicaciones legales Honduras",
+    "Biblioteca Legal HN",
+  ],
+  openGraph: {
+    title: buildSeoTitle("Gacetas Oficiales de Honduras"),
+    description:
+      "Listado de ediciones de La Gaceta de Honduras, con las reformas y leyes que contiene cada una.",
+    url: `${BASE_URL}/gacetas`,
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: `${BASE_URL}/gacetas`,
+  },
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  REFORM: "Reforma",
+  NEW_LAW: "Nueva Ley",
+  REPEAL: "Derogación",
+};
+
 function numberValue(raw: string): number {
   return Number(raw.replace(/[^\d]/g, "")) || 0;
 }
 
-const GacetasPage = async ({
-  searchParams,
-}: {
-  searchParams: { sort?: string };
-}) => {
-  // No seleccionamos pdfData aquí a propósito: son bytes pesados que no
-  // hacen falta para listar, y traerlos todos de una vez en cada carga de
-  // esta página sería carísimo. Se leen aparte solo al abrir el PDF
-  // (ver /api/dashboard/gacetas/[id]/pdf).
-  const gacetas = await prisma.gaceta.findMany({
+async function getGacetasWithContext() {
+  const gacetasRaw = await prisma.gaceta.findMany({
     select: {
       id: true,
       number: true,
-      fileName: true,
-      fileAvailable: true,
-      status: true,
-      updatesCreated: true,
-      errorMessage: true,
       uploadedAt: true,
-      processedAt: true,
+      fileAvailable: true,
     },
   });
 
-  const sortParam = searchParams?.sort === "asc" || searchParams?.sort === "desc" ? searchParams.sort : null;
+  const gacetas = [...gacetasRaw].sort(
+    (a, b) => numberValue(b.number) - numberValue(a.number)
+  );
 
-  const sortedGacetas = sortParam
-    ? [...gacetas].sort((a, b) => {
-        const diff = numberValue(a.number) - numberValue(b.number);
-        return sortParam === "asc" ? diff : -diff;
+  const numbers = gacetas.map((g) => g.number);
+
+  const updates = numbers.length
+    ? await prisma.legalUpdatePost.findMany({
+        where: { status: "published", gacetaNumber: { in: numbers } },
+        select: {
+          slug: true,
+          title: true,
+          type: true,
+          gacetaNumber: true,
+          relatedDocument: { select: { name: true } },
+        },
       })
-    : [...gacetas].sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+    : [];
 
-  const hasPending = gacetas.some((g) => g.status === "pending");
+  const updatesByGaceta = new Map<string, typeof updates>();
+  updates.forEach((u) => {
+    if (!u.gacetaNumber) return;
+    const list = updatesByGaceta.get(u.gacetaNumber) ?? [];
+    list.push(u);
+    updatesByGaceta.set(u.gacetaNumber, list);
+  });
+
+  return { gacetas, updatesByGaceta };
+}
+
+const GacetasPage = async () => {
+  const { gacetas, updatesByGaceta } = await getGacetasWithContext();
+  const gacetasConContenido = gacetas.filter((g) => updatesByGaceta.has(g.number));
 
   return (
     <div>
-      <div className="w-full flex justify-between items-center mb-2">
-        <h1 className="text-primary font-semibold text-[32px] leading-[120%]">
-          Biblioteca de Gacetas
-        </h1>
-        <div className="flex items-center gap-2">
-          <ProcessNowButton hasPending={hasPending} />
-          <UploadGacetasModal />
-        </div>
-      </div>
-      <p className="text-sm text-muted-foreground mb-6 max-w-[700px]">
-        Sube aquí los PDFs de La Gaceta a medida que salen. El sistema las
-        procesa automáticamente (lunes, miércoles y viernes) en orden de subida,
-        generando entre 1 y 5 actualizaciones por Gaceta según su importancia
-        real, sin repetir nunca la misma Gaceta dos veces.
-      </p>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "Gacetas Oficiales de Honduras",
+            description:
+              "Listado de ediciones de La Gaceta de Honduras revisadas por Biblioteca Legal HN, con las reformas y leyes que contiene cada una.",
+            url: `${BASE_URL}/gacetas`,
+            isPartOf: {
+              "@type": "WebSite",
+              name: "Biblioteca Legal HN",
+              url: BASE_URL,
+            },
+            numberOfItems: gacetas.length,
+          }),
+        }}
+      />
+      <HeaderSection
+        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/86f8cacd-d2d6-42df-a1bd-569b2c5e047c.webp"
+        title="Gacetas Oficiales"
+        description="Consulta y descarga los PDFs originales de La Gaceta de la República de Honduras"
+      />
 
-      {sortedGacetas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Todavía no has subido ninguna Gaceta.
+      <div className="container max-w-[1100px] py-12">
+        <p className="text-muted-foreground text-base leading-relaxed max-w-[750px] mb-10">
+          La Gaceta es el diario oficial de la República de Honduras: ahí se publican los
+          decretos, leyes, reglamentos y acuerdos que entran en vigencia en el país. En
+          Biblioteca Legal HN revisamos cada edición para identificar qué leyes y códigos
+          reforma, deroga o crea, y explicamos el cambio en lenguaje claro en{" "}
+          <Link href="/actualizaciones" className="text-primary underline">
+            Actualizaciones Legales
+          </Link>
+          . Aquí puedes consultar el listado de ediciones que hemos subido
+          {gacetas.length > 0 ? ` (${gacetas.length} hasta ahora)` : ""}, ordenadas de la
+          más nueva a la más vieja según su número de Gaceta, y mientras el PDF original
+          siga disponible, descargarlo directamente sin buscarlo en otro lado. Las que
+          todavía no tienen actualizaciones legales listadas abajo están en proceso de
+          revisión.
         </p>
-      ) : (
-        <div className="border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="text-left">
-                <th className="px-4 py-3 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <span>N° Gaceta</span>
-                    <div className="flex flex-col">
-                      <Link href="?sort=asc" title="Ordenar ascendente" className={sortParam === "asc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
-                        <ArrowUp className="w-3 h-3" />
-                      </Link>
-                      <Link href="?sort=desc" title="Ordenar descendente" className={sortParam === "desc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
-                        <ArrowDown className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  </div>
-                </th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="px-4 py-3 font-medium">Actualizaciones</th>
-                <th className="px-4 py-3 font-medium">Subida</th>
-                <th className="px-4 py-3 font-medium">Procesada</th>
-                <th className="px-4 py-3 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedGacetas.map((g) => {
-                const config = STATUS_CONFIG[g.status];
-                const Icon = config.icon;
-                return (
-                  <tr key={g.id} className="border-t">
-                    <td className="px-4 py-3 font-medium">
-                      {g.fileAvailable ? (
-                        <a href={`/api/dashboard/gacetas/${g.id}/pdf`} target="_blank" rel="noreferrer" className="hover:underline text-primary">
-                          {g.number}
-                        </a>
-                      ) : (
-                        <span title="El PDF ya se borró tras procesarse">{g.number}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${config.color}`}>
-                        <Icon className={`w-3.5 h-3.5 ${g.status === "processing" ? "animate-spin" : ""}`} />
-                        {config.label}
-                      </span>
-                      {g.status === "failed" && g.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1 max-w-[280px]">{g.errorMessage}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {g.status === "processed" ? g.updatesCreated : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {g.uploadedAt.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {g.processedAt
-                        ? g.processedAt.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        <GacetaRowActions id={g.id} status={g.status} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+
+        <GacetasPublicList
+          gacetas={gacetas.map((g) => ({
+            id: g.id,
+            number: g.number,
+            uploadedAt: g.uploadedAt.toISOString(),
+            fileAvailable: g.fileAvailable,
+            updatesCount: updatesByGaceta.get(g.number)?.length ?? 0,
+          }))}
+        />
+
+        {gacetasConContenido.length > 0 && (
+          <section
+            aria-label="Qué contiene cada Gaceta"
+            className="mt-16 pt-16 border-t space-y-10"
+          >
+            <h2 className="text-xl font-semibold">Qué contiene cada Gaceta</h2>
+            <div className="space-y-8">
+              {gacetasConContenido.map((g) => (
+                <div key={g.id}>
+                  <h3 className="font-semibold mb-2">La Gaceta N° {g.number}</h3>
+                  <ul className="space-y-1.5">
+                    {(updatesByGaceta.get(g.number) ?? []).map((u) => (
+                      <li key={u.slug} className="text-sm">
+                        <span className="text-muted-foreground">
+                          {TYPE_LABEL[u.type] ?? u.type}
+                          {u.relatedDocument ? ` · ${u.relatedDocument.name}` : ""}:
+                        </span>{" "}
+                        <Link
+                          href={`/actualizaciones/${u.slug}`}
+                          className="text-primary hover:underline"
+                        >
+                          {u.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 };
