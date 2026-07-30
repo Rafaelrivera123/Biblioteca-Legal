@@ -25,7 +25,7 @@ export default function ResearchTools() {
           Buscador Legal
         </h2>
         <h3 className="my-4 text-2xl font-bold text-[#1E2A38] md:text-[40px]">
-          Encuentra Información Legal
+          Búsqueda de Artículos Global 
         </h3>
         <p className="mb-10 font-medium text-[#1E2A38] md:text-lg">
           Busca por número de artículo, nombre de la ley o decreto, una
