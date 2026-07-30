@@ -35,7 +35,7 @@ export default function ResearchTools() {
           plataforma.
         </p>
         <div className="relative mx-auto max-w-3xl">
-          <div className="relative z-10 overflow-hidden rounded-xl bg-white p-6 shadow-xl">
+          <div className="relative z-10 rounded-xl bg-white p-6 shadow-xl">
             <div className="mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               {FEATURES.map(({ icon: Icon, label }) => (
                 <span
