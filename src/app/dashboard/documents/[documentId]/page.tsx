@@ -33,8 +33,11 @@ const Page = async ({ params }: { params: { documentId: string } }) => {
       documentId: document.id,
     },
     include: {
-      chapters: true,
+      chapters: {
+        orderBy: { createdAt: "asc" },
+      },
     },
+    orderBy: { createdAt: "asc" },
   });
 
   return (
