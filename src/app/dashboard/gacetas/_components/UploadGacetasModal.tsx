@@ -22,14 +22,24 @@ interface PendingFile {
 
 /**
  * Intenta adivinar el número de Gaceta a partir del nombre del archivo
- * (ej. "gaceta-37169.pdf", "La Gaceta 37,169.pdf") buscando una secuencia de
- * 4 a 6 dígitos, con o sin coma como separador de miles. El admin puede
+ * (ej. "gaceta-37169.pdf", "La Gaceta 37,169.pdf", o nuestra convención real
+ * de archivo "20260728 - 37205.pdf") buscando una secuencia de 4 a 6
+ * dígitos, con o sin coma como separador de miles. El admin puede
  * corregirlo a mano antes de subir si el archivo no sigue este patrón.
+ *
+ * Cuando el nombre trae la fecha (YYYYMMDD) antes del número de Gaceta,
+ * como en "20260728 - 37205.pdf", hay DOS coincidencias posibles: la fecha
+ * ("20260728" se lee como "202,607") y el número real ("37205" → "37,205").
+ * Antes nos quedábamos con la primera coincidencia (la fecha, mal), ahora
+ * nos quedamos con la ÚLTIMA: en nuestra convención el número de Gaceta
+ * siempre va después de la fecha, nunca antes.
  */
 function guessGacetaNumber(filename: string): string {
-  const match = filename.match(/(\d{2,3})[,.]?(\d{3})/);
-  if (!match) return "";
-  return `${match[1]},${match[2]}`;
+  const base = filename.replace(/\.[^.]+$/, "");
+  const matches = [...base.matchAll(/(\d{2,3})[,.]?(\d{3})/g)];
+  if (matches.length === 0) return "";
+  const last = matches[matches.length - 1];
+  return `${last[1]},${last[2]}`;
 }
 
 export function UploadGacetasModal() {
