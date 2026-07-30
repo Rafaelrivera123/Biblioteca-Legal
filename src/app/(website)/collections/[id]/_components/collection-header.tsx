@@ -1,15 +1,12 @@
 "use client";
 import { removeWatchLater, watchLater } from "@/actions/watch-later";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import useDebounce from "@/hooks/useDebounce";
-import { extractNumber } from "@/lib/utils";
-import { useArticleSearchStore } from "@/store/collections";
 import { Document, WatchLists } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Clock, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
+import DocumentSearch from "./document-search";
 
 interface apiProps {
   success: boolean;
@@ -24,10 +21,8 @@ interface Props {
 }
 
 const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
-  const [value, setvalue] = useState("");
   const [pending, startTransition] = useTransition();
   const [isScrolled, setIsScrolled] = useState(false);
-  const { setQuery } = useArticleSearchStore();
 
   const { data, isLoading, refetch } = useQuery<apiProps>({
     queryKey: ["watchlist", document.id],
@@ -72,17 +67,6 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
     }
   };
 
-  const debouncesvalue = useDebounce(value, 1000);
-
-  useEffect(() => {
-    if (debouncesvalue) {
-      const number = extractNumber(debouncesvalue);
-      setQuery(number?.toString() ?? "");
-    } else {
-      setQuery("");
-    }
-  }, [debouncesvalue, setQuery]);
-
   return (
     <>
       {/* Header estático con título */}
@@ -99,12 +83,7 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
 
         {hasFullAccess && !isScrolled && (
           <div className="w-full max-w-[600px] mx-auto flex flex-col items-center gap-y-3">
-            <Input
-              placeholder="Buscar por número de artículo..."
-              className="w-full"
-              value={value}
-              onChange={(e) => setvalue(e.target.value)}
-            />
+            <DocumentSearch documentId={document.id} />
             <Button
               variant="outline"
               className="text-primary hover:text-primary/80"
@@ -128,24 +107,9 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
       {hasFullAccess && isScrolled && (
         <div className="fixed top-[64px] left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/10 shadow-sm py-3 px-4">
           <div className="container mx-auto flex items-center gap-3 max-w-[800px]">
-            <Input
-              placeholder="Buscar por número de artículo..."
-              className="flex-1"
-              value={value}
-              onChange={(e) => setvalue(e.target.value)}
-            />
-            {value && (
-              <Button
-                variant="outline"
-                className="text-primary hover:text-primary/80 shrink-0"
-                onClick={() => {
-                  setvalue("");
-                  setQuery("");
-                }}
-              >
-                Limpiar
-              </Button>
-            )}
+            <div className="flex-1">
+              <DocumentSearch documentId={document.id} />
+            </div>
             <Button
               variant="outline"
               className="text-primary hover:text-primary/80 shrink-0"
