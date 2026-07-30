@@ -1,70 +1,18 @@
 "use client";
-import useCollectionSearchStore from "@/store/collections";
-import { BookOpen, Gavel, Scale, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { BookOpen, Gavel, Scale } from "lucide-react";
 import { useState } from "react";
-import { Input } from "./ui/input";
+import GlobalSearchBox from "./global-search-box";
 
 type TabKey = "legislation" | "jurisprudence" | "doctrine";
 
+const placeholders: Record<TabKey, string> = {
+  legislation: "Buscar legislación por artículo, ley o palabra clave...",
+  jurisprudence: "Buscar jurisprudencia por artículo, ley o palabra clave...",
+  doctrine: "Buscar doctrina por artículo, ley o palabra clave...",
+};
+
 export default function ResearchTools() {
   const [activeTab, setActiveTab] = useState<TabKey>("legislation");
-  const { query, setQuery } = useCollectionSearchStore();
-  const router = useRouter();
-
-  const tabContent: Record<TabKey, JSX.Element> = {
-    legislation: (
-      <div className="space-y-6">
-        <div className="relative">
-          <Input
-            startIcon={Search}
-            placeholder="Buscar legislación"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
-            }}
-          />
-        </div>
-      </div>
-    ),
-    jurisprudence: (
-      <div className="space-y-6">
-        <div className="relative">
-          <Input
-            startIcon={Search}
-            placeholder="Buscar jurisprudencia"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
-            }}
-          />
-        </div>
-      </div>
-    ),
-    doctrine: (
-      <div className="space-y-6">
-        <div className="relative">
-          <Input
-            startIcon={Search}
-            placeholder="Buscar doctrina"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
-            }}
-          />
-        </div>
-      </div>
-    ),
-  };
 
   return (
     <section className="py-16 px-4 md:py-24">
@@ -116,7 +64,9 @@ export default function ResearchTools() {
                 Doctrina
               </button>
             </div>
-            <div className="py-4">{tabContent[activeTab]}</div>
+            <div className="py-4">
+              <GlobalSearchBox placeholder={placeholders[activeTab]} />
+            </div>
           </div>
         </div>
       </div>
