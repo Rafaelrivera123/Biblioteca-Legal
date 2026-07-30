@@ -178,6 +178,34 @@ function buildPostFromItem(
   };
 }
 
+/**
+ * Trae los bytes del PDF de una Gaceta. Las Gacetas subidas desde el
+ * cambio a Vercel Blob (2026-07-29) solo tienen `pdfUrl`, así que se
+ * descargan de ahí; las subidas antes de ese cambio todavía pueden tener
+ * `pdfData` (bytea en Neon) como fallback.
+ */
+async function loadGacetaPdfBuffer(
+  pdfUrl: string | null,
+  pdfData: Uint8Array | Buffer | null
+): Promise<Buffer> {
+  if (pdfUrl) {
+    const res = await fetch(pdfUrl);
+    if (!res.ok) {
+      throw new Error(
+        `No se pudo descargar el PDF de la Gaceta desde Blob storage (status ${res.status}).`
+      );
+    }
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+  if (pdfData) {
+    return Buffer.from(pdfData);
+  }
+  throw new Error(
+    "Esta Gaceta no tiene archivo guardado (se borró o nunca se subió bien). Vuelve a subirla."
+  );
+}
+
 async function extractPdfText(pdfData: Buffer): Promise<string> {
   const pdfParse = (await import("pdf-parse")).default;
   const data = await pdfParse(pdfData);
@@ -345,12 +373,8 @@ export async function processPendingGacetas(
     if (claimed.count === 0) continue;
 
     try {
-      if (!next.pdfData) {
-        throw new Error(
-          "Esta Gaceta no tiene archivo guardado (se borró o nunca se subió bien). Vuelve a subirla."
-        );
-      }
-      const text = await extractPdfText(Buffer.from(next.pdfData));
+      const pdfBuffer = await loadGacetaPdfBuffer(next.pdfUrl, next.pdfData);
+      const text = await extractPdfText(pdfBuffer);
       const analysis = await analyzeGacetaText(next.number, text, documents);
       const sourceWeek = new Date();
       const allItems: AnalysisItem[] = [
