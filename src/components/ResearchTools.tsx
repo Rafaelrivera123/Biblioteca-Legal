@@ -1,7 +1,6 @@
 "use client";
-import useCollectionSearchStore from "@/store/collections";
+import { useGlobalSearchStore } from "@/store/search";
 import { BookOpen, Gavel, Scale, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Input } from "./ui/input";
 
@@ -9,8 +8,16 @@ type TabKey = "legislation" | "jurisprudence" | "doctrine";
 
 export default function ResearchTools() {
   const [activeTab, setActiveTab] = useState<TabKey>("legislation");
-  const { query, setQuery } = useCollectionSearchStore();
-  const router = useRouter();
+  const [value, setValue] = useState("");
+  const { openWithQuery } = useGlobalSearchStore();
+
+  const handleSubmit = () => {
+    if (value.trim() === "") return;
+    // Antes esto solo empujaba a /collections, cuyo buscador únicamente
+    // compara contra el título de la ley. Ahora abre el buscador global,
+    // que sí revisa el contenido de cada artículo (ver /api/search).
+    openWithQuery(value.trim());
+  };
 
   const tabContent: Record<TabKey, JSX.Element> = {
     legislation: (
@@ -19,12 +26,10 @@ export default function ResearchTools() {
           <Input
             startIcon={Search}
             placeholder="Buscar legislación"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
+              if (e.key === "Enter") handleSubmit();
             }}
           />
         </div>
@@ -36,12 +41,10 @@ export default function ResearchTools() {
           <Input
             startIcon={Search}
             placeholder="Buscar jurisprudencia"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
+              if (e.key === "Enter") handleSubmit();
             }}
           />
         </div>
@@ -53,12 +56,10 @@ export default function ResearchTools() {
           <Input
             startIcon={Search}
             placeholder="Buscar doctrina"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && query !== "") {
-                router.push("/collections");
-              }
+              if (e.key === "Enter") handleSubmit();
             }}
           />
         </div>
