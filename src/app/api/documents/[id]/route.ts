@@ -53,6 +53,7 @@ export async function GET(
         },
         include: {
           chapters: {
+            orderBy: { createdAt: "asc" },
             include: {
               articles: { orderBy: articleOrderBy },
             },
@@ -72,6 +73,7 @@ export async function GET(
           include: {
             chapters: {
               where: { title: { contains: searchQuery, mode: "insensitive" } },
+              orderBy: { createdAt: "asc" },
               include: {
                 articles: { orderBy: articleOrderBy },
               },
@@ -110,6 +112,7 @@ export async function GET(
                   },
                 },
               },
+              orderBy: { createdAt: "asc" },
               include: {
                 articles: {
                   where: {
@@ -142,6 +145,7 @@ export async function GET(
         where: { documentId: id },
         include: {
           chapters: {
+            orderBy: { createdAt: "asc" },
             include: {
               articles: { orderBy: articleOrderBy },
             },
