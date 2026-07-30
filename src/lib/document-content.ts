@@ -22,6 +22,7 @@ export function getDocumentSections(documentId: string) {
         where: { documentId },
         include: {
           chapters: {
+            orderBy: { createdAt: "asc" },
             include: {
               articles: {
                 orderBy: [
