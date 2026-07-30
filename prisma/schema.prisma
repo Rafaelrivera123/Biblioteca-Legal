@@ -49,7 +49,6 @@ model Gaceta {
   uploadedAt     DateTime     @default(now())
   processedAt    DateTime?
 }
-}
 model User {
   id               String    @id @default(cuid())
   first_name       String
