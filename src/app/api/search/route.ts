@@ -8,6 +8,7 @@ import {
   type SearchArticleResult,
   type SearchResponse,
 } from "@/lib/search-shared";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -69,10 +70,17 @@ async function searchDocuments(trimmed: string, limit: number): Promise<SearchDo
   `;
 }
 
-async function searchArticlesByNumber(trimmed: string, limit: number): Promise<RawArticleRow[]> {
+async function searchArticlesByNumber(
+  trimmed: string,
+  limit: number,
+  documentId?: string
+): Promise<RawArticleRow[]> {
   const match = trimmed.match(/^(?:art(?:í|i)?culo\.?\s*|art\.?\s*)?(\d{1,5})$/i);
   if (!match) return [];
   const articleNumber = parseInt(match[1], 10);
+  const documentCondition = documentId
+    ? Prisma.sql`AND s."documentId" = ${documentId}`
+    : Prisma.empty;
   return prisma.$queryRaw<RawArticleRow[]>`
     SELECT a.id, a."articleNumber", a."articleLabel", a."contentPlainText",
       d.id as "documentId", d.name as "documentName", d.slug as "documentSlug"
@@ -81,6 +89,7 @@ async function searchArticlesByNumber(trimmed: string, limit: number): Promise<R
     JOIN "Section" s ON c."sectionId" = s.id
     JOIN "Document" d ON s."documentId" = d.id
     WHERE a."articleNumber" = ${articleNumber} AND d.published = true
+      ${documentCondition}
     ORDER BY d."viewCount" DESC
     LIMIT ${limit}
   `;
@@ -94,7 +103,14 @@ async function searchArticlesByNumber(trimmed: string, limit: number): Promise<R
 // rechaza la consulta por conteo de parámetros. Por eso los marcadores van
 // escritos tal cual en el SQL (deben coincidir con las constantes
 // exportadas en @/lib/search-shared, que sí usa el cliente).
-async function searchArticlesByText(trimmed: string, limit: number): Promise<RawArticleRow[]> {
+async function searchArticlesByText(
+  trimmed: string,
+  limit: number,
+  documentId?: string
+): Promise<RawArticleRow[]> {
+  const documentCondition = documentId
+    ? Prisma.sql`AND s."documentId" = ${documentId}`
+    : Prisma.empty;
   return prisma.$queryRaw<RawArticleRow[]>`
     SELECT a.id, a."articleNumber", a."articleLabel",
       ts_headline(
@@ -111,16 +127,19 @@ async function searchArticlesByText(trimmed: string, limit: number): Promise<Raw
     JOIN "Document" d ON s."documentId" = d.id
     WHERE d.published = true
       AND to_tsvector('spanish', a."contentPlainText") @@ plainto_tsquery('spanish', ${trimmed})
+      ${documentCondition}
     ORDER BY rank DESC
     LIMIT ${limit}
   `;
 }
 
-async function literalSearch(trimmed: string, limit: number) {
+async function literalSearch(trimmed: string, limit: number, documentId?: string) {
   const [documents, numberMatches, textMatches] = await Promise.all([
-    searchDocuments(trimmed, limit),
-    searchArticlesByNumber(trimmed, limit),
-    searchArticlesByText(trimmed, limit),
+    // Si la búsqueda está acotada a un documento (buscador dentro de la
+    // página del documento), no tiene sentido devolver otras leyes.
+    documentId ? Promise.resolve([]) : searchDocuments(trimmed, limit),
+    searchArticlesByNumber(trimmed, limit, documentId),
+    searchArticlesByText(trimmed, limit, documentId),
   ]);
 
   const seen = new Set<string>();
@@ -135,9 +154,15 @@ async function literalSearch(trimmed: string, limit: number) {
   return { documents, articles };
 }
 
-async function semanticSearch(trimmed: string, limit: number): Promise<SearchArticleResult[]> {
+async function semanticSearch(
+  trimmed: string,
+  limit: number,
+  documentId?: string
+): Promise<SearchArticleResult[]> {
   const embedding = await getQueryEmbedding(trimmed);
   const vectorStr = `[${embedding.join(",")}]`;
+  const documentCondition = documentId ? `AND s."documentId" = $2` : "";
+  const params: unknown[] = documentId ? [vectorStr, documentId] : [vectorStr];
   const rows = await prisma.$queryRawUnsafe<RawArticleRow[]>(
     `SELECT a.id, a."articleNumber", a."articleLabel", a."contentPlainText",
             d.id as "documentId", d.name as "documentName", d.slug as "documentSlug"
@@ -146,9 +171,10 @@ async function semanticSearch(trimmed: string, limit: number): Promise<SearchArt
      JOIN "Section" s ON c."sectionId" = s.id
      JOIN "Document" d ON s."documentId" = d.id
      WHERE a.embedding IS NOT NULL AND d.published = true
+       ${documentCondition}
      ORDER BY a.embedding <=> $1::vector
      LIMIT ${limit}`,
-    vectorStr
+    ...params
   );
   return rows.map(toResult);
 }
@@ -165,6 +191,10 @@ export async function GET(req: NextRequest) {
     const query = (searchParams.get("q") || "").trim();
     const mode: SearchMode = searchParams.get("mode") === "semantic" ? "semantic" : "literal";
     const limit = Math.min(parseInt(searchParams.get("limit") || "8", 10) || 8, 20);
+    // Si viene documentId, la búsqueda se acota a ese documento (usado por
+    // el buscador embebido en /collections/[id]). Si no viene, busca en
+    // toda la biblioteca (usado por cualquier otro buscador global).
+    const documentId = searchParams.get("documentId") || undefined;
 
     if (!query) {
       return NextResponse.json<SearchResponse>({
@@ -190,7 +220,7 @@ export async function GET(req: NextRequest) {
           { status: 400 }
         );
       }
-      const articles = await semanticSearch(query, limit);
+      const articles = await semanticSearch(query, limit, documentId);
       if (articles.length === 0) logZeroResultSearch(query, "semantic");
       return NextResponse.json<SearchResponse>({
         success: true,
@@ -201,7 +231,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const { documents, articles } = await literalSearch(query, limit);
+    const { documents, articles } = await literalSearch(query, limit, documentId);
     if (documents.length === 0 && articles.length === 0) {
       logZeroResultSearch(query, "literal");
     }
