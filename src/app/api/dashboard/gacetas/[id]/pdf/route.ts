@@ -13,17 +13,24 @@ export async function GET(
 
   const gaceta = await prisma.gaceta.findUnique({
     where: { id: params.id },
-    select: { fileName: true, pdfData: true },
+    select: { fileName: true, pdfUrl: true, pdfData: true },
   });
 
-  if (!gaceta || !gaceta.pdfData) {
+  if (!gaceta || (!gaceta.pdfUrl && !gaceta.pdfData)) {
     return NextResponse.json(
       { error: "El archivo ya no está disponible (probablemente ya se procesó)." },
       { status: 404 }
     );
   }
 
-  return new NextResponse(Buffer.from(gaceta.pdfData), {
+  // Gacetas subidas desde el cambio a Vercel Blob viven ahí: redirigimos en
+  // vez de leer el buffer y reenviarlo nosotros, porque el response de una
+  // Function tiene el mismo tope de 4.5MB que el request.
+  if (gaceta.pdfUrl) {
+    return NextResponse.redirect(gaceta.pdfUrl);
+  }
+
+  return new NextResponse(Buffer.from(gaceta.pdfData!), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="${gaceta.fileName}"`,
