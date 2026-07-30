@@ -24,11 +24,15 @@ export async function GET(req: NextRequest) {
       const publishedCondition = isAdmin
         ? Prisma.empty
         : Prisma.sql`AND d.published = true`;
+      // También compara contra short_description: el input público de
+      // "Buscar por título, descripción o número de ley" prometía esto en
+      // el placeholder pero antes solo comparaba name/law_number.
       const results = await prisma.$queryRaw<{ id: string }[]>`
         SELECT DISTINCT d.id,
           GREATEST(
             similarity(d.name, ${query}),
-            similarity(d.law_number, ${query})
+            similarity(d.law_number, ${query}),
+            similarity(d.short_description, ${query})
           ) AS relevance
         FROM "Document" d
         WHERE 1=1
@@ -36,8 +40,10 @@ export async function GET(req: NextRequest) {
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
+            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.3
             OR similarity(d.law_number, ${query}) > 0.3
+            OR similarity(d.short_description, ${query}) > 0.25
           )
           ${categoryCondition}
         ORDER BY relevance DESC
@@ -51,8 +57,10 @@ export async function GET(req: NextRequest) {
           AND (
             d.name ILIKE ${likeQuery}
             OR d.law_number ILIKE ${likeQuery}
+            OR d.short_description ILIKE ${likeQuery}
             OR similarity(d.name, ${query}) > 0.3
             OR similarity(d.law_number, ${query}) > 0.3
+            OR similarity(d.short_description, ${query}) > 0.25
           )
           ${categoryCondition}
       `;
