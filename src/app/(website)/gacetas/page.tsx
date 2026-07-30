@@ -42,12 +42,10 @@ const TYPE_LABEL: Record<string, string> = {
   REPEAL: "Derogación",
 };
 
-function numberValue(raw: string): number {
-  return Number(raw.replace(/[^\d]/g, "")) || 0;
-}
-
 async function getGacetasWithContext() {
-  const gacetasRaw = await prisma.gaceta.findMany({
+  const gacetas = await prisma.gaceta.findMany({
+    where: { status: "processed" },
+    orderBy: { number: "desc" },
     select: {
       id: true,
       number: true,
@@ -55,10 +53,6 @@ async function getGacetasWithContext() {
       fileAvailable: true,
     },
   });
-
-  const gacetas = [...gacetasRaw].sort(
-    (a, b) => numberValue(b.number) - numberValue(a.number)
-  );
 
   const numbers = gacetas.map((g) => g.number);
 
@@ -126,12 +120,9 @@ const GacetasPage = async () => {
           <Link href="/actualizaciones" className="text-primary underline">
             Actualizaciones Legales
           </Link>
-          . Aquí puedes consultar el listado de ediciones que hemos subido
-          {gacetas.length > 0 ? ` (${gacetas.length} hasta ahora)` : ""}, ordenadas de la
-          más nueva a la más vieja según su número de Gaceta, y mientras el PDF original
-          siga disponible, descargarlo directamente sin buscarlo en otro lado. Las que
-          todavía no tienen actualizaciones legales listadas abajo están en proceso de
-          revisión.
+          . Aquí puedes consultar el listado de ediciones que hemos procesado y,
+          mientras el PDF original siga disponible, descargarlo directamente sin
+          buscarlo en otro lado.
         </p>
 
         <GacetasPublicList
