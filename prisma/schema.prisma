@@ -18,6 +18,30 @@ enum LegalUpdateStatus {
   draft
   published
 }
+enum GacetaStatus {
+  pending
+  processing
+  processed
+  failed
+}
+model Gaceta {
+  id             String       @id @default(cuid())
+  number         String       @unique
+  fileName       String
+  // El PDF se guarda directamente en Neon (Postgres) como bytea, no en
+  // EdgeStore — así evitamos el límite de storage de EdgeStore, que ya se
+  // alcanzó con archivos de otras partes del sitio. Se limpia (null) justo
+  // después de procesar la Gaceta con éxito, para no acumular peso muerto
+  // en la base de datos; mientras esté pending/failed se conserva para
+  // poder reintentar.
+  pdfData        Bytes?
+  fileAvailable  Boolean      @default(true)
+  status         GacetaStatus @default(pending)
+  updatesCreated Int          @default(0)
+  errorMessage   String?
+  uploadedAt     DateTime     @default(now())
+  processedAt    DateTime?
+}
 model User {
   id               String    @id @default(cuid())
   first_name       String
@@ -304,27 +328,14 @@ model LegalUpdatePost {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
-enum GacetaStatus {
-  pending
-  processing
-  processed
-  failed
-}
-model Gaceta {
-  id             String       @id @default(cuid())
-  number         String       @unique
-  fileName       String
-  // El PDF se guarda directamente en Neon (Postgres) como bytea, no en
-  // EdgeStore — así evitamos el límite de storage de EdgeStore, que ya se
-  // alcanzó con archivos de otras partes del sitio. Se limpia (null) justo
-  // después de procesar la Gaceta con éxito, para no acumular peso muerto
-  // en la base de datos; mientras esté pending/failed se conserva para
-  // poder reintentar.
-  pdfData        Bytes?
-  fileAvailable  Boolean      @default(true)
-  status         GacetaStatus @default(pending)
-  updatesCreated Int          @default(0)
-  errorMessage   String?
-  uploadedAt     DateTime     @default(now())
-  processedAt    DateTime?
+// Registra búsquedas que no devolvieron resultados en /api/search, para
+// saber qué palabras clave o frases la gente busca y no encuentra, y
+// priorizar sobre datos reales en vez de adivinar.
+model SearchLog {
+  id           String   @id @default(cuid())
+  query        String
+  resultsCount Int      @default(0)
+  source       String   @default("literal")
+  createdAt    DateTime @default(now())
+  @@index([createdAt])
 }
