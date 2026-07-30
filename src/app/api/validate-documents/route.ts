@@ -21,12 +21,18 @@ export async function GET() {
         slug: true,
         updatedAt: true,
         sections: {
+          orderBy: { createdAt: "asc" },
           select: {
             title: true,
             chapters: {
+              orderBy: { createdAt: "asc" },
               select: {
                 title: true,
                 articles: {
+                  orderBy: [
+                    { articleNumber: "asc" },
+                    { articleLabel: "asc" },
+                  ],
                   select: {
                     articleNumber: true,
                     contentPlainText: true,
