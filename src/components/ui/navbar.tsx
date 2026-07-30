@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -8,8 +8,6 @@ import { useEffect, useState, useTransition } from "react";
 import { logoutAction } from "@/actions/auth/logout";
 import { logoSrc } from "@/helper/assets";
 import { cn } from "@/lib/utils";
-import GlobalSearch from "@/components/shared/global-search";
-import { useGlobalSearchStore } from "@/store/search";
 import { User } from "@prisma/client";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -25,7 +23,6 @@ interface Props {
 const Navbar = ({ isLoggedin, user }: Props) => {
   const [isPending, startTransition] = useTransition();
   const [scrolling, setScrolling] = useState(false);
-  const { open: openSearch } = useGlobalSearchStore();
 
   const pathname = usePathname();
 
@@ -94,20 +91,6 @@ const Navbar = ({ isLoggedin, user }: Props) => {
               </Link>
             ))}
           </div>
-          <div className="hidden md:flex items-center">
-            <button
-              onClick={openSearch}
-              aria-label="Buscar en Biblioteca Legal"
-              className="mr-4 flex items-center gap-2 rounded-full border border-current/20 px-3 py-1.5 text-sm hover:bg-black/5 transition-colors"
-            >
-              <Search className="h-4 w-4" />
-              <span className="hidden lg:inline">Buscar</span>
-              <kbd className="hidden lg:inline-flex items-center rounded border border-current/30 px-1.5 py-0.5 text-[10px] font-mono opacity-70">
-                Ctrl K
-              </kbd>
-            </button>
-          </div>
-
           <div className="hidden md:block">
             {isLoggedin ? (
               <>
@@ -160,9 +143,6 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           </div>
 
           <div className="md:hidden flex items-center gap-x-4">
-            <button onClick={openSearch} aria-label="Buscar" className="p-1">
-              <Search className="h-5 w-5" />
-            </button>
             <div>
               {!isLoggedin && <Button size="sm">Iniciar sesión</Button>}
               {isLoggedin && (
@@ -204,7 +184,6 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           </div>
         </div>
       </div>
-      <GlobalSearch />
     </div>
   );
 };
