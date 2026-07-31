@@ -85,10 +85,20 @@ const MAX_GACETAS_PER_CLICK = 5;
  * el admin no tenga que esperar al próximo horario programado para probar
  * que una Gaceta recién subida se procesa bien. A diferencia del cron, cada
  * click procesa como máximo MAX_GACETAS_PER_CLICK Gacetas.
+ *
+ * El 250_000 que estaba acá antes dejaba solo ~50s de margen bajo los 300s
+ * de `maxDuration` (ver page.tsx) para todo el trabajo de una Gaceta además
+ * de la llamada a la IA (descarga del PDF, extracción de texto, escrituras
+ * a Prisma) — muy poco margen real. Eso hacía que Vercel matara la función
+ * a mitad de camino en vez de dejar que el propio código detectara el
+ * timeout y marcara la Gaceta como "failed": el resultado era que el botón
+ * se quedaba "Procesando..." para siempre y la fila quedaba atascada en
+ * "processing" sin ningún error visible. 60_000 deja margen real (~240s)
+ * para que la Gaceta en curso siempre termine dentro del tiempo, bien o mal.
  */
 export async function processGacetasNow() {
   await requireAdmin();
-  const summary = await processPendingGacetas(250_000, MAX_GACETAS_PER_CLICK);
+  const summary = await processPendingGacetas(60_000, MAX_GACETAS_PER_CLICK);
   revalidatePath("/dashboard/gacetas");
   revalidatePath("/dashboard/legal-updates");
   return summary;
