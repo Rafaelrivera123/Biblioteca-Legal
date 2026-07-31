@@ -1,6 +1,7 @@
 import HeaderSection from "@/components/shared/sections/header";
 import { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Sobre Nosotros | Biblioteca Legal HN",
@@ -144,6 +145,76 @@ const page = () => {
             porque el conocimiento legal también puede ser dinámico, accesible y
             transformador.
           </p>
+        </div>
+
+        <div className="max-w-7xl mx-auto mt-24">
+          <h3 className="text-lg md:text-[20px] font-semibold text-[#D4AF37] text-center mb-6">
+            Metodología
+          </h3>
+          <h2 className="text-2xl md:text-[32px] font-semibold text-[#1E2A38] text-center mb-16">
+            Cómo mantenemos el contenido actualizado
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 max-w-5xl mx-auto">
+            <div>
+              <h3 className="text-xl md:text-[22px] font-bold text-[#1E2A38] mb-4">
+                Fuente oficial
+              </h3>
+              <p className="text-[14px] md:text-[16px]">
+                Todo el texto legal publicado en Biblioteca Legal proviene
+                directamente de La Gaceta, el Diario Oficial de la República
+                de Honduras. No redactamos ni interpretamos leyes:
+                transcribimos y mantenemos vigente el texto tal como lo
+                publica el Estado.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl md:text-[22px] font-bold text-[#1E2A38] mb-4">
+                Proceso de actualización
+              </h3>
+              <p className="text-[14px] md:text-[16px]">
+                Revisamos La Gaceta varias veces por semana. Cuando se
+                publica un decreto que reforma, deroga o crea disposiciones
+                en alguna ley o código, localizamos el documento afectado,
+                actualizamos su texto vigente artículo por artículo y
+                publicamos un resumen en lenguaje claro en{" "}
+                <Link
+                  href="/actualizaciones"
+                  className="text-[#D4AF37] underline underline-offset-2 hover:no-underline"
+                >
+                  Actualizaciones Legales
+                </Link>{" "}
+                explicando qué cambió y qué implica.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl md:text-[22px] font-bold text-[#1E2A38] mb-4">
+                Trazabilidad
+              </h3>
+              <p className="text-[14px] md:text-[16px]">
+                Cada actualización enlaza al respaldo oficial correspondiente
+                en{" "}
+                <Link
+                  href="/gacetas"
+                  className="text-[#D4AF37] underline underline-offset-2 hover:no-underline"
+                >
+                  Gacetas Oficiales
+                </Link>
+                , para que cualquier persona pueda verificar el decreto
+                original sin depender de nuestra palabra.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl md:text-[22px] font-bold text-[#1E2A38] mb-4">
+                Cobertura
+              </h3>
+              <p className="text-[14px] md:text-[16px]">
+                Mantenemos 141+ leyes y códigos vigentes, con más de 20,000
+                artículos consultables y actualizaciones legales publicadas
+                de forma continua. Las cifras se actualizan en tiempo real y
+                pueden verse en la página de inicio.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </div>
