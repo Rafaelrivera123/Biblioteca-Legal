@@ -3,18 +3,25 @@ import LegalUpdateCard from "@/components/shared/cards/legal-update-card";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { GenerateWithAIModal } from "./_components/GenerateWithAIModal";
+import { parseGacetaNumber } from "@/lib/utils";
 
 const Page = async () => {
   const allUpdates = await prisma.legalUpdatePost.findMany({
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
       relatedDocument: {
         select: { name: true },
       },
     },
   });
-  const drafts = allUpdates.filter((u) => u.status === "draft");
-  const published = allUpdates.filter((u) => u.status === "published");
+  // Orden pedido por el usuario: N° de Gaceta más nuevo primero, bajando de
+  // más nuevo a más viejo. `gacetaNumber` es un String (ej. "37,183"), así
+  // que un `orderBy` de Prisma lo ordenaría alfabéticamente (mal) — por eso
+  // se ordena acá en JS con `parseGacetaNumber`, que sí compara los números
+  // reales sin importar la coma de miles.
+  const byGacetaNumberDesc = (a: { gacetaNumber: string | null }, b: { gacetaNumber: string | null }) =>
+    parseGacetaNumber(b.gacetaNumber) - parseGacetaNumber(a.gacetaNumber);
+  const drafts = allUpdates.filter((u) => u.status === "draft").sort(byGacetaNumberDesc);
+  const published = allUpdates.filter((u) => u.status === "published").sort(byGacetaNumberDesc);
 
   return (
     <div>
