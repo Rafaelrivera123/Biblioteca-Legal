@@ -1,5 +1,6 @@
 import { Facebook, Instagram, Mail } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Footer() {
   const quickLinks = [
@@ -42,12 +43,12 @@ export default function Footer() {
             <ul className="space-y-3">
               {quickLinks.map((link) => (
                 <li key={link.name}>
-                  
+                  <Link
                     href={link.href}
                     className="text-slate-300 hover:text-white transition-colors duration-200 text-sm"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -59,12 +60,12 @@ export default function Footer() {
             <ul className="space-y-3">
               {legalLinks.map((link) => (
                 <li key={link.name}>
-                  
+                  <Link
                     href={link.href}
                     className="text-slate-300 hover:text-white transition-colors duration-200 text-sm"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -75,29 +76,29 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Contáctenos</h4>
             <div className="flex items-center space-x-2">
               <Mail className="w-4 h-4 text-slate-400" />
-              
+              <Link
                 href="mailto:soporte@bibliotecalegalhn.com"
                 className="text-slate-300 hover:text-white transition-colors duration-200 text-sm"
               >
                 soporte@bibliotecalegalhn.com
-              </a>
+              </Link>
             </div>
 
             <div className="mt-8 flex items-center gap-x-5">
-              
+              <Link
                 className="cursor-pointer"
                 href="https://www.facebook.com/people/Biblioteca-Legal/61577353097593"
                 target="_blank"
               >
                 <Facebook className="w-4 h-4 text-slate-400 mt-2 hover:text-white transition-colors duration-200" />
-              </a>
-              
+              </Link>
+              <Link
                 className="cursor-pointer"
                 href="https://www.instagram.com/bibliotecalegalhn"
                 target="_blank"
               >
                 <Instagram className="w-4 h-4 text-slate-400 mt-2 hover:text-white transition-colors duration-200" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>
