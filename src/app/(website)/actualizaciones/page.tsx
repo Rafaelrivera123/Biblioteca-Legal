@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 import Link from "next/link";
 import { FileText, PlusCircle, XCircle } from "lucide-react";
+import { parseGacetaNumber } from "@/lib/utils";
 const TYPE_CONFIG = {
   REFORM: { label: "Reforma", icon: FileText, color: "text-amber-600 bg-amber-50 border-amber-200" },
   NEW_LAW: { label: "Nueva Ley", icon: PlusCircle, color: "text-green-600 bg-green-50 border-green-200" },
@@ -26,9 +27,8 @@ export const metadata: Metadata = {
 };
 export const revalidate = 3600;
 async function getPublishedUpdates() {
-  return prisma.legalUpdatePost.findMany({
+  const posts = await prisma.legalUpdatePost.findMany({
     where: { status: "published" },
-    orderBy: { publishedAt: "desc" },
     select: {
       id: true,
       slug: true,
@@ -42,6 +42,14 @@ async function getPublishedUpdates() {
       },
     },
   });
+  // Orden pedido por el usuario: N° de Gaceta más nuevo primero, bajando de
+  // más nuevo a más viejo (antes era por `publishedAt`). `gacetaNumber` es
+  // un String (ej. "37,183"), así que un `orderBy` de Prisma lo ordenaría
+  // alfabéticamente (mal) — se ordena acá en JS con `parseGacetaNumber`,
+  // que sí compara los números reales sin importar la coma de miles.
+  return posts.sort(
+    (a, b) => parseGacetaNumber(b.gacetaNumber) - parseGacetaNumber(a.gacetaNumber)
+  );
 }
 const ActualizacionesPage = async () => {
   const posts = await getPublishedUpdates();
