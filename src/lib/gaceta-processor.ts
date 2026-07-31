@@ -57,6 +57,23 @@ export interface GacetaRunSummary {
   error?: string;
 }
 
+/**
+ * Los errores de validación de Prisma (ej. "Invalid `prisma.X.create()`
+ * invocation") empiezan volcando el objeto COMPLETO que se le pasó a la
+ * query —acá eso incluye el HTML entero de un artículo, que fácilmente son
+ * miles de caracteres— y la razón real del error ("Argument `X` is
+ * missing.", "Invalid value provided...", etc.) queda SIEMPRE al final del
+ * mensaje, después de ese volcado. Cortar por los primeros 500 caracteres
+ * (como hacía este código antes) solo mostraba un pedazo del volcado del
+ * objeto y nunca llegaba a la razón real, dejando el errorMessage guardado
+ * en la Gaceta inútil para diagnosticar cualquier fallo de Prisma. Nos
+ * quedamos con el FINAL del mensaje en vez del principio.
+ */
+function truncateErrorMessage(message: string, maxLen = 800): string {
+  if (message.length <= maxLen) return message;
+  return `…${message.slice(-maxLen)}`;
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -88,6 +105,28 @@ export function buildReformTable(changes: ReformArticleChange[]): string {
                 <th style="border: 1px solid #333; padding: 8px; color: #4CAF50; text-align: left;">[DESPUÉS] Disposición Nueva / Texto Reformado</th>
               </tr>${rows}
             </table>`;
+}
+
+/**
+ * Fuerza a string cualquier valor que venga directo del JSON de la IA sin
+ * pasar por un template literal (que ya coerciona solo). Se detectó en
+ * producción que un `prisma.legalUpdatePost.create()` puede fallar con
+ * "Invalid invocation" cuando la IA devuelve, por ejemplo, `gacetaNumber`
+ * como número en vez de string ("37183" sin comillas) — Prisma rechaza el
+ * tipo y el error real queda enterrado dentro del volcado del objeto (ver
+ * [[truncateErrorMessage]]). Estos campos (title, summary, gacetaNumber,
+ * legalSource) se asignan DIRECTO desde el item de la IA sin pasar por un
+ * template literal en ningún lado, así que son los únicos con este riesgo.
+ */
+function str(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return fallback;
+  return String(value);
+}
+function strOrNull(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return null;
+  return String(value);
 }
 
 function buildPostFromItem(
@@ -125,15 +164,15 @@ function buildPostFromItem(
       content,
       changesData: item.changes as unknown as Prisma.InputJsonValue,
       type: "REFORM",
-      gacetaNumber: item.gacetaNumber,
-      legalSource: item.legalSource,
+      gacetaNumber: strOrNull(item.gacetaNumber),
+      legalSource: strOrNull(item.legalSource),
       relatedDocumentId: matchedDocumentId,
       sourceWeek,
     };
   }
   if (item.type === "NEW_LAW") {
-    const title = item.lawName;
-    const summary = item.summary;
+    const title = str(item.lawName, "Ley sin título");
+    const summary = str(item.summary);
     const content = `
       <p>${item.context}</p>
       <p><strong>Decreto:</strong> ${item.decreeNumber}</p>
@@ -148,8 +187,8 @@ function buildPostFromItem(
       content,
       changesData: undefined,
       type: "NEW_LAW",
-      gacetaNumber: item.gacetaNumber,
-      legalSource: item.decreeNumber,
+      gacetaNumber: strOrNull(item.gacetaNumber),
+      legalSource: strOrNull(item.decreeNumber),
       relatedDocumentId: null,
       sourceWeek,
     };
@@ -171,8 +210,8 @@ function buildPostFromItem(
     content,
     changesData: undefined,
     type: "REPEAL",
-    gacetaNumber: item.gacetaNumber,
-    legalSource: item.repealingInstrument,
+    gacetaNumber: strOrNull(item.gacetaNumber),
+    legalSource: strOrNull(item.repealingInstrument),
     relatedDocumentId: matchedDocumentId,
     sourceWeek,
   };
@@ -231,6 +270,19 @@ async function analyzeGacetaText(
   // esperando). Por eso la llamada va en modo stream y esperamos a
   // finalMessage(), que devuelve el mismo objeto que .create() (mismo
   // content, stop_reason, usage) una vez termina de generarse todo.
+  //
+  // El timeout acá (180s) es DELIBERADAMENTE más chico que los 300s de
+  // `maxDuration` de la función completa. Antes estaba en 250_000, dejando
+  // solo ~50s de margen para todo lo demás (descarga del PDF, pdf-parse,
+  // varias escrituras a Prisma). En la práctica ese margen no alcanzaba:
+  // Vercel mataba la función a la fuerza ANTES de que este timeout llegara
+  // a dispararse, y como el kill es un SIGKILL (no una excepción de JS), el
+  // bloque catch de processPendingGacetas nunca llegaba a correr — la
+  // Gaceta se quedaba en "processing" para siempre, sin error visible en
+  // ningún lado. Con 180s acá, sí queda margen real (~100-120s) para el
+  // resto del trabajo dentro del tope de 300s, así que este timeout SIEMPRE
+  // se dispara primero como una excepción normal de JS, capturable, y la
+  // Gaceta pasa a "failed" con un mensaje claro en vez de quedar atascada.
   const stream = anthropic.messages.stream(
     {
       model: "claude-sonnet-5",
@@ -280,7 +332,7 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
         },
       ],
     },
-    { timeout: 250_000 }
+    { timeout: 180_000 }
   );
 
   // Acumulamos el texto nosotros mismos a partir del evento "text" del
@@ -295,7 +347,24 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
     rawText += textDelta;
   });
 
-  const response = await stream.finalMessage();
+  let response;
+  try {
+    response = await stream.finalMessage();
+  } catch (err: any) {
+    // Distinguimos el timeout (nombre "APIConnectionTimeoutError" en el SDK
+    // de Anthropic, o mensaje que menciona "timed out") de otros errores de
+    // red, para que el mensaje guardado en la Gaceta le diga al usuario
+    // exactamente qué pasó y qué hacer, en vez de un error genérico.
+    const isTimeout =
+      err?.name === "APIConnectionTimeoutError" ||
+      /timed? ?out/i.test(err?.message ?? "");
+    if (isTimeout) {
+      throw new Error(
+        `El análisis con IA de la Gaceta ${gacetaNumber} no terminó a tiempo (más de 180s). Probablemente esta Gaceta trae demasiado contenido para analizarla de una sola vez. Vuelve a intentarlo con "Reintentar"; si sigue fallando, divide el PDF en partes más pequeñas y súbelas por separado.`
+      );
+    }
+    throw err;
+  }
 
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
@@ -343,9 +412,22 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
  * dashboard sí lo usa (con 5) para que cada click tenga un costo y un
  * tiempo de espera acotados y predecibles, en vez de vaciar de un jalón
  * una cola de 100+ Gacetas.
+ *
+ * `maxDurationMs` solo controla cuándo dejar de EMPEZAR una Gaceta nueva —
+ * no acota una Gaceta ya en curso. Por eso tiene que dejar margen real bajo
+ * los 300s de `maxDuration`: una sola Gaceta puede tardar hasta ~180s solo
+ * en la llamada a la IA (ver `analyzeGacetaText`), más descarga del PDF,
+ * extracción de texto y varias escrituras a Prisma. Antes este default
+ * estaba en 260_000 (dejando solo 40s de margen), lo que dejaba muy poco
+ * espacio para ese trabajo extra y causaba que Vercel matara la función a
+ * la fuerza a mitad de una Gaceta — dejándola en "processing" para siempre,
+ * sin que el catch de abajo llegara a marcarla "failed". Con 60_000 el
+ * margen real bajo los 300s queda en ~240s, de sobra para que la primera
+ * Gaceta siempre termine (bien o mal) dentro del tiempo, y solo se intenta
+ * una segunda si sobró tiempo de verdad.
  */
 export async function processPendingGacetas(
-  maxDurationMs = 260_000,
+  maxDurationMs = 60_000,
   maxGacetas?: number
 ): Promise<GacetaRunSummary[]> {
   const startedAt = Date.now();
@@ -445,7 +527,7 @@ export async function processPendingGacetas(
         where: { id: next.id },
         data: {
           status: "failed",
-          errorMessage: message.slice(0, 500),
+          errorMessage: truncateErrorMessage(message),
         },
       });
       summaries.push({
