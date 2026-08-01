@@ -81,7 +81,7 @@ const GacetasPage = async () => {
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
                       {g.fileAvailable ? (
-                        
+                        <a
                           href={`/api/dashboard/gacetas/${g.id}/pdf`}
                           target="_blank"
                           rel="noreferrer"
