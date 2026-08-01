@@ -89,9 +89,11 @@ const CompanyHeader = ({ data, subscription }: Props) => {
   return (
     <>
       <div>
-        <div className="flex items-center justify-between">
-          <h1 className="font-bold text-[24px] leading-[120%]">{data.name}</h1>
-          <div className="flex items-center gap-x-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="font-bold text-[22px] sm:text-[24px] leading-[120%] break-words">
+            {data.name}
+          </h1>
+          <div className="flex items-center gap-3 sm:gap-x-5">
             <Button
               variant="outline"
               className="text-rose-500 hover:text-rose-500/80 bg-white"
