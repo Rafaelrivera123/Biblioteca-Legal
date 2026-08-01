@@ -48,9 +48,9 @@ const Page = async ({
   return (
     <div className="space-y-[30px]">
       <BackNow />
-      <section className="flex justify-between items-start">
+      <section className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
         <div className="space-y-[15px]">
-          <h1 className="font-bold text-[24px] leading-[120%]">
+          <h1 className="font-bold text-[22px] sm:text-[24px] leading-[120%] break-words">
             {document.name}
           </h1>
           <p className="font-medium leading-[120%]">
@@ -81,7 +81,7 @@ const Page = async ({
         </div>
         <div className="flex items-center gap-x-[30px]">
           <AddArticleModal
-            trigger={<Button>Add Article</Button>}
+            trigger={<Button className="w-full sm:w-auto">Add Article</Button>}
             chapterId={params.chapterId}
             documentId={params.documentId}
             sectionId={params.sectionId}
