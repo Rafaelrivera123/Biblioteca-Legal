@@ -7,9 +7,9 @@ import { Search } from "lucide-react";
 const ManageUserHeader = () => {
   const { query, setQuery } = useManageUserSearchStore();
   return (
-    <div>
+    <div className="w-full sm:w-auto">
       <Input
-        className="min-w-[400px]"
+        className="w-full sm:min-w-[400px]"
         placeholder="Search by name, email..."
         endIcon={Search}
         value={query}
