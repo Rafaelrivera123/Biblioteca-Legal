@@ -15,11 +15,13 @@ const Page = async () => {
 
   return (
     <div>
-      <div className="w-full flex justify-between mb-5">
-        <h1 className="text-primary font-semibold text-[32px] leading-[120%]">
+      <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+        <h1 className="text-primary font-semibold text-[26px] sm:text-[32px] leading-[120%]">
           Waitlist
         </h1>
-        <AddWaitlistDialog trigger={<Button>Add New waitlist</Button>} />
+        <AddWaitlistDialog
+          trigger={<Button className="w-full sm:w-auto">Add New waitlist</Button>}
+        />
       </div>
       <WaitListContainer data={userQue ?? []} />
     </div>
