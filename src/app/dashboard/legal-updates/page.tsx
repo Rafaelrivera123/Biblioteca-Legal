@@ -25,15 +25,15 @@ const Page = async () => {
 
   return (
     <div>
-      <div className="w-full flex justify-between items-center mb-5">
-        <h1 className="text-primary font-semibold text-[32px] leading-[120%]">
+      <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+        <h1 className="text-primary font-semibold text-[26px] sm:text-[32px] leading-[120%]">
           Actualizaciones Legales
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <GenerateWithAIModal />
           <Link
             href="/dashboard/legal-updates/new"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+            className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             Nueva actualización
