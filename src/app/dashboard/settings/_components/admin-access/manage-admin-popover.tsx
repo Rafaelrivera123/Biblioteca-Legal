@@ -133,19 +133,17 @@ const ManageAdminPopover = () => {
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-     <PopoverTrigger asChild>
-        <Button>
+<PopoverTrigger asChild>
+        <Button className="w-full sm:w-auto">
           <UserPlus className="mr-2 h-4 w-4" />
           Manage Admin Access
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0"
+        className="w-[calc(100vw-2rem)] max-w-[400px] p-0"
         align="end"
         side="bottom"
         sideOffset={5}
-        style={{ width: 400 }}
       >
       >
         <Command>
