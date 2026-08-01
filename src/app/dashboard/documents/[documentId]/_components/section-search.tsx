@@ -71,10 +71,10 @@ const SectionSearch = () => {
   };
 
   return (
-    <div className="flex gap-2 items-start">
-      <div className="relative">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+      <div className="relative w-full sm:w-auto">
         <Input
-          className="min-w-[300px]"
+          className="w-full sm:min-w-[300px]"
           value={sectionQuery}
           onChange={(e) => setSectionQuery(e.target.value)}
           placeholder="Search by Section title, chapter title..."
@@ -89,10 +89,10 @@ const SectionSearch = () => {
         )}
       </div>
 
-      <div className="relative flex flex-col gap-1">
+      <div className="relative flex flex-col gap-1 w-full sm:w-auto">
         <div className="relative">
           <Input
-            className="min-w-[160px] pr-8"
+            className="w-full sm:min-w-[160px] pr-8"
             value={articleInput}
             onChange={handleArticleChange}
             placeholder="Ir al artículo..."
