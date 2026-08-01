@@ -134,7 +134,7 @@ const ManageAdminPopover = () => {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+     <PopoverTrigger asChild>
         <Button>
           <UserPlus className="mr-2 h-4 w-4" />
           Manage Admin Access
@@ -146,6 +146,7 @@ const ManageAdminPopover = () => {
         side="bottom"
         sideOffset={5}
         style={{ width: 400 }}
+      >
       >
         <Command>
           <CommandInput
