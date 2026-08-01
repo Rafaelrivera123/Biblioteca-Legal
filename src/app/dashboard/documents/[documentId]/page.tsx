@@ -43,9 +43,9 @@ const Page = async ({ params }: { params: { documentId: string } }) => {
   return (
     <div className="space-y-[30px]">
       <BackNow />
-      <section className="flex justify-between items-start">
+      <section className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
         <div className="space-y-[15px]">
-          <h1 className="font-bold text-[24px] leading-[120%]">
+          <h1 className="font-bold text-[22px] sm:text-[24px] leading-[120%] break-words">
             {document.name}
           </h1>
           <p className="font-medium leading-[120%]">
@@ -67,10 +67,10 @@ const Page = async ({ params }: { params: { documentId: string } }) => {
         />
       </section>
 
-      <div className="w-full flex justify-end gap-x-5">
+      <div className="w-full flex flex-col gap-3 sm:flex-row sm:justify-end sm:items-start sm:gap-x-5">
         <SectionSearch />
         <AddDocumentSectionTitleModal
-          trigger={<Button>Add Title</Button>}
+          trigger={<Button className="w-full sm:w-auto">Add Title</Button>}
           documentId={params.documentId}
         />
       </div>
