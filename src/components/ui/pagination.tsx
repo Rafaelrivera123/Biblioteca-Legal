@@ -17,7 +17,7 @@ const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
 )
 Pagination.displayName = "Pagination"
 
-const PaginationContent = React.forwardRef
+const PaginationContent = React.forwardRef<
   HTMLUListElement,
   React.ComponentProps<"ul">
 >(({ className, ...props }, ref) => (
@@ -29,7 +29,7 @@ const PaginationContent = React.forwardRef
 ))
 PaginationContent.displayName = "PaginationContent"
 
-const PaginationItem = React.forwardRef
+const PaginationItem = React.forwardRef<
   HTMLLIElement,
   React.ComponentProps<"li">
 >(({ className, ...props }, ref) => (
@@ -48,7 +48,7 @@ const PaginationLink = ({
   size = "icon",
   ...props
 }: PaginationLinkProps) => (
-  
+  <a
     aria-current={isActive ? "page" : undefined}
     className={cn(
       buttonVariants({
