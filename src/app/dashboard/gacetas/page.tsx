@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/db";
-import Link from "next/link";
 import { UploadGacetasModal } from "./_components/UploadGacetasModal";
 import { GacetaRowActions } from "./_components/GacetaRowActions";
 import { ProcessNowButton } from "./_components/ProcessNowButton";
-import { ArrowDown, ArrowUp, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 
+// Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
+// hasta 300 segundos de duración — necesario porque "Procesar ahora" corre
+// el mismo análisis con IA que el cron.
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
@@ -15,16 +17,13 @@ const STATUS_CONFIG = {
   failed: { label: "Falló", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
 
-function numberValue(raw: string): number {
-  return Number(raw.replace(/[^\d]/g, "")) || 0;
-}
-
-const GacetasPage = async ({
-  searchParams,
-}: {
-  searchParams: { sort?: string };
-}) => {
+const GacetasPage = async () => {
+  // No seleccionamos pdfData aquí a propósito: son bytes pesados que no
+  // hacen falta para listar, y traerlos todos de una vez en cada carga de
+  // esta página sería carísimo. Se leen aparte solo al abrir el PDF
+  // (ver /api/dashboard/gacetas/[id]/pdf).
   const gacetas = await prisma.gaceta.findMany({
+    orderBy: { uploadedAt: "desc" },
     select: {
       id: true,
       number: true,
@@ -37,25 +36,15 @@ const GacetasPage = async ({
       processedAt: true,
     },
   });
-
-  const sortParam = searchParams?.sort === "asc" || searchParams?.sort === "desc" ? searchParams.sort : null;
-
-  const sortedGacetas = sortParam
-    ? [...gacetas].sort((a, b) => {
-        const diff = numberValue(a.number) - numberValue(b.number);
-        return sortParam === "asc" ? diff : -diff;
-      })
-    : [...gacetas].sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
-
   const hasPending = gacetas.some((g) => g.status === "pending");
 
   return (
     <div>
-      <div className="w-full flex justify-between items-center mb-2">
-        <h1 className="text-primary font-semibold text-[32px] leading-[120%]">
+      <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+        <h1 className="text-primary font-semibold text-[26px] sm:text-[32px] leading-[120%]">
           Biblioteca de Gacetas
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <ProcessNowButton hasPending={hasPending} />
           <UploadGacetasModal />
         </div>
@@ -67,28 +56,16 @@ const GacetasPage = async ({
         real, sin repetir nunca la misma Gaceta dos veces.
       </p>
 
-      {sortedGacetas.length === 0 ? (
+      {gacetas.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Todavía no has subido ninguna Gaceta.
         </p>
       ) : (
-        <div className="border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/50">
               <tr className="text-left">
-                <th className="px-4 py-3 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <span>N° Gaceta</span>
-                    <div className="flex flex-col">
-                      <Link href="?sort=asc" title="Ordenar ascendente" className={sortParam === "asc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
-                        <ArrowUp className="w-3 h-3" />
-                      </Link>
-                      <Link href="?sort=desc" title="Ordenar descendente" className={sortParam === "desc" ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
-                        <ArrowDown className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  </div>
-                </th>
+                <th className="px-4 py-3 font-medium">N° Gaceta</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium">Actualizaciones</th>
                 <th className="px-4 py-3 font-medium">Subida</th>
@@ -97,14 +74,19 @@ const GacetasPage = async ({
               </tr>
             </thead>
             <tbody>
-              {sortedGacetas.map((g) => {
+              {gacetas.map((g) => {
                 const config = STATUS_CONFIG[g.status];
                 const Icon = config.icon;
                 return (
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
                       {g.fileAvailable ? (
-                        <a href={`/api/dashboard/gacetas/${g.id}/pdf`} target="_blank" rel="noreferrer" className="hover:underline text-primary">
+                        
+                          href={`/api/dashboard/gacetas/${g.id}/pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline text-primary"
+                        >
                           {g.number}
                         </a>
                       ) : (
