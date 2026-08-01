@@ -10,13 +10,13 @@ interface Props {
 const EmployeeContainer = ({ users, companyId }: Props) => {
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-semibold text-[20px] leading-[120%]">
           Employee Lists ({users.length})
         </h1>
 
         <AddEmployeeModal
-          trigger={<Button>Add Employee</Button>}
+          trigger={<Button className="w-full sm:w-auto">Add Employee</Button>}
           companyId={companyId}
         />
       </div>
