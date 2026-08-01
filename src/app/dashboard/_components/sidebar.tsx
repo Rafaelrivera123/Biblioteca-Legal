@@ -3,6 +3,7 @@ import { logoutAction } from "@/actions/auth/logout";
 import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
 import { logoSrc } from "@/helper/assets";
+import { useSidebarStore } from "@/store/dashboard/sidebar";
 import {
   Archive,
   Building,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   TableOfContents,
   Users,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -41,6 +43,8 @@ const Sidebar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
+  const isMobileOpen = useSidebarStore((state) => state.isOpen);
+  const closeMobile = useSidebarStore((state) => state.close);
   const onLogout = () => {
     setIsLoading(true);
     startTransition(() => {
@@ -56,15 +60,39 @@ const Sidebar = () => {
   useEffect(() => {
     return () => { setIsLoading(false); };
   }, []);
+  // Close the mobile drawer whenever the route changes
+  useEffect(() => {
+    closeMobile();
+  }, [pathname, closeMobile]);
   return (
     <>
-      <div className="fixed inset-y-0 left-0 z-50 w-64 border-r bg-white">
+      {/* Backdrop (mobile only) */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r bg-white transition-transform duration-300 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0 ${
+          isMobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="border-b p-6 flex justify-center items-center">
-            <div className="relative h-[80px] w-[80px]">
+          <div className="border-b p-4 sm:p-6 flex justify-center items-center relative">
+            <div className="relative h-[64px] w-[64px] sm:h-[80px] sm:w-[80px]">
               <Image src={logoSrc} alt="logo" fill />
             </div>
+            <button
+              type="button"
+              onClick={closeMobile}
+              className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+              aria-label="Cerrar menú"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
           {/* Navigation Links */}
           <nav className="flex-1 overflow-auto p-3">
@@ -79,13 +107,14 @@ const Sidebar = () => {
                   <li key={route.id}>
                     <Link
                       href={route.href}
+                      onClick={closeMobile}
                       className={`flex items-center gap-3 rounded-md px-3 py-2 ${
                         isActive
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
-                      <Icon className="h-5 w-5" />
+                      <Icon className="h-5 w-5 shrink-0" />
                       <span>{route.label}</span>
                     </Link>
                   </li>
