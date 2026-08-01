@@ -24,11 +24,11 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
     <div className="flex min-h-screen flex-col">
       <SIdebar />
       {/* Main Content */}
-      <div className="ml-64 flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col lg:ml-64">
         {/* Top Bar */}
         <Topbar name={(user.first_name + " " + user.last_name) as string} />
 
-        <div className="p-6 bg-[#F5F7FA] min-h-[calc(100vh-80px)]">
+        <div className="min-h-[calc(100vh-80px)] overflow-x-hidden bg-[#F5F7FA] p-3 sm:p-6">
           {children}
         </div>
       </div>
