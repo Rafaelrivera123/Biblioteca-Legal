@@ -56,17 +56,21 @@ export default function ValidatePage() {
   const outdated = results.filter((r) => !r.up_to_date);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-3 sm:p-6 max-w-4xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-primary">
+          <h1 className="text-xl sm:text-2xl font-bold text-primary">
             Validación de Documentos
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Verifica si tus leyes están al día con la legislación hondureña actual.
           </p>
         </div>
-        <Button onClick={handleValidate} disabled={loading} className="bg-primary">
+        <Button
+          onClick={handleValidate}
+          disabled={loading}
+          className="bg-primary w-full sm:w-auto"
+        >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
