@@ -111,15 +111,15 @@ export function UploadGacetasModal() {
           } else {
             failed.push(`${files[i].number}: ${res.message}`);
           }
-        } catch (uploadErr: any) {
-          failed.push(`${files[i].number}: ${uploadErr?.message ?? "Error subiendo el archivo"}`);
+        } catch (uploadErr: unknown) {
+          failed.push(`${files[i].number}: ${uploadErr instanceof Error ? uploadErr.message : "Error subiendo el archivo"}`);
         }
       }
 
       setResult({ created, failed });
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message ?? "Ocurrió un error inesperado subiendo las Gacetas");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Ocurrió un error inesperado subiendo las Gacetas");
     } finally {
       setLoading(false);
       setLoadingMsg("");

@@ -68,7 +68,6 @@ const DocumentIndex = ({ sections, onNavigate }: Props) => {
       ) as HTMLElement | null;
 
       if (indexContainer && activeButton) {
-        const containerTop = indexContainer.scrollTop;
         const containerHeight = indexContainer.clientHeight;
         const buttonTop = activeButton.offsetTop;
         const buttonHeight = activeButton.clientHeight;

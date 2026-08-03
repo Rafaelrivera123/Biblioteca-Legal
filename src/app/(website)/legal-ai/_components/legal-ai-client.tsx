@@ -86,7 +86,7 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
 
     try {
       let body: FormData | string;
-      let headers: Record<string, string> = {};
+      const headers: Record<string, string> = {};
 
       if (file) {
         const formData = new FormData();

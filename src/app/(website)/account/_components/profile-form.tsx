@@ -28,7 +28,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { useEdgeStore } from "@/lib/edgestore";
+import { upload } from "@vercel/blob/client";
 import { cn } from "@/lib/utils";
 import {
   profileSchema,
@@ -48,7 +48,6 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [imageLoader, setImageLoader] = useState(false);
   const [pending, startTransition] = useTransition();
-  const { edgestore } = useEdgeStore();
 
   const form = useForm<ProfileSchemaType>({
     resolver: zodResolver(profileSchema),
@@ -73,8 +72,11 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
     const file = event.target.files?.[0];
     if (file) {
       setImageLoader(true);
-      const res = await edgestore.publicFiles.upload({ file });
-      form.setValue("image", res?.url || "");
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/uploads",
+      });
+      form.setValue("image", blob.url);
       setImageLoader(false);
     }
   };

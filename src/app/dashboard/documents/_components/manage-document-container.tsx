@@ -97,8 +97,8 @@ const ManageDocumentContainer = () => {
       {/* Barra de búsqueda y conteo */}
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-gray-500 shrink-0">
-          {data?.meta?.total !== undefined
-            ? `${data.meta.total} documento${data.meta.total !== 1 ? "s" : ""}`
+          {data?.meta?.totalCount !== undefined
+            ? `${data.meta.totalCount} documento${data.meta.totalCount !== 1 ? "s" : ""}`
             : ""}
         </p>
         <div className="relative max-w-[400px] w-full ml-auto">

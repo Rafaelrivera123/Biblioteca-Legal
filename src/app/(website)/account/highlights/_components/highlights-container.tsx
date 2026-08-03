@@ -95,7 +95,7 @@ const HighlightContainer = () => {
       <div className="pb-20">
         <div className="grid grid-cols-1 space-y-10">
           {grouped.map((doc: GroupedByDocument) => {
-            const docHref = `/collections/${(doc.document as any).slug || doc.documentId}`;
+            const docHref = `/collections/${doc.document.slug || doc.documentId}`;
             return (
               <Card className="shadow-none" key={doc.documentId}>
                 <CardHeader>
@@ -122,7 +122,7 @@ const HighlightContainer = () => {
                       metaId={item.id}
                       isBookmarked={item.isBookmarked}
                       selectedColor={item.selectedColor ?? "#f0f0f0"}
-                      documentSlug={(doc.document as any).slug}
+                      documentSlug={doc.document.slug}
                       documentId={doc.documentId}
                     />
                   ))}

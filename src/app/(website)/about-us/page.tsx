@@ -1,4 +1,5 @@
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -25,7 +26,7 @@ const page = () => {
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/about%20us.webp"
+        imageUrl={siteAssets.aboutUs}
         title="Sobre Nosotros"
         description=""
       />

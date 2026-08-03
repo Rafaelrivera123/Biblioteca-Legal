@@ -1,11 +1,12 @@
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import RegistrationForm from "./_components/registration-form";
 
 const Page = () => {
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/registration%20page.webp"
+        imageUrl={siteAssets.registrationPage}
         title="Crea tu cuenta"
         description="Únete a nuestra plataforma para acceder a recursos legales completos"
       />

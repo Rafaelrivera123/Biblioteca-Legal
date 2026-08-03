@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { logoSrc } from "@/helper/assets";
+import { logoSrc, siteAssets } from "@/helper/assets";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import LoginForm from "./_components/login-form";
@@ -13,7 +13,7 @@ export default async function LoginPage() {
       {/* Lado izquierdo - Imagen */}
       <div className="hidden lg:w-3/5 md:w-1/2 bg-gray-900 lg:block relative">
         <Image
-          src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/login%20page%20sidebar.webp"
+          src={siteAssets.loginSidebar}
           alt="Fondo de la página de inicio de sesión"
           fill
           className="object-cover"

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { backendClient } from "@/lib/edgestore-server";
+import { del } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
+import { LegalUpdateType } from "@prisma/client";
 
 // Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
 // hasta 300 segundos de duración máxima — no 60. (Corregido: antes decía 60
@@ -24,6 +25,29 @@ function slugify(text: string): string {
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+}
+
+interface GeneratedLegalUpdate {
+  title?: string;
+  summary?: string;
+  content?: string;
+  type?: string;
+  gacetaNumber?: string;
+  legalSource?: string;
+}
+
+const LEGAL_UPDATE_TYPES = new Set<string>(Object.values(LegalUpdateType));
+
+function parseLegalUpdateType(value: string): LegalUpdateType | null {
+  return LEGAL_UPDATE_TYPES.has(value) ? (value as LegalUpdateType) : null;
+}
+
+function getErrorName(err: unknown): string | undefined {
+  return err instanceof Error ? err.name : undefined;
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export async function POST(req: NextRequest) {
@@ -49,8 +73,9 @@ export async function POST(req: NextRequest) {
       }
       pdfBuffer = await pdfResponse.arrayBuffer();
       console.log("[generate-legal-updates] PDF descargado, bytes:", pdfBuffer.byteLength);
-    } catch (err: any) {
-      const msg = err?.name === "TimeoutError" || err?.name === "AbortError"
+    } catch (err: unknown) {
+      const errName = getErrorName(err);
+      const msg = errName === "TimeoutError" || errName === "AbortError"
         ? "Tiempo de espera agotado al descargar el PDF"
         : "Error al descargar el PDF";
       console.error("[generate-legal-updates] error descargando PDF:", err);
@@ -70,10 +95,10 @@ export async function POST(req: NextRequest) {
       const data = await pdfParse(Buffer.from(pdfBuffer));
       pdfText = data.text?.trim() ?? "";
       console.log("[generate-legal-updates] texto extraído, caracteres:", pdfText.length, "páginas:", data.numpages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[generate-legal-updates] error en pdf-parse:", err);
       return NextResponse.json(
-        { error: `No se pudo extraer el texto del PDF: ${err?.message ?? "desconocido"}` },
+        { error: `No se pudo extraer el texto del PDF: ${getErrorMessage(err)}` },
         { status: 400 }
       );
     }
@@ -87,7 +112,7 @@ export async function POST(req: NextRequest) {
     // respecto al límite anterior (600,000 → 1,800,000) porque el modelo
     // puede con Gacetas mucho más grandes sin problema de contexto, y con
     // Fluid Compute tenemos hasta 300s reales para procesarlas.
-    const MAX_CHARS = 1_800_000;
+    const MAX_CHARS = 500_000;
     if (pdfText.length > MAX_CHARS) {
       console.error("[generate-legal-updates] texto excede MAX_CHARS:", pdfText.length);
       return NextResponse.json(
@@ -109,7 +134,7 @@ export async function POST(req: NextRequest) {
       response = await anthropic.messages.create(
         {
           model: "claude-sonnet-5",
-          max_tokens: 20000,
+          max_tokens: 12000,
           messages: [
             {
               role: "user",
@@ -140,10 +165,14 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
         { timeout: 250_000 }
       );
       console.log("[generate-legal-updates] respuesta de la IA recibida, stop_reason:", response.stop_reason, "tokens de salida:", response.usage?.output_tokens);
-    } catch (err: any) {
-      console.error("[generate-legal-updates] error llamando a la IA:", err?.status, err?.message, err);
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? (err as { status?: unknown }).status
+          : undefined;
+      console.error("[generate-legal-updates] error llamando a la IA:", status, getErrorMessage(err), err);
       return NextResponse.json(
-        { error: `Error al llamar a la IA: ${err?.message ?? "desconocido"}` },
+        { error: `Error al llamar a la IA: ${getErrorMessage(err)}` },
         { status: 502 }
       );
     }
@@ -151,7 +180,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
     const rawText = response.content[0].type === "text" ? response.content[0].text : "";
     console.log("[generate-legal-updates] largo de la respuesta de texto:", rawText.length, "primeros 300 caracteres:", rawText.slice(0, 300));
 
-    let updates: any[] = [];
+    let updates: GeneratedLegalUpdate[] = [];
     try {
       // Limpiar por si Claude agrega markdown
       const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -171,14 +200,15 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
 
     const created = [];
     for (const update of updates.slice(0, 6)) {
-      if (!update.title || !update.summary || !update.content || !update.type) {
+      const updateType = update.type ? parseLegalUpdateType(update.type) : null;
+      if (!update.title || !update.summary || !update.content || !updateType) {
         console.error(
           "[generate-legal-updates] actualización descartada por campos faltantes:",
           {
             hasTitle: !!update.title,
             hasSummary: !!update.summary,
             hasContent: !!update.content,
-            hasType: !!update.type,
+            hasType: !!updateType,
             rawUpdate: update,
           }
         );
@@ -198,7 +228,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
           slug,
           summary: update.summary,
           content: update.content,
-          type: update.type,
+          type: updateType,
           gacetaNumber: update.gacetaNumber || null,
           legalSource: update.legalSource || null,
           status: "draft",
@@ -211,15 +241,11 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
 
     return NextResponse.json({ created: created.length });
   } finally {
-    // El PDF de la Gaceta ya cumplió su función (se le extrajo el texto).
-    // Lo borramos de EdgeStore sin importar si el procesamiento tuvo éxito
-    // o falló, para no dejar archivos huérfanos ocupando storage. (Además,
-    // el upload en el modal ahora se marca como "temporary", así que aunque
-    // este borrado no llegue a correr, EdgeStore lo limpia solo en 24h.)
+    // El PDF temporal ya cumplió su función — borrarlo de Blob.
     try {
-      await backendClient.publicFiles.deleteFile({ url });
+      await del(url);
     } catch (err) {
-      console.error("No se pudo borrar el PDF de EdgeStore:", url, err);
+      console.error("No se pudo borrar el PDF temporal de Blob:", url, err);
     }
   }
 }

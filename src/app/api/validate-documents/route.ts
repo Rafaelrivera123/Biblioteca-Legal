@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
@@ -10,7 +11,29 @@ const anthropic = new Anthropic({
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+interface DocumentChange {
+  article_number?: number;
+  section?: string;
+  chapter?: string;
+  change_description?: string;
+  source?: string;
+}
+
+interface ValidationResult {
+  id: string;
+  name: string;
+  law_number: string | null;
+  slug: string | null;
+  updatedAt: Date;
+  up_to_date: boolean;
+  changes: DocumentChange[];
+  summary: string;
+}
+
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
+
   try {
     const documents = await prisma.document.findMany({
       where: { published: true },
@@ -54,10 +77,11 @@ export async function GET() {
           model: "claude-sonnet-4-5",
           max_tokens: 1024,
           tools: [
+            // Anthropic SDK Tool typings lag behind web_search tool support
             {
               type: "web_search_20250305",
               name: "web_search",
-            } as any,
+            } as unknown as Anthropic.Messages.Tool,
           ],
           messages: [
             {
@@ -86,14 +110,14 @@ Devuelve SOLO JSON válido:
 
         const textBlock = message.content.find((b) => b.type === "text");
 
-        let result = {
+        let result: ValidationResult = {
           id: doc.id,
           name: doc.name,
           law_number: doc.law_number,
           slug: doc.slug,
           updatedAt: doc.updatedAt,
           up_to_date: true,
-          changes: [] as any[],
+          changes: [],
           summary: "No se pudo analizar",
         };
 
@@ -113,7 +137,7 @@ Devuelve SOLO JSON válido:
         }
 
         results.push(result);
-      } catch (docError) {
+      } catch {
         results.push({
           id: doc.id,
           name: doc.name,

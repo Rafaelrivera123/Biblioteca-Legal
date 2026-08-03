@@ -1,4 +1,5 @@
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import { prisma } from "@/lib/db";
 import CollectionFilter from "./_components/collection-filter";
 import CollectionContainer from "./_components/collection-container";
@@ -60,10 +61,13 @@ const Page = async () => {
   ]);
 
   const initialData = {
+    success: true,
+    message: "Successfully retrieved documents",
     data: documents,
     meta: {
       totalPages: Math.ceil(totalCount / LIMIT),
-      total: totalCount,
+      totalCount,
+      pageSize: LIMIT,
       page: 1,
     },
   };
@@ -71,7 +75,7 @@ const Page = async () => {
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/86f8cacd-d2d6-42df-a1bd-569b2c5e047c.webp"
+        imageUrl={siteAssets.collectionsHero}
         title="Colección de Documentos Legales"
         description="Explore nuestra colección actualizada de leyes, decretos y documentos legales"
       />

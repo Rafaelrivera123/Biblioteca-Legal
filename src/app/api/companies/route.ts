@@ -1,9 +1,10 @@
-import { PrismaClient } from "@prisma/client";
+import { requireAdminSession } from "@/lib/admin-auth";
+import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
-
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   const { searchParams } = new URL(req.url);
 
   const searchQuery = searchParams.get("searchQuery") || "";

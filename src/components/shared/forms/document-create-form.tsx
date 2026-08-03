@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 
 import { createDocument, editDocument } from "@/actions/document/create";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ export function DocumentCreateForm({ initialData }: Props) {
   });
 
   const form = useForm<DocumentFormSchemaType>({
-    resolver: zodResolver(documentFormSchema),
+    resolver: zodResolver(documentFormSchema) as Resolver<DocumentFormSchemaType>,
     defaultValues: {
       categoryIds: [],
       short_description: initialData?.short_description ?? "",

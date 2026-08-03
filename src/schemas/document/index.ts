@@ -6,13 +6,12 @@ export const documentFormSchema = z.object({
     .string()
     .min(2, { message: "Document name must be at least 2 characters." })
     .max(100, { message: "Document name must not exceed 100 characters." }),
-  categoryIds: z.array(z.string()).optional().default([]),
+  categoryIds: z.array(z.string()).default([]),
   short_description: z
     .string()
     .max(145, { message: "Description must not exceed 145 characters." })
-    .optional()
     .default(""),
-  law_number: z.string().optional().default(""),
+  law_number: z.string().default(""),
   publishedDate: z.date().optional(),
 });
 

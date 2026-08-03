@@ -1,4 +1,4 @@
-// src/app/(dashboard)/dashboard/documents/import/page.tsx
+// src/app/dashboard/documents/import/page.tsx
 import DocumentImporter from "./_components/document-importer";
 
 const Page = () => {

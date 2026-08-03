@@ -30,8 +30,8 @@ export function GacetaRowActions({
           toast.success("Gaceta puesta de nuevo en la cola.");
           router.refresh();
         })
-        .catch((err: any) => {
-          toast.error(err?.message ?? "No se pudo reintentar.");
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "No se pudo reintentar.");
         });
     });
   }
@@ -44,8 +44,8 @@ export function GacetaRowActions({
           setConfirmDelete(false);
           router.refresh();
         })
-        .catch((err: any) => {
-          toast.error(err?.message ?? "No se pudo eliminar.");
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "No se pudo eliminar.");
         });
     });
   }

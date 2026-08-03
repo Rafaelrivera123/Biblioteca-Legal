@@ -1,16 +1,22 @@
+import { auth } from "@/auth";
+import { isAdminRequest } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * pageSize;
     const query = searchParams.get("search")?.toLowerCase().trim() || "";
     const category = searchParams.get("category") || undefined;
-    const isAdmin = searchParams.get("admin") === "true";
+    const isAdmin = isAdminRequest(
+      searchParams.get("admin") === "true",
+      session?.user?.role
+    );
     const isDefaultView = (!category || category === "all") && !query;
     if (query) {
       const likeQuery = `%${query}%`;
@@ -85,7 +91,7 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    const whereClause: any = {};
+    const whereClause: Prisma.DocumentWhereInput = {};
     if (!isAdmin) {
       whereClause.published = true;
     }

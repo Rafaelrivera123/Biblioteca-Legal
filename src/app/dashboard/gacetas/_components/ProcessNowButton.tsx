@@ -29,8 +29,8 @@ export function ProcessNowButton({ hasPending }: { hasPending: boolean }) {
           }
           router.refresh();
         })
-        .catch((err: any) => {
-          toast.error(err?.message ?? "Ocurrió un error procesando las Gacetas");
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "Ocurrió un error procesando las Gacetas");
         });
     });
   }

@@ -9,8 +9,7 @@
 
 export const SITE_NAME = "Biblioteca Legal HN";
 
-export const SITE_OG_IMAGE =
-  "https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp";
+export const SITE_OG_IMAGE = "/site/opengraph-image.webp";
 
 export const TITLE_MAX_LENGTH = 60;
 export const DESCRIPTION_MAX_LENGTH = 155;

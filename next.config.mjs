@@ -1,19 +1,12 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   experimental: {
-    // Por defecto Next.js limita el body de un Server Action a 1MB. Los PDF
-    // de La Gaceta suben directo a Neon (Postgres) vía Server Action, y
-    // fácilmente pesan varios MB, así que subimos el límite.
+    // Next.js defaults Server Action bodies to 1MB. Raise as a defensive
+    // measure for admin flows that post large JSON/HTML (content pages,
+    // document metadata). Binary uploads (Gaceta PDFs, avatars) bypass
+    // Server Actions via Vercel Blob client upload — see /api/gacetas/upload
+    // and /api/uploads. That does NOT remove Vercel's hard 4.5MB Function
+    // body limit on Route Handlers; Blob direct upload exists for that.
     serverActions: {
       bodySizeLimit: "25mb",
     },
@@ -21,44 +14,14 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        hostname: "files.edgestore.dev",
-        protocol: "https",
-      },
-      {
-        hostname: "res.cloudinary.com",
-        protocol: "https",
-      },
-      {
         hostname: "github.com",
         protocol: "https",
       },
+      {
+        hostname: "*.public.blob.vercel-storage.com",
+        protocol: "https",
+      },
     ],
-  },
-  async redirects() {
-    try {
-      const documents = await prisma.document.findMany({
-        where: {
-          oldSlug: { not: null },
-          slug: { not: null },
-          published: true,
-        },
-        select: {
-          slug: true,
-          oldSlug: true,
-        },
-      });
-
-      return documents.map((doc) => ({
-        source: `/collections/${doc.oldSlug}`,
-        destination: `/collections/${doc.slug}`,
-        permanent: true,
-      }));
-    } catch (error) {
-      console.error("Error generando redirects:", error);
-      return [];
-    } finally {
-      await prisma.$disconnect();
-    }
   },
 };
 

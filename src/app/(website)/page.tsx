@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { siteAssets } from "@/helper/assets";
 import HomeContact from "@/components/HomeContact";
 import OurServices from "@/components/OurServices";
 import PlatformStats from "@/components/PlatformStats";
@@ -68,7 +69,7 @@ export default async function Home() {
     <>
       <div className="h-screen md:h-[80vh] lg:h-screen w-full flex justify-start items-center relative overflow-hidden">
         <Image
-          src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/b878d4e8-03ef-4945-963b-b8f95ddbfb03.webp"
+          src={siteAssets.homeHero}
           alt="Biblioteca Jurídica Virtual Honduras"
           fill
           priority

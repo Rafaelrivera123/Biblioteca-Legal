@@ -1,4 +1,5 @@
 "use client";
+import { logoSrc } from "@/helper/assets";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Crown, Sparkles, Bookmark, MessageSquare, Scale } from "lucide-react";
@@ -17,7 +18,7 @@ const SubscribeModal = ({ open, onClose }: Props) => {
       <DialogContent className="max-w-sm text-center">
         <div className="flex justify-center mb-2">
           <Image
-            src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/logo.webp"
+            src={logoSrc}
             alt="Biblioteca Legal"
             width={70}
             height={70}

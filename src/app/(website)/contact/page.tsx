@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import CTA from "@/components/shared/sections/cta";
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import ContactForm from "./_components/contact-form.";
 
 const Page = async () => {
@@ -10,7 +11,7 @@ const Page = async () => {
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/6a97120d-8c08-4f98-97b9-a2d269864fc7.webp"
+        imageUrl={siteAssets.contactHero}
         title="Ponte en Contacto"
         description="Estamos aquí para ayudarte con cualquier pregunta sobre nuestros recursos legales"
       />

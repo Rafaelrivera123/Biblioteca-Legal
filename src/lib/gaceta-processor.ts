@@ -4,10 +4,8 @@ import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Mismo límite que usa /api/dashboard/generate-legal-updates: con
-// claude-sonnet-5 (1M tokens de contexto) esto ya no es el cuello de
-// botella real para una Gaceta individual.
-const MAX_CHARS = 1_800_000;
+// Balanced cost cap: enough for large Gacetas without unbounded Sonnet bills.
+const MAX_CHARS = 500_000;
 
 interface ReformArticleChange {
   gacetaNumber: string;
@@ -333,7 +331,7 @@ async function analyzeGacetaText(
       // se cortaba antes de cerrar el JSON, y JSON.parse reventaba con
       // "Unexpected end of JSON input" en vez de un error entendible. Se
       // sube el techo bastante para que eso deje de pasar en la práctica.
-      max_tokens: 64000,
+      max_tokens: 16000,
       messages: [
         {
           role: "user",
@@ -392,14 +390,16 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
   let response;
   try {
     response = await stream.finalMessage();
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Distinguimos el timeout (nombre "APIConnectionTimeoutError" en el SDK
     // de Anthropic, o mensaje que menciona "timed out") de otros errores de
     // red, para que el mensaje guardado en la Gaceta le diga al usuario
     // exactamente qué pasó y qué hacer, en vez de un error genérico.
+    const errName = err instanceof Error ? err.name : undefined;
+    const errMessage = err instanceof Error ? err.message : String(err);
     const isTimeout =
-      err?.name === "APIConnectionTimeoutError" ||
-      /timed? ?out/i.test(err?.message ?? "");
+      errName === "APIConnectionTimeoutError" ||
+      /timed? ?out/i.test(errMessage);
     if (isTimeout) {
       throw new Error(
         `El análisis con IA de la Gaceta ${gacetaNumber} no terminó a tiempo (más de 180s). Probablemente esta Gaceta trae demasiado contenido para analizarla de una sola vez. Vuelve a intentarlo con "Reintentar"; si sigue fallando, divide el PDF en partes más pequeñas y súbelas por separado.`
@@ -425,9 +425,9 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
     );
   }
 
-  let parsed: any;
+  let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned) as Record<string, unknown>;
   } catch {
     throw new Error(
       `La IA no devolvió JSON válido para la Gaceta ${gacetaNumber} (${cleaned.length} caracteres recibidos, stop_reason: ${response.stop_reason}).`
