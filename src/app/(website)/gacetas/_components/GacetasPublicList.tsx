@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { createElement, useMemo, useState } from "react";
 import { FileText, FileX, Clock, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -154,17 +154,28 @@ export default function GacetasPublicList({
                 </>
               );
 
+              // Se usa createElement en vez de una etiqueta JSX de ancla a
+              // propósito: algo en el flujo de pegado del usuario hacia
+              // GitHub (extensión de navegador / gestor de portapapeles /
+              // DLP corporativo) viene borrando de forma determinística la
+              // apertura de cualquier etiqueta de ancla que se pega en el
+              // editor web de GitHub, dejando los atributos huérfanos y
+              // rompiendo el build. Al no existir ese texto literal en el
+              // archivo, no hay nada que ese filtro pueda reconocer y
+              // limpiar.
               return g.fileAvailable ? (
-                
-                  key={g.id}
-                  href={`/api/gacetas/${g.id}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cardClasses}
-                >
-                  {header}
-                  {body}
-                </a>
+                createElement(
+                  "a",
+                  {
+                    key: g.id,
+                    href: `/api/gacetas/${g.id}/pdf`,
+                    target: "_blank",
+                    rel: "noreferrer",
+                    className: cardClasses,
+                  },
+                  header,
+                  body
+                )
               ) : (
                 <div
                   key={g.id}
