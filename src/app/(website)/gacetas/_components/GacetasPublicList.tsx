@@ -20,10 +20,17 @@ const PENDING_DESCRIPTION =
 const NO_CHANGES_DESCRIPTION =
   "No se identificaron cambios legales relevantes en esta edición.";
 
+// Antes esto solo miraba g.description cuando status === "processed", así
+// que una descripción guardada a mano (o generada con IA) en una Gaceta
+// todavía pendiente/en cola/fallida quedaba invisible en la tarjeta
+// pública — se mostraba siempre el mensaje genérico sin importar lo que
+// hubiera guardado el admin. El botón "Generar con IA" del dashboard
+// funciona precisamente para Gacetas sin procesar todavía (lee el PDF
+// directo), así que la descripción real debe tener prioridad siempre que
+// exista, sin importar el status.
 function getDescription(g: GacetaPublic): string {
-  if (g.status === "processed") {
-    return g.description ?? NO_CHANGES_DESCRIPTION;
-  }
+  if (g.description) return g.description;
+  if (g.status === "processed") return NO_CHANGES_DESCRIPTION;
   return PENDING_DESCRIPTION;
 }
 
@@ -141,7 +148,7 @@ export default function GacetasPublicList({
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {description}
                   </p>
-                  {!isProcessed && (
+                  {!isProcessed && !g.description && (
                     <span className="text-xs text-muted-foreground font-medium">
                       Pendiente de análisis
                     </span>
