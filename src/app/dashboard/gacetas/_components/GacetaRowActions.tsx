@@ -6,13 +6,18 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import AlertModal from "@/components/ui/alert-modal";
 import { deleteGaceta, retryGaceta } from "../actions";
+import { EditDescriptionButton } from "./EditDescriptionButton";
 
 export function GacetaRowActions({
   id,
+  number,
   status,
+  description,
 }: {
   id: string;
+  number: string;
   status: "pending" | "processing" | "processed" | "failed";
+  description: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -54,6 +59,7 @@ export function GacetaRowActions({
 
   return (
     <div className="flex items-center gap-2">
+      <EditDescriptionButton id={id} number={number} description={description} />
       {canRetry && (
         <button
           onClick={handleRetry}
