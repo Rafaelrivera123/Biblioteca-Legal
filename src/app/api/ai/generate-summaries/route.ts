@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
-  const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  const providedToken = authHeader?.replace(/^Bearer\s+/i, "").trim();
+  const isManual = !!cronSecret && providedToken === cronSecret;
 
   if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      Authorization: `Bearer ${cronSecret}`,
     },
     body: JSON.stringify(body),
   });
