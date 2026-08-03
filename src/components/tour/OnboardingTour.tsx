@@ -30,7 +30,7 @@ function waitForElement(selector: string, timeout = 8000): Promise<Element | nul
 export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const tourRef = useRef<any>(null);
+  const tourRef = useRef<{ complete: () => void } | null>(null);
   const startedRef = useRef(false);
 
   useEffect(() => {

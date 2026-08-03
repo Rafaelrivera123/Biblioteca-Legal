@@ -9,12 +9,11 @@ import { UserArticleMetaWithArticle } from "./notes-card";
 
 interface Props {
   meta: UserArticleMetaWithArticle;
-  index: number;
   documentSlug?: string | null;
   documentId?: string;
 }
 
-const NoteCard = ({ meta, index, documentSlug, documentId }: Props) => {
+const NoteCard = ({ meta, documentSlug, documentId }: Props) => {
   const [pending, startTransition] = useTransition();
   const queryClient = useQueryClient();
 

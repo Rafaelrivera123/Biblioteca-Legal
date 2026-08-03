@@ -4,10 +4,8 @@ import Navbar from "@/components/ui/navbar";
 import { prisma } from "@/lib/db";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import NextTopLoader from "nextjs-toploader";
-import { ReactNode, Suspense } from "react";
+import { ReactNode } from "react";
 import CookieBanner from "@/components/shared/cookie-banner";
-import dynamic from "next/dynamic";
-const OnboardingTour = dynamic(() => import("@/components/tour/OnboardingTour"), { ssr: false });
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;

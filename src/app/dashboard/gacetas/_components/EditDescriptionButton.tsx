@@ -52,8 +52,8 @@ export function EditDescriptionButton({
           setOpen(false);
           router.refresh();
         })
-        .catch((err: any) => {
-          toast.error(err?.message ?? "No se pudo guardar la descripción.");
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "No se pudo guardar la descripción.");
         });
     });
   }
@@ -70,8 +70,8 @@ export function EditDescriptionButton({
           setValue(res.description);
           toast.success("Descripción generada con IA. Revísala y dale Guardar.");
         })
-        .catch((err: any) => {
-          toast.error(err?.message ?? "No se pudo generar la descripción con IA.");
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "No se pudo generar la descripción con IA.");
         });
     });
   }

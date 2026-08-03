@@ -45,7 +45,6 @@ function hasUsedTrial(documentId: string): boolean {
 const LegalChatbot = ({
   documentName,
   documentId,
-  isLoggedin,
   hasSubscription,
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);

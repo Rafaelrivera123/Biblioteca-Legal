@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getQueryEmbedding } from "@/lib/embeddings";
 import {
-  SEARCH_HL_START,
-  SEARCH_HL_END,
   type SearchMode,
   type SearchDocumentResult,
   type SearchArticleResult,

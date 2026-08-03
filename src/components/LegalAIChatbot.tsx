@@ -19,7 +19,7 @@ interface Props {
 
 const DAILY_LIMIT = 20;
 
-const LegalAIChatbot = ({ isLoggedin, hasSubscription }: Props) => {
+const LegalAIChatbot = ({ hasSubscription }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);

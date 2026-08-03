@@ -54,10 +54,9 @@ const NotesCard = ({ document }: Props) => {
   } else {
     content = (
       <div className="space-y-4">
-        {data?.data.map((meta, i) => (
+        {data?.data.map((meta) => (
           <NoteCard
             key={meta.id}
-            index={i}
             meta={meta}
             documentSlug={document.slug}
             documentId={document.id}

@@ -5,13 +5,11 @@ import LegalAiClient from "./_components/legal-ai-client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  Scale,
   Sparkles,
   BookOpen,
   MessageSquare,
   FileText,
   CheckCircle,
-  ArrowRight,
 } from "lucide-react";
 
 export const metadata: Metadata = {

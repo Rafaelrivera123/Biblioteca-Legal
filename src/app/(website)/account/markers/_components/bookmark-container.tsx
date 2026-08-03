@@ -89,7 +89,7 @@ const BookmarkContainer = () => {
       <div className="pb-20 space-y-10">
         <div className="grid grid-cols-1 space-y-10">
           {groupDataByDocumentId.map((doc: GroupedByDocument) => {
-            const docHref = `/collections/${(doc.document as any).slug || doc.documentId}`;
+            const docHref = `/collections/${doc.document.slug || doc.documentId}`;
             return (
               <Card className="shadow-none" key={doc.documentId}>
                 <CardHeader>
@@ -112,8 +112,8 @@ const BookmarkContainer = () => {
                         key={bookmark.id}
                         articleId={bookmark.articleId}
                         metaId={bookmark.id}
-                        article={(bookmark as any).article}
-                        document={doc.document as any}
+                        article={bookmark.article}
+                        document={doc.document}
                       />
                     ))}
                   </CardContent>

@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    const whereClause: any = {};
+    const whereClause: Prisma.DocumentWhereInput = {};
     if (!isAdmin) {
       whereClause.published = true;
     }

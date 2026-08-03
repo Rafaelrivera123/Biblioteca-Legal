@@ -11,6 +11,25 @@ const anthropic = new Anthropic({
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+interface DocumentChange {
+  article_number?: number;
+  section?: string;
+  chapter?: string;
+  change_description?: string;
+  source?: string;
+}
+
+interface ValidationResult {
+  id: string;
+  name: string;
+  law_number: string | null;
+  slug: string | null;
+  updatedAt: Date;
+  up_to_date: boolean;
+  changes: DocumentChange[];
+  summary: string;
+}
+
 export async function GET() {
   const { error } = await requireAdminSession();
   if (error) return error;
@@ -61,7 +80,7 @@ export async function GET() {
             {
               type: "web_search_20250305",
               name: "web_search",
-            } as any,
+            },
           ],
           messages: [
             {
@@ -90,14 +109,14 @@ Devuelve SOLO JSON válido:
 
         const textBlock = message.content.find((b) => b.type === "text");
 
-        let result = {
+        let result: ValidationResult = {
           id: doc.id,
           name: doc.name,
           law_number: doc.law_number,
           slug: doc.slug,
           updatedAt: doc.updatedAt,
           up_to_date: true,
-          changes: [] as any[],
+          changes: [],
           summary: "No se pudo analizar",
         };
 
@@ -117,7 +136,7 @@ Devuelve SOLO JSON válido:
         }
 
         results.push(result);
-      } catch (docError) {
+      } catch {
         results.push({
           id: doc.id,
           name: doc.name,

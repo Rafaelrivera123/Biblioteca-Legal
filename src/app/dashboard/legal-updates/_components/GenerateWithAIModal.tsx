@@ -55,8 +55,8 @@ export function GenerateWithAIModal() {
       const data = await res.json();
       setResult({ created: data.created });
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message ?? "Ocurrió un error inesperado");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Ocurrió un error inesperado");
     } finally {
       setLoading(false);
       setLoadingMsg("");

@@ -26,6 +26,23 @@ function slugify(text: string): string {
     .replace(/-+/g, "-");
 }
 
+interface GeneratedLegalUpdate {
+  title?: string;
+  summary?: string;
+  content?: string;
+  type?: string;
+  gacetaNumber?: string;
+  legalSource?: string;
+}
+
+function getErrorName(err: unknown): string | undefined {
+  return err instanceof Error ? err.name : undefined;
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (session?.user?.role !== "admin") {
@@ -49,8 +66,9 @@ export async function POST(req: NextRequest) {
       }
       pdfBuffer = await pdfResponse.arrayBuffer();
       console.log("[generate-legal-updates] PDF descargado, bytes:", pdfBuffer.byteLength);
-    } catch (err: any) {
-      const msg = err?.name === "TimeoutError" || err?.name === "AbortError"
+    } catch (err: unknown) {
+      const errName = getErrorName(err);
+      const msg = errName === "TimeoutError" || errName === "AbortError"
         ? "Tiempo de espera agotado al descargar el PDF"
         : "Error al descargar el PDF";
       console.error("[generate-legal-updates] error descargando PDF:", err);
@@ -70,10 +88,10 @@ export async function POST(req: NextRequest) {
       const data = await pdfParse(Buffer.from(pdfBuffer));
       pdfText = data.text?.trim() ?? "";
       console.log("[generate-legal-updates] texto extraído, caracteres:", pdfText.length, "páginas:", data.numpages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[generate-legal-updates] error en pdf-parse:", err);
       return NextResponse.json(
-        { error: `No se pudo extraer el texto del PDF: ${err?.message ?? "desconocido"}` },
+        { error: `No se pudo extraer el texto del PDF: ${getErrorMessage(err)}` },
         { status: 400 }
       );
     }
@@ -140,10 +158,14 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
         { timeout: 250_000 }
       );
       console.log("[generate-legal-updates] respuesta de la IA recibida, stop_reason:", response.stop_reason, "tokens de salida:", response.usage?.output_tokens);
-    } catch (err: any) {
-      console.error("[generate-legal-updates] error llamando a la IA:", err?.status, err?.message, err);
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? (err as { status?: unknown }).status
+          : undefined;
+      console.error("[generate-legal-updates] error llamando a la IA:", status, getErrorMessage(err), err);
       return NextResponse.json(
-        { error: `Error al llamar a la IA: ${err?.message ?? "desconocido"}` },
+        { error: `Error al llamar a la IA: ${getErrorMessage(err)}` },
         { status: 502 }
       );
     }
@@ -151,7 +173,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
     const rawText = response.content[0].type === "text" ? response.content[0].text : "";
     console.log("[generate-legal-updates] largo de la respuesta de texto:", rawText.length, "primeros 300 caracteres:", rawText.slice(0, 300));
 
-    let updates: any[] = [];
+    let updates: GeneratedLegalUpdate[] = [];
     try {
       // Limpiar por si Claude agrega markdown
       const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
