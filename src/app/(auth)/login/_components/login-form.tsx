@@ -33,7 +33,11 @@ export default function LoginForm() {
   const [pending, startTransition] = useTransition();
   const [isMounted, setMounted] = useState(false);
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? undefined;
+  // Middleware uses callbackUrl; some links use redirectTo
+  const redirectTo =
+    searchParams.get("redirectTo") ??
+    searchParams.get("callbackUrl") ??
+    undefined;
 
   const router = useRouter();
 
@@ -63,20 +67,27 @@ export default function LoginForm() {
       .catch(() => "unknown");
 
     startTransition(() => {
-      loginAction({ data, userAgent, ipAddress: ip }).then((res) => {
-        if (!res?.success) {
-          toast.error(res?.message);
-          setIsLoading(false);
-          return;
-        } else {
-          setIsLoading(true);
-          if (res.role === "user") {
-            router.push(redirectTo ?? "/");
-          } else if (res.role === "admin") {
-            router.push(redirectTo ?? "/dashboard");
+      loginAction({ data, userAgent, ipAddress: ip })
+        .then((res) => {
+          if (!res?.success) {
+            toast.error(res?.message ?? "No se pudo iniciar sesión.");
+            setIsLoading(false);
+            return;
           }
-        }
-      });
+          const destination =
+            redirectTo && redirectTo.startsWith("/")
+              ? redirectTo
+              : res.role === "admin"
+                ? "/dashboard"
+                : "/";
+          router.push(destination);
+          router.refresh();
+        })
+        .catch((err) => {
+          console.error(err);
+          toast.error("Error al iniciar sesión. Intenta de nuevo.");
+          setIsLoading(false);
+        });
     });
   }
 

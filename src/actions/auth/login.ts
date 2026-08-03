@@ -3,7 +3,9 @@ import { signIn } from "@/auth";
 import { prisma } from "@/lib/db";
 import { loginFormSchema, LoginFormValues } from "@/schemas/auth";
 import bcrypt from "bcryptjs";
+import { AuthError } from "next-auth";
 import { cookies } from "next/headers";
+import { isRedirectError } from "next/dist/client/components/redirect";
 
 // Admin emails exempt from device limits (comma-separated in env)
 function getUnlimitedEmails(): string[] {
@@ -112,12 +114,21 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
       message: "Login successful.",
       role: user.role,
     };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Auth.js may throw a Next.js redirect on success — never swallow it.
+    if (isRedirectError(error)) throw error;
+
     console.error("Sign-in error:", error);
+    if (error instanceof AuthError) {
+      return {
+        success: false,
+        message: "No se pudo iniciar sesión. Verifica tus credenciales.",
+      };
+    }
     return {
       success: false,
-      message: error.message ?? "Something went wrong.",
+      message:
+        error instanceof Error ? error.message : "Something went wrong.",
     };
   }
 }

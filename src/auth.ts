@@ -4,6 +4,9 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Vercel / multi-host (www vs apex): trust the request host so session
+  // cookies are issued for the hostname the user actually visits.
+  trustHost: true,
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -35,5 +38,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 });
