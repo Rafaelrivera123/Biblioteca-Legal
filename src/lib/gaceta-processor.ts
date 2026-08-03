@@ -74,6 +74,48 @@ function truncateErrorMessage(message: string, maxLen = 800): string {
   return `…${message.slice(-maxLen)}`;
 }
 
+/**
+ * Une una lista de strings en español con comas y un "y" final, sin comilla
+ * de Oxford (ej. ["a", "b", "c"] -> "a, b y c"), para armar la descripción
+ * corta de la Gaceta en una sola oración legible.
+ */
+function joinSpanishList(parts: string[]): string {
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Arma un resumen corto (máx. 40 palabras) de qué contiene la Gaceta, a
+ * partir de las reformas/leyes nuevas/derogaciones que la IA identificó en
+ * `analyzeGacetaText`. Se guarda en `Gaceta.description` para mostrarlo en
+ * la tarjeta pública de /gacetas — el admin puede corregirlo a mano después
+ * desde /dashboard/gacetas si el resultado automático no queda claro.
+ *
+ * Devuelve null cuando el análisis no encontró ningún cambio relevante
+ * (Gaceta procesada pero sin actualizaciones), para que la UI pública
+ * pueda distinguir ese caso de "todavía no se ha analizado".
+ */
+function buildGacetaDescription(analysis: AnalysisResult): string | null {
+  const allItems: AnalysisItem[] = [
+    ...analysis.reforms,
+    ...analysis.newLaws,
+    ...analysis.repeals,
+  ];
+  if (allItems.length === 0) return null;
+
+  const parts = allItems.map((item) => {
+    if (item.type === "REFORM") return `reforma a ${item.lawName}`;
+    if (item.type === "NEW_LAW") return `la nueva ley "${item.lawName}"`;
+    return `la derogación de ${item.lawName}`;
+  });
+
+  const sentence = `Esta edición trae ${joinSpanishList(parts)}.`;
+  const words = sentence.trim().split(/\s+/);
+  if (words.length <= 40) return sentence;
+  return `${words.slice(0, 40).join(" ")}…`;
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -407,11 +449,12 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
  * procesar la misma Gaceta dos veces y una Gaceta con error no bloquea a
  * las demás.
  *
- * `maxGacetas` es opcional: el cron (weekly-update) no lo usa, así procesa
- * todo lo que le quepa en el tiempo. El botón "Procesar ahora" del
- * dashboard sí lo usa (con 5) para que cada click tenga un costo y un
- * tiempo de espera acotados y predecibles, en vez de vaciar de un jalón
- * una cola de 100+ Gacetas.
+ * `maxGacetas` es opcional: se usa desde el botón "Procesar ahora" del
+ * dashboard (con 5) para que cada click tenga un costo y un tiempo de
+ * espera acotados y predecibles, en vez de vaciar de un jalón una cola de
+ * 100+ Gacetas. Antes también corría sin este tope desde un cron
+ * automático (weekly-update), que se eliminó — el procesamiento ahora es
+ * 100% manual, solo por este botón.
  *
  * `maxDurationMs` solo controla cuándo dejar de EMPEZAR una Gaceta nueva —
  * no acota una Gaceta ya en curso. Por eso tiene que dejar margen real bajo
@@ -509,6 +552,7 @@ export async function processPendingGacetas(
           updatesCreated: createdCount,
           processedAt: new Date(),
           errorMessage: null,
+          description: buildGacetaDescription(analysis),
           // El PDF YA NO se borra tras procesar: ahora también se muestra
           // públicamente en /gacetas, así que tiene que quedarse disponible
           // para todos los usuarios, no solo mientras esté pendiente/failed.
