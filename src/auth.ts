@@ -1,42 +1,25 @@
-import { getUserByEmail, getUserById } from "@/helper/user";
-import { Role } from "@prisma/client";
+import { getUserByEmail } from "@/helper/user";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { authConfig } from "./auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // Vercel / multi-host (www vs apex): trust the request host so session
-  // cookies are issued for the hostname the user actually visits.
-  trustHost: true,
+  ...authConfig,
   providers: [
     Credentials({
       async authorize(credentials) {
-        if (!credentials) return null;
+        if (!credentials?.email) return null;
         const user = await getUserByEmail(credentials.email as string);
         if (!user) return null;
-        return user;
+        // Slim user for the JWT — no password hash.
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        };
       },
     }),
   ],
-  callbacks: {
-    async session({ session, token }) {
-      if (token.sub && session.user) {
-        session.user.id = token.sub;
-      }
-      if (session.user) {
-        session.user.role = token.role as Role;
-      }
-      return session;
-    },
-    async jwt({ token }) {
-      if (!token.sub) return token;
-      const data = await getUserById(token.sub);
-      if (!data) return token;
-      token.role = data.role;
-      return token;
-    },
-  },
-  session: {
-    strategy: "jwt",
-  },
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 });
