@@ -6,7 +6,9 @@ const ANTHROPIC_BATCH_URL = "https://api.anthropic.com/v1/messages/batches";
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
-  const isManual = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  const providedToken = authHeader?.replace(/^Bearer\s+/i, "").trim();
+  const isManual = !!cronSecret && providedToken === cronSecret;
 
   if (!isManual) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
