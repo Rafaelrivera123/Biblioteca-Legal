@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { prisma } from "@/lib/db";
 import { UploadGacetasModal } from "./_components/UploadGacetasModal";
 import { GacetaRowActions } from "./_components/GacetaRowActions";
@@ -81,15 +82,25 @@ const GacetasPage = async () => {
                 return (
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
+                      {/* createElement en vez de una etiqueta JSX de
+                          ancla: algo en el flujo de pegado del usuario
+                          hacia GitHub borra de forma determinística la
+                          apertura de cualquier etiqueta de ancla pegada en
+                          su editor web, dejando los atributos huérfanos y
+                          rompiendo el build. Sin ese texto literal en el
+                          archivo, no hay nada que ese filtro pueda
+                          limpiar. */}
                       {g.fileAvailable ? (
-                        
-                          href={`/api/dashboard/gacetas/${g.id}/pdf`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="hover:underline text-primary"
-                        >
-                          {g.number}
-                        </a>
+                        createElement(
+                          "a",
+                          {
+                            href: `/api/dashboard/gacetas/${g.id}/pdf`,
+                            target: "_blank",
+                            rel: "noreferrer",
+                            className: "hover:underline text-primary",
+                          },
+                          g.number
+                        )
                       ) : (
                         <span title="El PDF ya se borró tras procesarse">{g.number}</span>
                       )}
