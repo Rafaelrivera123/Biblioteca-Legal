@@ -30,6 +30,26 @@ function capWords(text: string, maxWords = 40): string {
 }
 
 /**
+ * Extrae la oración generada por la IA del bloque `<description>...
+ * </description>` que le pedimos en el prompt. Antes se usaba el texto
+ * completo de la respuesta tal cual, y en la práctica el modelo a veces
+ * agregaba una frase introductoria antes de la oración de verdad (ej. "De
+ * acuerdo a lo solicitado, aquí está la oración resumen:..."). Eso rompía
+ * dos cosas a la vez: la descripción quedaba con una introducción de
+ * relleno en vez de ir directo al contenido, y como `capWords` cuenta
+ * palabras sobre el texto completo, el recorte de 40 palabras se comía esa
+ * introducción y cortaba la oración real a mitad de camino (ej. terminaba
+ * en "...reglamento de…"). Pedirle a la IA que envuelva SOLO la oración en
+ * esas etiquetas, y quedarnos únicamente con lo que hay adentro, evita
+ * ambos problemas de raíz. Si por algún motivo la IA no usa las etiquetas,
+ * se cae de vuelta al texto completo tal cual.
+ */
+function extractDescriptionTag(rawText: string): string {
+  const match = rawText.match(/<description>([\s\S]*?)<\/description>/i);
+  return (match ? match[1] : rawText).trim();
+}
+
+/**
  * Registra en Neon (Postgres) una Gaceta cuyo PDF ya se subió directo del
  * navegador a Vercel Blob (ver /api/gacetas/upload y UploadGacetasModal).
  * El binario nunca llega a este Server Action — solo la URL que devolvió
@@ -148,11 +168,17 @@ export async function generateGacetaDescriptionAI(id: string): Promise<{ descrip
 
   let prompt: string;
 
+  // Se le pide a la IA que devuelva la oración envuelta en <description>
+  // ...</description> y NADA más — ver `extractDescriptionTag` arriba
+  // sobre por qué (evita frases introductorias que antes rompían tanto el
+  // formato como el recorte de 40 palabras).
+  const formatInstruction = `No agregues ninguna introducción, saludo, ni explicación de que estás cumpliendo la instrucción (nada de "De acuerdo a lo solicitado...", "Aquí está...", etc.). No uses viñetas, markdown ni comillas. Responde ÚNICAMENTE con este formato exacto, sin nada antes ni después: <description>tu oración aquí</description>`;
+
   if (updates.length > 0) {
     const list = updates
       .map((u, i) => `${i + 1}. [${u.type}] ${u.title} — ${u.summary}`)
       .join("\n");
-    prompt = `Eres un editor de contenido legal para Honduras. A partir de las actualizaciones legales que identificamos en La Gaceta N° ${gaceta.number}, escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma qué contiene esta edición para mostrarla en una tarjeta pública. No uses viñetas, markdown, comillas ni prefijos como "Resumen:". Responde ÚNICAMENTE con la oración.
+    prompt = `Eres un editor de contenido legal para Honduras. A partir de las actualizaciones legales que identificamos en La Gaceta N° ${gaceta.number}, escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma qué contiene esta edición para mostrarla en una tarjeta pública. ${formatInstruction}
 
 Actualizaciones identificadas:
 ${list}`;
@@ -162,7 +188,7 @@ ${list}`;
     const excerpt = fullText.slice(0, DESCRIPTION_FALLBACK_EXCERPT_CHARS);
     const truncatedNote =
       fullText.length > excerpt.length ? " (mostrado parcialmente por su extensión)" : "";
-    prompt = `Eres un editor de contenido legal para Honduras. Este es el texto de La Gaceta N° ${gaceta.number} (diario oficial de Honduras)${truncatedNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. No uses viñetas, markdown, comillas ni prefijos como "Resumen:". Responde ÚNICAMENTE con la oración.
+    prompt = `Eres un editor de contenido legal para Honduras. Este es el texto de La Gaceta N° ${gaceta.number} (diario oficial de Honduras)${truncatedNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${formatInstruction}
 
 Texto de la Gaceta:
 ${excerpt}`;
@@ -175,7 +201,12 @@ ${excerpt}`;
   });
 
   const block = response.content[0];
-  const text = block?.type === "text" ? block.text.trim() : "";
+  const rawText = block?.type === "text" ? block.text.trim() : "";
+  if (!rawText) {
+    throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
+  }
+
+  const text = extractDescriptionTag(rawText);
   if (!text) {
     throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
   }
