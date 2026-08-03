@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!isVercelCron && !isManual) {
     return NextResponse.json(
       {
-        error: "No autorizado",
+        error: "TEST-123-NUEVO",
         debug: {
           hasEnvSecret: !!cronSecret,
           envSecretLength: cronSecret?.length ?? 0,
