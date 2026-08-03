@@ -136,8 +136,12 @@ export async function updateGacetaDescription(id: string, description: string) {
 // necesitamos el análisis completo artículo por artículo para escribir una
 // sola oración de resumen general, así que basta con un extracto — esto
 // mantiene la llamada rápida y barata en vez de repetir el análisis
-// completo de `analyzeGacetaText`.
-const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 150_000;
+// completo de `analyzeGacetaText`. Bajado de 150,000 a 30,000: para
+// caracterizar de qué trata una Gaceta en una sola oración genérica, las
+// primeras ~30k caracteres (varias páginas de decretos/acuerdos) ya son de
+// sobra, sin pérdida de calidad detectada en la práctica, y corta el input
+// de esta llamada a una quinta parte.
+const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 30_000;
 
 /**
  * Genera con IA una descripción corta (≤40 palabras) de qué contiene una
@@ -194,8 +198,12 @@ Texto de la Gaceta:
 ${excerpt}`;
   }
 
+  // Tarea trivial (una sola oración de máximo 40 palabras): claude-sonnet-5
+  // es innecesariamente caro para esto. haiku-4-5 da el mismo resultado a
+  // una fracción del costo por token — mismo modelo que ya usa
+  // batch-create/route.ts para tareas igual de simples.
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-5",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 200,
     messages: [{ role: "user", content: prompt }],
   });
