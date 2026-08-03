@@ -43,14 +43,19 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 async function getGacetasWithContext() {
+  // Se listan TODAS las Gacetas subidas, sin importar su status — antes
+  // solo se traían las "processed", así que cualquier Gaceta pendiente,
+  // en cola o que falló al procesar simplemente no aparecía en /gacetas
+  // aunque ya estuviera subida y su PDF disponible para descargar.
   const gacetas = await prisma.gaceta.findMany({
-    where: { status: "processed" },
     orderBy: { number: "desc" },
     select: {
       id: true,
       number: true,
       uploadedAt: true,
       fileAvailable: true,
+      status: true,
+      description: true,
     },
   });
 
@@ -131,7 +136,8 @@ const GacetasPage = async () => {
             number: g.number,
             uploadedAt: g.uploadedAt.toISOString(),
             fileAvailable: g.fileAvailable,
-            updatesCount: updatesByGaceta.get(g.number)?.length ?? 0,
+            status: g.status,
+            description: g.description,
           }))}
         />
 
