@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
 import CollectionHeader from "./_components/collection-header";
@@ -15,11 +15,23 @@ import {
 } from "@/lib/seo";
 
 async function getDocument(id: string) {
-  return prisma.document.findFirst({
+  const byCurrent = await prisma.document.findFirst({
     where: {
       OR: [{ slug: id }, { id }],
     },
   });
+  if (byCurrent) {
+    return { document: byCurrent, shouldRedirect: false as const };
+  }
+
+  const byOldSlug = await prisma.document.findFirst({
+    where: { oldSlug: id, published: true },
+  });
+  if (byOldSlug) {
+    return { document: byOldSlug, shouldRedirect: true as const };
+  }
+
+  return null;
 }
 
 export async function generateMetadata({
@@ -27,10 +39,11 @@ export async function generateMetadata({
 }: {
   params: { id: string };
 }): Promise<Metadata> {
-  const document = await getDocument(params.id);
-  if (!document) {
+  const result = await getDocument(params.id);
+  if (!result) {
     return { title: "Documento no encontrado | Biblioteca Legal HN" };
   }
+  const document = result.document;
   const name = document.name.trim();
   const nameWithHonduras = name.toLowerCase().includes("honduras")
     ? name
@@ -87,8 +100,12 @@ export async function generateMetadata({
 const Page = async ({ params }: { params: { id: string } }) => {
   const cu = await auth();
   const isLoggedin = !!cu;
-  const document = await getDocument(params.id);
-  if (!document) notFound();
+  const result = await getDocument(params.id);
+  if (!result) notFound();
+  if (result.shouldRedirect && result.document.slug) {
+    redirect(`/collections/${result.document.slug}`);
+  }
+  const document = result.document;
 
   // Fire and forget - no bloquea el render
   prisma.document

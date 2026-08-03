@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Sparkles, UploadCloud, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEdgeStore } from "@/lib/edgestore";
+import { upload } from "@vercel/blob/client";
 
 export function GenerateWithAIModal() {
   const [open, setOpen] = useState(false);
@@ -21,7 +21,6 @@ export function GenerateWithAIModal() {
   const [result, setResult] = useState<{ created: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { edgestore } = useEdgeStore();
 
   function reset() {
     setFile(null);
@@ -35,14 +34,10 @@ export function GenerateWithAIModal() {
     setLoading(true);
     try {
       setLoadingMsg("Subiendo PDF...");
-      // Subimos como "temporary": si el procesamiento se corta por el límite
-      // de 60s de Vercel (o falla por cualquier otra razón), EdgeStore borra
-      // este archivo solo a las 24h aunque nuestro código nunca llegue a
-      // ejecutar su propia limpieza. Así el storage no se vuelve a llenar
-      // con PDFs huérfanos de intentos que se cortaron a la mitad.
-      const uploaded = await edgestore.publicFiles.upload({
-        file,
-        options: { temporary: true },
+      const uploaded = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/uploads",
+        clientPayload: JSON.stringify({ kind: "legal-update-pdf" }),
       });
 
       setLoadingMsg("Analizando con IA...");

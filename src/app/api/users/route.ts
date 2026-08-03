@@ -1,7 +1,10 @@
+import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query") || "";
   const page = parseInt(searchParams.get("page") || "1", 10);

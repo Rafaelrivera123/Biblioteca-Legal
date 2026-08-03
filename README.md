@@ -1,81 +1,44 @@
-# 📚 Biblioteca Legal
+# Biblioteca Legal
 
-![Thumbnail](https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp)
+Virtual Honduran law library: searchable statutes, document reader, highlights, subscriptions, Gaceta pipeline, and Legal AI chat.
 
-**Biblioteca Legal** is a virtual law library platform dedicated to organizing and providing access to a wide range of legal resources. It supports legal professionals, students, and researchers by offering a centralized hub of searchable statutes, case summaries, and legal references.
+Live: [bibliotecalegalhn.com](https://bibliotecalegalhn.com)
 
-🌐 **Live Site**: [https://bibliotecalegalhn.com](https://bibliotecalegalhn.com)
+## Stack
 
----
+- **Frontend**: Next.js 14 (App Router), React 18, Tailwind CSS
+- **Backend**: Next.js Route Handlers + Server Actions
+- **Database**: PostgreSQL (Neon) via Prisma + pgvector
+- **Hosting**: Vercel
+- **Storage**: `/public` static assets + Vercel Blob (PDFs, avatars)
+- **Auth**: NextAuth v5 (credentials + JWT)
+- **Payments**: Paddle
+- **Email**: Resend
+- **AI**: Anthropic (Gaceta extraction), OpenAI (embeddings), Groq (chat)
+- **Analytics**: Google Analytics
 
-## 🚀 Key Features
+## Getting started
 
-* **Structured & Searchable Legal Content** – Advanced search, categorized laws, and fast retrieval.
-* **Responsive Design** – Optimized for mobile, tablet, and desktop.
-* **Document Viewing** – Clean in-browser reader with zoom & navigation.
-* **Smart Reading Tool** – Save documents, highlight articles in color, bookmark sections, and add personal notes.
-* **Access Plans** – Individual and company subscriptions.
+```bash
+cp .env.example .env.local
+# fill in DATABASE_URL, AUTH_SECRET, API keys, etc.
+npm install
+npm run dev
+```
 
----
+Schema changes use explicit migrations — `postinstall` only runs `prisma generate`.
 
-## 🛠 Admin Panel
+## Scripts
 
-* Visitor activity tracking
-* User, document, company, and category management
-* Content publishing tools
-* Waitlist viewer for unpaid signups
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Local dev server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript check |
+| `npm run validate` | Prisma schema validate |
+| `npx tsx scripts/backfill-gaceta-pdf-to-blob.ts` | One-time legacy pdfData → Blob migration |
 
----
+## Deployment
 
-## 🖼️ Screenshots
-
-> _A few glimpses of the Biblioteca Legal platform:_
-
-| Home Page | Collections |
-|----------|---------------|
-| ![Home Screenshot](https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/opengraph-image.webp) | ![Collections Screenshot](https://files.edgestore.dev/ln9m9j3kr2yibrue/promotional/_public/collections%20page_p.webp) |
-
-> 📌 _You can add more screenshots as needed by uploading them and updating the URLs._
-
----
-
-## 🛠 Tech Stack
-
-- **Frontend**: Next.js, Tailwind CSS  
-- **Backend**: Node.js, Express.js  
-- **Database**: MongoDB  
-- **Storage**: Edge Store  
-- **Deployment**: Hostinger
-
----
-
-## 🤝 Contributors
-
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/monirhabderabby">
-        <img src="https://files.edgestore.dev/fo77r421j6yzhzmy/PortfolioV5/_public/profile%20photo.webp" width="100px;" alt="Monir Hossain Rabby"/>
-        <br /><sub><b>Monir Hossain Rabby</b></sub>
-      </a>
-      <br />🚀 Creator / Developer
-    </td>
-    <!-- Add more contributors below as needed -->
-  </tr>
-</table>
-
----
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 🙋‍♂️ Author
-
-**Monir Hossain Rabby**  
-GitHub: [@monirhabderabby](https://github.com/monirhabderabby)
-
-> This repository powers the official website of Biblioteca Legal:  
-> 📌 [https://bibliotecalegalhn.com](https://bibliotecalegalhn.com)
+Deploy on Vercel. Required env vars are listed in `.env.example`. Cron job (`vercel.json`) runs nightly article summaries at 02:00 UTC.

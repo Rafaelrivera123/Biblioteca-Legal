@@ -1,3 +1,4 @@
+import { siteAssets } from "@/helper/assets";
 import AddEmployeeModal from "@/components/shared/modals/add-company-employee-modal";
 import { Button } from "@/components/ui/button";
 import { User } from "@prisma/client";
@@ -25,10 +26,7 @@ const EmployeeContainer = ({ users, companyId }: Props) => {
         {users.map((item) => (
           <EmployeeCard
             key={item.id}
-            profileImage={
-              item.image ??
-              "https://files.edgestore.dev/ln9m9j3kr2yibrue/public/_public/08ce8d0c-d7ec-40bc-9beb-6972163e3e9b.jpg"
-            }
+            profileImage={item.image ?? siteAssets.employeePlaceholder}
             firstName={item.first_name}
             email={item.email}
             lastName={item.last_name}

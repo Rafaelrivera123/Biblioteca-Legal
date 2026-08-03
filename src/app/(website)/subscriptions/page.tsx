@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import CTA from "@/components/shared/sections/cta";
 import HeaderSection from "@/components/shared/sections/header";
 import { getCurrentUserSubscription } from "@/helper/subscription";
+import { siteAssets } from "@/helper/assets";
 import { prisma } from "@/lib/db";
 import PricingComparison from "./_components/pricing-plan";
 
@@ -25,13 +26,19 @@ const Page = async () => {
 
   const paddleCustomerId = userData?.paddleCustomerId ?? "";
   const userId = userData?.id ?? "";
-  const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN ?? "live_1c7d31d29e8a6cba0bb95bc7304";
-  const priceId = process.env.NEXT_PUBLIC_PRICE_ID ?? "pri_01jxccwd2cg20vw1ne8c46f5vd";
+  const paddleToken = process.env.NEXT_PUBLIC_PADDLE_TOKEN;
+  const priceId = process.env.NEXT_PUBLIC_PRICE_ID;
+
+  if (!paddleToken || !priceId) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_PADDLE_TOKEN or NEXT_PUBLIC_PRICE_ID environment variables."
+    );
+  }
 
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/subscription%20page.webp"
+        imageUrl={siteAssets.subscriptionPage}
         title="Nuestros Planes"
         description="Únete a nuestra plataforma para acceder a recursos legales actualizados"
       />

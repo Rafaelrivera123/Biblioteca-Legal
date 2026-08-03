@@ -4,10 +4,8 @@ import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Mismo límite que usa /api/dashboard/generate-legal-updates: con
-// claude-sonnet-5 (1M tokens de contexto) esto ya no es el cuello de
-// botella real para una Gaceta individual.
-const MAX_CHARS = 1_800_000;
+// Balanced cost cap: enough for large Gacetas without unbounded Sonnet bills.
+const MAX_CHARS = 500_000;
 
 interface ReformArticleChange {
   gacetaNumber: string;
@@ -333,7 +331,7 @@ async function analyzeGacetaText(
       // se cortaba antes de cerrar el JSON, y JSON.parse reventaba con
       // "Unexpected end of JSON input" en vez de un error entendible. Se
       // sube el techo bastante para que eso deje de pasar en la práctica.
-      max_tokens: 64000,
+      max_tokens: 16000,
       messages: [
         {
           role: "user",

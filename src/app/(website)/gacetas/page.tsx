@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 import Link from "next/link";
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import GacetasPublicList from "./_components/GacetasPublicList";
 import { buildSeoDescription, buildSeoTitle } from "@/lib/seo";
 
@@ -111,7 +112,7 @@ const GacetasPage = async () => {
         }}
       />
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/86f8cacd-d2d6-42df-a1bd-569b2c5e047c.webp"
+        imageUrl={siteAssets.collectionsHero}
         title="Gacetas Oficiales"
         description="Consulta y descarga los PDFs originales de La Gaceta de la República de Honduras"
       />

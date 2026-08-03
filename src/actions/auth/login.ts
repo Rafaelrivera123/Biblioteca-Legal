@@ -5,8 +5,14 @@ import { loginFormSchema, LoginFormValues } from "@/schemas/auth";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
-// Admin emails that never have device restrictions
-const UNLIMITED_EMAILS = ["rafariveras10@gmail.com"];
+// Admin emails exempt from device limits (comma-separated in env)
+function getUnlimitedEmails(): string[] {
+  const fromEnv = process.env.ADMIN_UNLIMITED_EMAILS ?? process.env.ADMIN_EMAIL ?? "";
+  return fromEnv
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
 const MAX_DEVICES = 2;
 
 interface Props {
@@ -47,7 +53,7 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
   }
 
   // 4. Handle device management
-  const isUnlimited = UNLIMITED_EMAILS.includes(parsedData.email);
+  const isUnlimited = getUnlimitedEmails().includes(parsedData.email.toLowerCase());
 
   const userDevices = await prisma.device.findMany({
     where: { userId: user.id },

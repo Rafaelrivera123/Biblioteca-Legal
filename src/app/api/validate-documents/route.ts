@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
@@ -11,6 +12,9 @@ const anthropic = new Anthropic({
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
+
   try {
     const documents = await prisma.document.findMany({
       where: { published: true },

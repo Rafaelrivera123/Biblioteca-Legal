@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { backendClient } from "@/lib/edgestore-server";
+import { del } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     // respecto al límite anterior (600,000 → 1,800,000) porque el modelo
     // puede con Gacetas mucho más grandes sin problema de contexto, y con
     // Fluid Compute tenemos hasta 300s reales para procesarlas.
-    const MAX_CHARS = 1_800_000;
+    const MAX_CHARS = 500_000;
     if (pdfText.length > MAX_CHARS) {
       console.error("[generate-legal-updates] texto excede MAX_CHARS:", pdfText.length);
       return NextResponse.json(
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       response = await anthropic.messages.create(
         {
           model: "claude-sonnet-5",
-          max_tokens: 20000,
+          max_tokens: 12000,
           messages: [
             {
               role: "user",
@@ -211,15 +211,11 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
 
     return NextResponse.json({ created: created.length });
   } finally {
-    // El PDF de la Gaceta ya cumplió su función (se le extrajo el texto).
-    // Lo borramos de EdgeStore sin importar si el procesamiento tuvo éxito
-    // o falló, para no dejar archivos huérfanos ocupando storage. (Además,
-    // el upload en el modal ahora se marca como "temporary", así que aunque
-    // este borrado no llegue a correr, EdgeStore lo limpia solo en 24h.)
+    // El PDF temporal ya cumplió su función — borrarlo de Blob.
     try {
-      await backendClient.publicFiles.deleteFile({ url });
+      await del(url);
     } catch (err) {
-      console.error("No se pudo borrar el PDF de EdgeStore:", url, err);
+      console.error("No se pudo borrar el PDF temporal de Blob:", url, err);
     }
   }
 }

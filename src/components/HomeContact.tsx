@@ -1,4 +1,5 @@
 import ContactForm from "@/app/(website)/contact/_components/contact-form.";
+import { siteAssets } from "@/helper/assets";
 import Image from "next/image";
 
 const HomeContact = () => {
@@ -7,7 +8,7 @@ const HomeContact = () => {
       {/* Izquierda: Imagen */}
       <div className="w-full max-w-[450px] lg:flex-shrink-0">
         <Image
-          src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/contactimg.webp"
+          src={siteAssets.contactImg}
           height={635}
           width={450}
           alt="Contacto"

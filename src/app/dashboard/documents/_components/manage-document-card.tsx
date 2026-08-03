@@ -25,8 +25,12 @@ import { useState } from "react";
 
 const ArticleReviewModal = dynamic(() => import("./article-review-modal"), { ssr: false });
 
+type DocumentWithCategories = Document & {
+  categories?: Array<{ id: string; name: string }>;
+};
+
 interface Props {
-  document?: Document;
+  document?: DocumentWithCategories;
 }
 
 const ManageDocumentCard = ({ document }: Props) => {
@@ -112,7 +116,7 @@ const ManageDocumentCard = ({ document }: Props) => {
             </span>
           </div>
           <div className="mt-[20px] flex flex-wrap gap-[10px] font-poppins font-normal">
-            {document?.categories.map(({ name, id }) => (
+            {document?.categories?.map(({ name, id }) => (
               <Badge className="font-light" key={id}>
                 {name}
               </Badge>

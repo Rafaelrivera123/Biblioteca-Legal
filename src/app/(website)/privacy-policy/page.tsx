@@ -1,5 +1,6 @@
 import ContentViewer from "@/app/dashboard/documents/[documentId]/[sectionId]/[chapterId]/_components/contentViwer";
 import HeaderSection from "@/components/shared/sections/header";
+import { siteAssets } from "@/helper/assets";
 import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 
@@ -25,7 +26,7 @@ const Page = async () => {
   return (
     <div>
       <HeaderSection
-        imageUrl="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/terms%20and%20condition.webp"
+        imageUrl={siteAssets.termsAndCondition}
         title="Política de Privacidad"
         description=""
       />

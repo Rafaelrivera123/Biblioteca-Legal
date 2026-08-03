@@ -1,4 +1,4 @@
-import { logoSrc } from "@/helper/assets";
+import { logoSrc, siteAssets } from "@/helper/assets";
 import { MoveLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,7 +10,7 @@ export default function LoginPage() {
       {/* Lado izquierdo - Imagen */}
       <div className="hidden lg:w-3/5 md:w-1/2 bg-gray-900 lg:block relative">
         <Image
-          src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/login%20page%20sidebar.webp"
+          src={siteAssets.loginSidebar}
           alt="Reunión de equipo"
           fill
           className="object-cover"

@@ -1,6 +1,7 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
+import { del } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -109,6 +110,17 @@ export async function retryGaceta(id: string) {
 
 export async function deleteGaceta(id: string) {
   await requireAdmin();
+  const gaceta = await prisma.gaceta.findUnique({
+    where: { id },
+    select: { pdfUrl: true },
+  });
+  if (gaceta?.pdfUrl) {
+    try {
+      await del(gaceta.pdfUrl);
+    } catch (err) {
+      console.error("[deleteGaceta] No se pudo borrar Blob:", gaceta.pdfUrl, err);
+    }
+  }
   await prisma.gaceta.delete({ where: { id } });
   revalidatePath("/dashboard/gacetas");
 }

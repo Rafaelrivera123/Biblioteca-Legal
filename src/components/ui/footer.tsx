@@ -1,6 +1,7 @@
 import { Facebook, Instagram, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { siteAssets } from "@/helper/assets";
 
 export default function Footer() {
   const quickLinks = [
@@ -25,7 +26,7 @@ export default function Footer() {
           <div className="lg:col-span-1">
             <div className="flex items-center mb-4">
               <Image
-                src="https://files.edgestore.dev/ln9m9j3kr2yibrue/staticFiled/_public/white%20logo.webp"
+                src={siteAssets.whiteLogo}
                 height={100}
                 width={100}
                 alt="Logo"
