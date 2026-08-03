@@ -10,25 +10,13 @@ export async function POST(req: NextRequest) {
   const isManual = !!cronSecret && providedToken === cronSecret;
 
   if (!isVercelCron && !isManual) {
-    return NextResponse.json(
-      {
-        error: "TEST-123-NUEVO",
-        debug: {
-          hasEnvSecret: !!cronSecret,
-          envSecretLength: cronSecret?.length ?? 0,
-          envSecretLast4: cronSecret?.slice(-4) ?? null,
-          hasAuthHeader: !!authHeader,
-          tokenLength: providedToken?.length ?? 0,
-          tokenLast4: providedToken?.slice(-4) ?? null,
-        },
-      },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
 
-  const res = await fetch(`${process.env.NEXTAUTH_URL}/api/ai/batch-create`, {
+  const origin = req.nextUrl.origin;
+  const res = await fetch(`${origin}/api/ai/batch-create`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
