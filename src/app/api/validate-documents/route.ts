@@ -77,10 +77,11 @@ export async function GET() {
           model: "claude-sonnet-4-5",
           max_tokens: 1024,
           tools: [
+            // Anthropic SDK Tool typings lag behind web_search tool support
             {
               type: "web_search_20250305",
               name: "web_search",
-            },
+            } as unknown as Anthropic.Messages.Tool,
           ],
           messages: [
             {

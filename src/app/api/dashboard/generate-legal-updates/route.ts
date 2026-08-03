@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { del } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
+import { LegalUpdateType } from "@prisma/client";
 
 // Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
 // hasta 300 segundos de duración máxima — no 60. (Corregido: antes decía 60
@@ -33,6 +34,12 @@ interface GeneratedLegalUpdate {
   type?: string;
   gacetaNumber?: string;
   legalSource?: string;
+}
+
+const LEGAL_UPDATE_TYPES = new Set<string>(Object.values(LegalUpdateType));
+
+function parseLegalUpdateType(value: string): LegalUpdateType | null {
+  return LEGAL_UPDATE_TYPES.has(value) ? (value as LegalUpdateType) : null;
 }
 
 function getErrorName(err: unknown): string | undefined {
@@ -193,14 +200,15 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
 
     const created = [];
     for (const update of updates.slice(0, 6)) {
-      if (!update.title || !update.summary || !update.content || !update.type) {
+      const updateType = update.type ? parseLegalUpdateType(update.type) : null;
+      if (!update.title || !update.summary || !update.content || !updateType) {
         console.error(
           "[generate-legal-updates] actualización descartada por campos faltantes:",
           {
             hasTitle: !!update.title,
             hasSummary: !!update.summary,
             hasContent: !!update.content,
-            hasType: !!update.type,
+            hasType: !!updateType,
             rawUpdate: update,
           }
         );
@@ -220,7 +228,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdow
           slug,
           summary: update.summary,
           content: update.content,
-          type: update.type,
+          type: updateType,
           gacetaNumber: update.gacetaNumber || null,
           legalSource: update.legalSource || null,
           status: "draft",
