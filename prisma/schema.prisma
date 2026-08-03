@@ -46,6 +46,12 @@ model Gaceta {
   status         GacetaStatus @default(pending)
   updatesCreated Int          @default(0)
   errorMessage   String?
+  // Resumen corto (máx. ~40 palabras) de qué contiene esta Gaceta, para
+  // mostrar en la tarjeta de /gacetas. Se genera automáticamente al
+  // procesar la Gaceta (ver gaceta-processor.ts) a partir de las reformas,
+  // leyes nuevas y derogaciones detectadas, pero el admin puede corregirlo
+  // a mano desde /dashboard/gacetas (ver updateGacetaDescription).
+  description    String?
   uploadedAt     DateTime     @default(now())
   processedAt    DateTime?
 }
