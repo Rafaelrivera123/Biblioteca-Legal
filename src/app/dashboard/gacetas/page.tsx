@@ -1,9 +1,10 @@
 import { createElement } from "react";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { UploadGacetasModal } from "./_components/UploadGacetasModal";
 import { GacetaRowActions } from "./_components/GacetaRowActions";
 import { ProcessNowButton } from "./_components/ProcessNowButton";
-import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 
 // Con Fluid Compute (activado por defecto en Vercel), el plan Hobby permite
 // hasta 300 segundos de duración — necesario porque "Procesar ahora" corre
@@ -18,13 +19,26 @@ const STATUS_CONFIG = {
   failed: { label: "Falló", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
 
-const GacetasPage = async () => {
+// El campo "number" es texto (ej. "37,169"), no numérico, así que un
+// orderBy de Prisma sobre ese campo ordenaría como string ("9,000" antes
+// que "37,169"). Se extraen solo los dígitos y se ordena en memoria.
+const parseGacetaNumber = (value: string) => {
+  const digits = value.replace(/[^\d]/g, "");
+  return digits ? parseInt(digits, 10) : 0;
+};
+
+const GacetasPage = async ({
+  searchParams,
+}: {
+  searchParams?: { sort?: string };
+}) => {
+  const sortDir: "asc" | "desc" = searchParams?.sort === "asc" ? "asc" : "desc";
+
   // No seleccionamos pdfData aquí a propósito: son bytes pesados que no
   // hacen falta para listar, y traerlos todos de una vez en cada carga de
   // esta página sería carísimo. Se leen aparte solo al abrir el PDF
   // (ver /api/dashboard/gacetas/[id]/pdf).
   const gacetas = await prisma.gaceta.findMany({
-    orderBy: { uploadedAt: "desc" },
     select: {
       id: true,
       number: true,
@@ -38,6 +52,12 @@ const GacetasPage = async () => {
       processedAt: true,
     },
   });
+
+  gacetas.sort((a, b) => {
+    const diff = parseGacetaNumber(a.number) - parseGacetaNumber(b.number);
+    return sortDir === "asc" ? diff : -diff;
+  });
+
   const hasPending = gacetas.some((g) => g.status === "pending");
 
   return (
@@ -67,7 +87,20 @@ const GacetasPage = async () => {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/50">
               <tr className="text-left">
-                <th className="px-4 py-3 font-medium">N° Gaceta</th>
+                <th className="px-4 py-3 font-medium">
+                  <Link
+                    href={`/dashboard/gacetas?sort=${sortDir === "asc" ? "desc" : "asc"}`}
+                    className="inline-flex items-center gap-1 hover:text-primary"
+                    title={sortDir === "asc" ? "Ordenar descendente" : "Ordenar ascendente"}
+                  >
+                    N° Gaceta
+                    {sortDir === "asc" ? (
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    )}
+                  </Link>
+                </th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium">Actualizaciones</th>
                 <th className="px-4 py-3 font-medium">Subida</th>
