@@ -265,7 +265,7 @@ function buildPostFromItem(
  * descargan de ahí; las subidas antes de ese cambio todavía pueden tener
  * `pdfData` (bytea en Neon) como fallback.
  */
-async function loadGacetaPdfBuffer(
+export async function loadGacetaPdfBuffer(
   pdfUrl: string | null,
   pdfData: Uint8Array | Buffer | null
 ): Promise<Buffer> {
@@ -287,7 +287,7 @@ async function loadGacetaPdfBuffer(
   );
 }
 
-async function extractPdfText(pdfData: Buffer): Promise<string> {
+export async function extractPdfText(pdfData: Buffer): Promise<string> {
   const pdfParse = (await import("pdf-parse")).default;
   const data = await pdfParse(pdfData);
   const text = data.text?.trim() ?? "";
