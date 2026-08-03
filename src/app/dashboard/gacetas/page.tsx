@@ -32,6 +32,7 @@ const GacetasPage = async () => {
       status: true,
       updatesCreated: true,
       errorMessage: true,
+      description: true,
       uploadedAt: true,
       processedAt: true,
     },
@@ -81,7 +82,7 @@ const GacetasPage = async () => {
                   <tr key={g.id} className="border-t">
                     <td className="px-4 py-3 font-medium">
                       {g.fileAvailable ? (
-                        <a
+                        
                           href={`/api/dashboard/gacetas/${g.id}/pdf`}
                           target="_blank"
                           rel="noreferrer"
@@ -115,7 +116,12 @@ const GacetasPage = async () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end">
-                        <GacetaRowActions id={g.id} status={g.status} />
+                        <GacetaRowActions
+                          id={g.id}
+                          number={g.number}
+                          status={g.status}
+                          description={g.description}
+                        />
                       </div>
                     </td>
                   </tr>
