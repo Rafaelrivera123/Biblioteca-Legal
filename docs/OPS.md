@@ -34,4 +34,8 @@
 ## Vendors cancelled
 
 - EdgeStore — static assets in `/public/site`, uploads on Vercel Blob.
-- Vercel Analytics / Speed Insights — GA only.
+
+## Analytics
+
+- Vercel Web Analytics via `@vercel/analytics` in `src/app/layout.tsx` (enable in Vercel project → Analytics).
+- Google Analytics via `GOOGLE_ANALYTICS_ID` in the website layout.

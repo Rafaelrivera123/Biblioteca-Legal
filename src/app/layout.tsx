@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { SITE_OG_IMAGE } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import AppProvider from "@/provider/AppProvider";
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Poppins, Raleway } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
@@ -82,6 +83,7 @@ export default function RootLayout({
         <AppProvider>{children}</AppProvider>
         <Toaster richColors position="bottom-right" />
         <NextTopLoader showSpinner={false} color="#1E2A38" />
+        <Analytics />
       </body>
     </html>
   );
