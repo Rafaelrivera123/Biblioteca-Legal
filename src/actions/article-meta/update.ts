@@ -1,14 +1,14 @@
 "use server";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db"; // Your Prisma client
+import { prisma } from "@/lib/db";
 
 interface UpdateMetaInput {
   articleId: string;
-  selectedColor?: string;
+  selectedColor?: string | null;
   isBookmarked?: boolean;
   comment?: string;
-  documentId: string; // Optional, if you want to associate with a document
+  documentId: string;
 }
 
 export async function updateArticleMeta({
@@ -20,8 +20,8 @@ export async function updateArticleMeta({
 }: UpdateMetaInput) {
   const session = await auth();
 
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("Unauthorized");
+  if (!session?.user?.id) {
+    return { success: false, message: "No autorizado." };
   }
 
   const userId = session.user.id;
@@ -70,27 +70,70 @@ interface RemoveBookmarkInput {
 export async function removeBookmark({ metaId }: RemoveBookmarkInput) {
   const session = await auth();
 
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("Unauthorized");
+  if (!session?.user?.id) {
+    return { success: false, message: "No autorizado." };
   }
 
   try {
-    const updatedMeta = await prisma.userArticleMeta.delete({
-      where: {
-        id: metaId,
-      },
+    const existing = await prisma.userArticleMeta.findFirst({
+      where: { id: metaId, userId: session.user.id },
+    });
+
+    if (!existing) {
+      return { success: false, message: "Marcador no encontrado." };
+    }
+
+    // Clear bookmark flag but keep notes/highlights on the same row
+    const updatedMeta = await prisma.userArticleMeta.update({
+      where: { id: metaId },
+      data: { isBookmarked: false },
     });
 
     return {
       success: true,
-      message: "Bookmark removed successfully.",
+      message: "Marcador eliminado correctamente.",
       data: updatedMeta,
     };
   } catch (error) {
     console.error("Failed to remove bookmark:", error);
     return {
       success: false,
-      message: "Failed to remove bookmark.",
+      message: "No se pudo eliminar el marcador.",
+    };
+  }
+}
+
+export async function removeHighlight({ metaId }: RemoveBookmarkInput) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, message: "No autorizado." };
+  }
+
+  try {
+    const existing = await prisma.userArticleMeta.findFirst({
+      where: { id: metaId, userId: session.user.id },
+    });
+
+    if (!existing) {
+      return { success: false, message: "Resaltado no encontrado." };
+    }
+
+    const updatedMeta = await prisma.userArticleMeta.update({
+      where: { id: metaId },
+      data: { selectedColor: null },
+    });
+
+    return {
+      success: true,
+      message: "Resaltado eliminado correctamente.",
+      data: updatedMeta,
+    };
+  } catch (error) {
+    console.error("Failed to remove highlight:", error);
+    return {
+      success: false,
+      message: "No se pudo eliminar el resaltado.",
     };
   }
 }
@@ -98,30 +141,34 @@ export async function removeBookmark({ metaId }: RemoveBookmarkInput) {
 export async function removeNotes({ metaId }: RemoveBookmarkInput) {
   const session = await auth();
 
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("Unauthorized");
+  if (!session?.user?.id) {
+    return { success: false, message: "No autorizado." };
   }
 
   try {
+    const existing = await prisma.userArticleMeta.findFirst({
+      where: { id: metaId, userId: session.user.id },
+    });
+
+    if (!existing) {
+      return { success: false, message: "Nota no encontrada." };
+    }
+
     const updatedMeta = await prisma.userArticleMeta.update({
-      where: {
-        id: metaId,
-      },
-      data: {
-        comment: "",
-      },
+      where: { id: metaId },
+      data: { comment: "" },
     });
 
     return {
       success: true,
-      message: "Notes removed successfully.",
+      message: "Nota eliminada correctamente.",
       data: updatedMeta,
     };
   } catch (error) {
     console.error("Failed to remove notes:", error);
     return {
       success: false,
-      message: "Failed to remove notes.",
+      message: "No se pudo eliminar la nota.",
     };
   }
 }

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { Metadata } from "next";
@@ -120,21 +121,10 @@ const Page = async ({ params }: { params: { id: string } }) => {
   if (cu?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: cu.user.id },
-      select: {
-        role: true,
-        userSubscription: {
-          select: { isActive: true, currentPeriodEnd: true },
-        },
-      },
+      select: { role: true },
     });
-    if (user?.role === "admin") {
-      hasSubscription = true;
-    } else {
-      hasSubscription = !!(
-        user?.userSubscription?.isActive &&
-        new Date(user.userSubscription.currentPeriodEnd) > new Date()
-      );
-    }
+    hasSubscription =
+      user?.role === "admin" || (await isSubscribed());
   }
 
   // El texto completo del documento (secciones, capítulos y artículos) se
@@ -217,7 +207,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
       />
       <CollectionHeader
         document={document}
-        hasFullAccess={true}
+        hasFullAccess={hasSubscription}
         isLoggedin={isLoggedin}
       />
       <ArticleContainer

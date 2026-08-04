@@ -26,6 +26,15 @@ export default function RegistrationForm() {
 
   const form = useForm<RegistrationSchemaType>({
     resolver: zodResolver(registrationSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      terms: false as unknown as true,
+      promotion: true,
+    },
   });
 
   function onSubmit(values: RegistrationSchemaType) {

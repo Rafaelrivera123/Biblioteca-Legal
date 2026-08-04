@@ -58,7 +58,7 @@ export async function sendOtp(email: string) {
     await resend.emails.send({
       from: "Biblioteca Legal <support@bibliotecalegalhn.com>",
       to: [nuevaSolicitud.email as string],
-      subject: `Tu código OTP para restablecer la contraseña: [${nuevaSolicitud.otp}]`,
+      subject: "Código para restablecer tu contraseña",
       react: OtpEmail({
         otpCode: nuevaSolicitud.otp.toString(),
       }),

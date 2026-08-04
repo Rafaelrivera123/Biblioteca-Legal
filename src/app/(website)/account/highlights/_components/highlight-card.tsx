@@ -1,4 +1,4 @@
-import { removeBookmark } from "@/actions/article-meta/update";
+import { removeHighlight } from "@/actions/article-meta/update";
 import ContentViewer from "@/app/dashboard/documents/[documentId]/[sectionId]/[chapterId]/_components/contentViwer";
 import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getBackgroundClass } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 import { Article } from "@prisma/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bookmark, ExternalLink, Loader2, Trash } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Bookmark, ExternalLink, Trash } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -21,55 +21,39 @@ interface Props {
   isBookmarked: boolean;
   documentSlug?: string | null;
   documentId?: string;
+  article: Article;
 }
 
-interface ApiProps {
-  success: boolean;
-  data: Article;
-  message?: string;
-}
-
-const HighlightCard = ({ articleId, metaId, selectedColor, isBookmarked, documentSlug, documentId }: Props) => {
+const HighlightCard = ({
+  articleId,
+  metaId,
+  selectedColor,
+  isBookmarked,
+  documentSlug,
+  documentId,
+  article,
+}: Props) => {
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [contentOpen, setContentOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<ApiProps>({
-    queryKey: ["meta", articleId],
-    queryFn: () => fetch(`/api/article/${articleId}`).then((res) => res.json()),
-  });
-
-  const displayLabel = data?.data?.articleLabel ?? String(data?.data?.articleNumber ?? "");
+  const displayLabel = article.articleLabel ?? String(article.articleNumber ?? "");
   const docHref = `/collections/${documentSlug || documentId}`;
 
-  const onRemoveBookmark = () => {
+  const onRemoveHighlight = () => {
     startTransition(() => {
-      removeBookmark({ metaId }).then((res) => {
+      removeHighlight({ metaId }).then((res) => {
         if (!res.success) {
           toast.error(res.message || "Error al eliminar");
           return;
         }
         toast.success("Resaltado eliminado");
         setOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["markers"] });
-        queryClient.invalidateQueries({ queryKey: ["meta", articleId] });
+        queryClient.invalidateQueries({ queryKey: ["highlights"] });
       });
     });
   };
-
-  let content;
-  if (isLoading) {
-    content = (
-      <div className="min-h-[100px] flex items-center justify-center">
-        <Loader2 className="animate-spin opacity-70" />
-      </div>
-    );
-  } else if (!data?.data) {
-    content = <div className="text-gray-500 p-4">Artículo no encontrado.</div>;
-  } else {
-    content = <ContentViewer content={data.data.content} />;
-  }
 
   return (
     <>
@@ -102,7 +86,10 @@ const HighlightCard = ({ articleId, metaId, selectedColor, isBookmarked, documen
               <Button
                 variant="link"
                 className="hover:text-red-500"
-                onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(true);
+                }}
               >
                 <Trash size={16} />
               </Button>
@@ -111,7 +98,12 @@ const HighlightCard = ({ articleId, metaId, selectedColor, isBookmarked, documen
         </div>
       </div>
 
-      <AlertModal loading={pending} isOpen={open} onClose={() => setOpen(false)} onConfirm={onRemoveBookmark} />
+      <AlertModal
+        loading={pending}
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        onConfirm={onRemoveHighlight}
+      />
 
       <ResponsiveDialog
         open={contentOpen}
@@ -120,7 +112,7 @@ const HighlightCard = ({ articleId, metaId, selectedColor, isBookmarked, documen
         description=""
       >
         <ScrollArea className="min-h-[200px] h-auto lg:max-h-[400px]">
-          {content}
+          <ContentViewer content={article.content} />
         </ScrollArea>
       </ResponsiveDialog>
     </>

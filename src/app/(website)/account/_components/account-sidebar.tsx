@@ -1,11 +1,11 @@
 "use client";
+import { logoutAction } from "@/actions/auth/logout";
 import AlertModal from "@/components/ui/alert-modal";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
-import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { accountTablists } from "./data";
 
 interface Props {
@@ -14,22 +14,24 @@ interface Props {
 
 const AccountSidebar = ({ onTabClick }: Props) => {
   const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const pathname = usePathname();
 
   const onLogout = () => {
-    setIsLoading(true);
-    signOut({
-      redirectTo: "/",
+    startTransition(() => {
+      logoutAction()
+        .then(() => {
+          router.push("/");
+          router.refresh();
+        })
+        .catch(() => {
+          router.push("/");
+          router.refresh();
+        });
     });
   };
 
-  useEffect(() => {
-    return () => {
-      setIsLoading(false);
-    };
-  }, []);
   return (
     <div className=" h-full">
       <div className="flex h-full max-h-screen flex-col gap-2 ">
@@ -48,9 +50,6 @@ const AccountSidebar = ({ onTabClick }: Props) => {
                 href={tab.path}
                 onClick={onTabClick && onTabClick}
               >
-                {/* <div className="border rounded-lg border-gray-400 p-1 bg-white">
-                  {tab.icon}
-                </div> */}
                 {tab.linkText}
               </Link>
             ))}
@@ -72,7 +71,7 @@ const AccountSidebar = ({ onTabClick }: Props) => {
         isOpen={open}
         onClose={() => setOpen(false)}
         onConfirm={onLogout}
-        loading={isLoading}
+        loading={pending}
         title="¿Estás seguro que quieres cerrar sesión?"
         message=""
       />

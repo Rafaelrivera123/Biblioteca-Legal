@@ -21,6 +21,7 @@ type OTPSchemaType = z.infer<typeof otpSchema>;
 interface Props {
   otpId: string;
 }
+
 const OTPForm = ({ otpId }: Props) => {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -31,6 +32,14 @@ const OTPForm = ({ otpId }: Props) => {
     },
   });
 
+  const otpValue = form.watch("otp");
+
+  const setOtpDigit = (index: number, digit: string) => {
+    const digits = otpValue.padEnd(6, " ").split("");
+    digits[index] = digit;
+    form.setValue("otp", digits.join("").replace(/ /g, ""));
+  };
+
   const handleSubmit = (values: OTPSchemaType) => {
     startTransition(() => {
       verifyOTP(otpId, Number(values.otp)).then((res) => {
@@ -38,8 +47,6 @@ const OTPForm = ({ otpId }: Props) => {
           toast.error(res.message);
           return;
         }
-
-        // manejar éxito
         router.push(`/reset-request/otp/${otpId}/reset-now`);
       });
     });
@@ -57,44 +64,46 @@ const OTPForm = ({ otpId }: Props) => {
               key={i}
               id={`otp-input-${i}`}
               type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
               maxLength={1}
-              value={form.watch("otp")[i] || ""}
+              value={otpValue[i] || ""}
               onChange={(e) => {
                 form.clearErrors("otp");
-                const value = e.target.value;
-                if (!/^[0-9]*$/.test(value)) return;
+                const value = e.target.value.replace(/\D/g, "");
+                if (!value) {
+                  setOtpDigit(i, "");
+                  return;
+                }
 
-                const currentOtp = form.getValues("otp");
-                const updatedOtp =
-                  currentOtp.substring(0, i) +
-                  value.slice(-1) +
-                  currentOtp.substring(i + 1);
+                const digit = value.slice(-1);
+                const digits = otpValue.padEnd(6, " ").split("");
+                digits[i] = digit;
+                const next = digits.join("").replace(/ /g, "");
+                form.setValue("otp", next);
 
-                form.setValue("otp", updatedOtp);
-
-                // Mover el foco al siguiente input
-                if (value && i < 5) {
-                  const nextInput = document.getElementById(
-                    `otp-input-${i + 1}`
-                  );
+                if (i < 5) {
+                  const nextInput = document.getElementById(`otp-input-${i + 1}`);
                   if (nextInput) (nextInput as HTMLInputElement).focus();
                 }
               }}
               onKeyDown={(e) => {
-                // Manejar la tecla Backspace para enfocar el input anterior
-                if (e.key === "Backspace" && !form.watch("otp")[i] && i > 0) {
-                  const prevInput = document.getElementById(
-                    `otp-input-${i - 1}`
-                  );
-                  if (prevInput) {
-                    (prevInput as HTMLInputElement).focus();
-                    const currentOtp = form.getValues("otp");
-                    const updatedOtp =
-                      currentOtp.substring(0, i - 1) +
-                      " " + // Limpiar el valor del input anterior si es necesario
-                      currentOtp.substring(i);
-                    form.setValue("otp", updatedOtp.trim());
-                  }
+                if (e.key !== "Backspace") return;
+                e.preventDefault();
+
+                if (otpValue[i]) {
+                  const digits = otpValue.split("");
+                  digits[i] = "";
+                  form.setValue("otp", digits.join("").replace(/\s/g, ""));
+                  return;
+                }
+
+                if (i > 0) {
+                  const digits = otpValue.split("");
+                  digits[i - 1] = "";
+                  form.setValue("otp", digits.join("").replace(/\s/g, ""));
+                  const prevInput = document.getElementById(`otp-input-${i - 1}`);
+                  if (prevInput) (prevInput as HTMLInputElement).focus();
                 }
               }}
               className={`!text-[30px] text-[#4E4E4E] !font-medium !leading-[45px] w-[43.83px] 
@@ -103,28 +112,13 @@ const OTPForm = ({ otpId }: Props) => {
               ${
                 form.formState.errors.otp
                   ? "bg-red-200/50 border-red-500/50"
-                  : form.watch("otp")[i]
+                  : otpValue[i]
                     ? "border-primary "
                     : "border-[#121D42] bg-white"
               }`}
             />
           ))}
         </div>
-        {/* <div className="flex items-center justify-between mt-4">
-          <span className="text-base text-[#444444] font-normal leading-[19.2px]">
-            ¿No recibiste el OTP?
-          </span>
-          <Button
-            type="button"
-            variant="link"
-            className="text-gradient text-base font-normal leading-[19.2px] disabled:opacity-80 disabled:text-gray-500"
-            onClick={() => {
-              //   resendOtp({ email: email });
-            }}
-          >
-            {true ? `Reenviar en ${15}s` : "Reenviar"}
-          </Button>
-        </div> */}
         <Button
           type="submit"
           className="w-full min-h-[45px]"

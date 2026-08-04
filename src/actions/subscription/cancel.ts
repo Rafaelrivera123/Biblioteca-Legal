@@ -33,23 +33,14 @@ export async function cancelSubscriptionAction() {
   const paddleRes = await paddle.subscriptions.cancel(subId);
 
   if (paddleRes) {
-    // eliminar suscripción de la base de datos
-    await prisma.userSubscription.update({
-      where: {
-        id: sub.id,
-      },
-      data: {
-        isActive: false,
-        currentPeriodEnd: new Date(),
-      },
-    });
-
+    // Keep access until the paid period ends. Paddle webhook will
+    // deactivate the subscription when the period actually ends.
     revalidatePath("/account");
 
     return {
       success: true,
       message:
-        "Tu suscripción ha sido cancelada exitosamente. Ya no se te cobrará.",
+        "Tu suscripción ha sido cancelada. Conservarás el acceso hasta el final del período actual.",
     };
   }
 

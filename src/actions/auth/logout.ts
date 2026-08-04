@@ -31,8 +31,8 @@ export async function logoutAction() {
   // Remove device_id cookie (optional)
   cookies().delete("device_id");
 
-  // Invalidate session (assuming NextAuth)
-  await signOut(); // or `signOut({ redirect: false })` if used inside server action
+  // Invalidate session without forcing a server redirect from the action
+  await signOut({ redirect: false });
 
   return { success: true, message: "Logged out successfully." };
 }

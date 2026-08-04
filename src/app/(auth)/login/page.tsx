@@ -2,12 +2,26 @@ import { auth } from "@/auth";
 import { logoSrc, siteAssets } from "@/helper/assets";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import LoginForm from "./_components/login-form";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { redirectTo?: string; callbackUrl?: string };
+}) {
   const cu = await auth();
 
-  if (!!cu) redirect("/");
+  if (cu) {
+    const destination =
+      searchParams?.redirectTo?.startsWith("/")
+        ? searchParams.redirectTo
+        : searchParams?.callbackUrl?.startsWith("/")
+          ? searchParams.callbackUrl
+          : "/";
+    redirect(destination);
+  }
+
   return (
     <div className="flex min-h-screen">
       {/* Lado izquierdo - Imagen */}
@@ -41,7 +55,9 @@ export default async function LoginPage() {
           </div>
 
           {/* Componente de formulario de inicio de sesión */}
-          <LoginForm />
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
         </div>
       </div>
     </div>

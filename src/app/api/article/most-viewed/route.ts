@@ -29,7 +29,7 @@ const getMostViewedArticles = unstable_cache(
               select: {
                 id: true,
                 document: {
-                  select: { id: true, name: true },
+                  select: { id: true, name: true, slug: true },
                 },
               },
             },

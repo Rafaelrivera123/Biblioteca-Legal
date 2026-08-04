@@ -16,6 +16,7 @@ interface ArticleWithContext {
       document: {
         id: string;
         name: string;
+        slug: string | null;
       };
     };
   };
@@ -24,8 +25,7 @@ interface ArticleWithContext {
 const MostViewedArticles = () => {
   const { data: articles, isLoading } = useQuery<ArticleWithContext[]>({
     queryKey: ["most-viewed-articles"],
-   queryFn: () =>
-  fetch("/api/article/most-viewed").then((r) => r.json()),
+    queryFn: () => fetch("/api/article/most-viewed").then((r) => r.json()),
   });
 
   if (isLoading) {
@@ -55,36 +55,38 @@ const MostViewedArticles = () => {
         </h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {articles.map((article) => (
-          <Link
-            key={article.id}
-            href={`/dashboard/documents/${article.chapter.section.document.id}/${article.chapter.section.id}/${article.chapter.id}`}
-            className="group border border-black/10 rounded-xl p-4 hover:border-primary/40 hover:shadow-sm transition-all bg-white"
-          >
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <span className="text-[12px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                Artículo {article.articleNumber}
-              </span>
-              <div className="flex items-center gap-1 text-gray-400 text-[12px]">
-                <Eye size={12} />
-                <span>
-                  {article.viewCount > 0
-                    ? article.viewCount
-                    : article._count.userMeta}
+        {articles.map((article) => {
+          const doc = article.chapter.section.document;
+          const href = `/collections/${doc.slug || doc.id}`;
+          return (
+            <Link
+              key={article.id}
+              href={href}
+              className="group border border-black/10 rounded-xl p-4 hover:border-primary/40 hover:shadow-sm transition-all bg-white"
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-[12px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  Artículo {article.articleNumber}
                 </span>
+                <div className="flex items-center gap-1 text-gray-400 text-[12px]">
+                  <Eye size={12} />
+                  <span>
+                    {article.viewCount > 0
+                      ? article.viewCount
+                      : article._count.userMeta}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-1 mb-2">
-              <BookOpen size={12} className="text-gray-400 shrink-0" />
-              <p className="text-[12px] text-gray-500 truncate">
-                {article.chapter.section.document.name}
+              <div className="flex items-center gap-1 mb-2">
+                <BookOpen size={12} className="text-gray-400 shrink-0" />
+                <p className="text-[12px] text-gray-500 truncate">{doc.name}</p>
+              </div>
+              <p className="text-[13px] text-gray-700 line-clamp-3 leading-[1.6]">
+                {article.contentPlainText.slice(0, 150)}...
               </p>
-            </div>
-            <p className="text-[13px] text-gray-700 line-clamp-3 leading-[1.6]">
-              {article.contentPlainText.slice(0, 150)}...
-            </p>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

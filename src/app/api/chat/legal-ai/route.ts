@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import {
   DAILY_CHAT_LIMIT,
@@ -28,20 +29,10 @@ async function handleLegalChat(req: NextRequest) {
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: {
-          role: true,
-          userSubscription: {
-            select: { isActive: true, currentPeriodEnd: true },
-          },
-        },
+        select: { role: true },
       });
       isAdmin = user?.role === "admin";
-      hasSubscription =
-        isAdmin ||
-        !!(
-          user?.userSubscription?.isActive &&
-          new Date(user.userSubscription.currentPeriodEnd) > new Date()
-        );
+      hasSubscription = isAdmin || (await isSubscribed());
     }
 
     const contentType = req.headers.get("content-type") ?? "";
@@ -82,6 +73,10 @@ async function handleLegalChat(req: NextRequest) {
       if (!hasSubscription) {
         if (!isFreeTrial) {
           return NextResponse.json({ error: "Sin suscripción activa" }, { status: 403 });
+        }
+        // Free trial requires login to prevent anonymous abuse
+        if (!isLoggedin) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
         }
         if (!documentId) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });

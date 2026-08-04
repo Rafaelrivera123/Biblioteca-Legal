@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Document, WatchLists } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Clock, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import DocumentSearch from "./document-search";
@@ -20,9 +21,10 @@ interface Props {
   isLoggedin: boolean;
 }
 
-const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
+const CollectionHeader = ({ document, isLoggedin }: Props) => {
   const [pending, startTransition] = useTransition();
   const [isScrolled, setIsScrolled] = useState(false);
+  const router = useRouter();
 
   const { data, isLoading, refetch } = useQuery<apiProps>({
     queryKey: ["watchlist", document.id],
@@ -32,7 +34,7 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
   });
 
   const isWatched = data?.success;
-  const loading = pending || isLoading;
+  const loading = pending || (isLoggedin && isLoading);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,15 +45,21 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
   }, []);
 
   const watchListHandle = () => {
+    if (!isLoggedin) {
+      router.push(
+        `/login?redirectTo=/collections/${document.slug || document.id}`
+      );
+      return;
+    }
+
     if (!data?.success) {
       startTransition(() => {
         watchLater(document.id).then((res) => {
           if (!res.success) {
             toast.error(res.message);
             return;
-          } else if (res.success) {
-            refetch();
           }
+          refetch();
         });
       });
     } else {
@@ -67,6 +75,18 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
     }
   };
 
+  const saveLabel = !isLoggedin
+    ? "Inicia sesión para guardar"
+    : isWatched
+      ? "Quitar de seguidos"
+      : "Guardar";
+
+  const saveLabelDesktop = !isLoggedin
+    ? "Inicia sesión para guardar"
+    : isWatched
+      ? "Eliminar la lista de seguimiento"
+      : "Guardar";
+
   return (
     <>
       {/* Header estático con título */}
@@ -81,7 +101,7 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
           </p>
         )}
 
-        {hasFullAccess && !isScrolled && (
+        {!isScrolled && (
           <div className="w-full max-w-[600px] mx-auto flex flex-col items-center gap-y-3">
             <DocumentSearch documentId={document.id} />
             <Button
@@ -97,19 +117,15 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
               ) : (
                 <Clock />
               )}{" "}
-              <span className="sm:hidden">
-                {isWatched ? "Quitar de seguidos" : "Guardar"}
-              </span>
-              <span className="hidden sm:inline">
-                {isWatched ? "Eliminar la lista de seguimiento" : "Guardar"}
-              </span>
+              <span className="sm:hidden">{saveLabel}</span>
+              <span className="hidden sm:inline">{saveLabelDesktop}</span>
             </Button>
           </div>
         )}
       </div>
 
       {/* Barra sticky que aparece al hacer scroll */}
-      {hasFullAccess && isScrolled && (
+      {isScrolled && (
         <div className="fixed top-[60px] left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-black/10 shadow-sm py-3 px-4">
           <div className="container mx-auto flex items-center gap-2 sm:gap-3 max-w-[800px]">
             <div className="flex-1 min-w-0">
@@ -121,7 +137,7 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
               className="text-primary hover:text-primary/80 shrink-0 h-10 w-10"
               disabled={loading}
               onClick={watchListHandle}
-              aria-label={isWatched ? "Quitar de seguidos" : "Guardar"}
+              aria-label={saveLabel}
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={16} />

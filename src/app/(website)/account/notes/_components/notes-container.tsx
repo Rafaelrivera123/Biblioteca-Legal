@@ -48,7 +48,7 @@ const NotesContainer = () => {
     content = (
       <div className="min-h-[300px] flex flex-col items-center justify-center text-red-600 dark:text-red-400 text-center space-y-2">
         <AlertTriangle size={32} />
-        <p className="text-lg font-medium">Error al cargar los marcadores</p>
+        <p className="text-lg font-medium">Error al cargar las notas</p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {error?.message ||
             "Algo salió mal. Por favor, inténtalo de nuevo más tarde."}
