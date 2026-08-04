@@ -60,6 +60,7 @@ export async function getCurrentUserSubscription(): Promise<{
   const companySubscription = await prisma.companySubscription.findFirst({
     where: {
       companyId: user.companyId,
+      isActive: true,
     },
   });
 

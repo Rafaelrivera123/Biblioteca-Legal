@@ -105,8 +105,7 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
 
     await manejarCookiesRecordarme(
       !!data.rememberMe,
-      data.rememberMe ? data.email : undefined,
-      data.rememberMe ? data.password : undefined
+      data.rememberMe ? data.email : undefined
     );
 
     return {
@@ -135,19 +134,19 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
 
 export async function manejarCookiesRecordarme(
   recordarme: boolean,
-  email?: string,
-  password?: string
+  email?: string
 ) {
   const opcionesCookie = {
     sameSite: "strict" as const,
     maxAge: 2592000, // 30 días
   };
 
-  if (recordarme && email && password) {
+  // Never store passwords in cookies — only prefill email.
+  cookies().delete("rememberMePassword");
+
+  if (recordarme && email) {
     cookies().set({ name: "rememberMeEmail", value: email, ...opcionesCookie });
-    cookies().set({ name: "rememberMePassword", value: password, ...opcionesCookie });
   } else {
     cookies().delete("rememberMeEmail");
-    cookies().delete("rememberMePassword");
   }
 }

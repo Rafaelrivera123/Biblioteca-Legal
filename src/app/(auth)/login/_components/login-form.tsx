@@ -22,10 +22,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-// Retrieve cookies for email and "Remember Me"
+// Retrieve remembered email only (never store passwords in cookies)
 const rememberedEmail = Cookies.get("rememberMeEmail");
-const rememberMePassword = Cookies.get("rememberMePassword");
-const isRemembered = !!rememberedEmail && !!rememberMePassword;
+const isRemembered = !!rememberedEmail;
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -50,7 +49,7 @@ export default function LoginForm() {
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
       email: rememberedEmail ?? "",
-      password: rememberMePassword ?? "",
+      password: "",
       rememberMe: isRemembered ?? false,
     },
   });

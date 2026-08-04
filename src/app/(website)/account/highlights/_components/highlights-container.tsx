@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import { Prisma, UserArticleMeta } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -62,7 +62,7 @@ export function groupByDocumentId(data: UserArticleMetaWithRelations[]): Grouped
 const HighlightContainer = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const { data, isLoading, isError, error } = useQuery<UserArticleMetaResponse>({
-    queryKey: ["markers", currentPage],
+    queryKey: ["highlights", currentPage],
     queryFn: () =>
       fetch(`/api/account/highlights?page=${currentPage}&limit=10`).then((res) => res.json()),
   });
@@ -114,16 +114,15 @@ const HighlightContainer = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {doc.items.map((item: UserArticleMeta) => (
+                  {doc.items.map((item) => (
                     <HighlightCard
                       key={item.id}
-                      articleId={item.articleId}
-                      index={0}
                       metaId={item.id}
                       isBookmarked={item.isBookmarked}
                       selectedColor={item.selectedColor ?? "#f0f0f0"}
                       documentSlug={doc.document.slug}
                       documentId={doc.documentId}
+                      article={item.article}
                     />
                   ))}
                 </CardContent>

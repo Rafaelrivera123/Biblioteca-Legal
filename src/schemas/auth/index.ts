@@ -12,8 +12,10 @@ export const registrationSchema = z
       .regex(/[a-z]/, "Password must contain at least one lowercase letter")
       .regex(/[0-9]/, "Password must contain at least one number"),
     confirmPassword: z.string(),
-    terms: z.boolean({
-      message: "You must need to agree with our Terms of Service",
+    terms: z.literal(true, {
+      errorMap: () => ({
+        message: "Debes aceptar los Términos de Servicio",
+      }),
     }),
     promotion: z.boolean().default(true).optional(),
   })

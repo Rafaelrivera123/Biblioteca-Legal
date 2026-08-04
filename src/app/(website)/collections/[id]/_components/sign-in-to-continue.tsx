@@ -8,8 +8,10 @@ const SignInToContinue = () => {
 
   return (
     <div className="mb-20 w-full flex justify-center">
-      <Button>
-        <Link href={`/login?redirectTo=${pathName}`}>Sign in to continue</Link>
+      <Button asChild>
+        <Link href={`/login?redirectTo=${pathName}`}>
+          Inicia sesión para continuar
+        </Link>
       </Button>
     </div>
   );

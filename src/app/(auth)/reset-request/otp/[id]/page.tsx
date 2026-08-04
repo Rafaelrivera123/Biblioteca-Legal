@@ -3,7 +3,6 @@ import { prisma } from "@/lib/db";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { toast } from "sonner";
 import OTPForm from "./_components/otp-form";
 
 export default async function OTPPage({ params }: { params: { id: string } }) {
@@ -16,8 +15,7 @@ export default async function OTPPage({ params }: { params: { id: string } }) {
   });
 
   if (!exist) {
-    toast.warning("El código OTP no existe");
-    redirect("/reset-request");
+    redirect("/reset-request?error=otp-missing");
   }
 
   return (

@@ -2,7 +2,6 @@ import { logoSrc, siteAssets } from "@/helper/assets";
 import { prisma } from "@/lib/db";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { toast } from "sonner";
 import ResetNowForm from "./_components/reset-now-form";
 
 export default async function ResetNowPage({
@@ -18,8 +17,15 @@ export default async function ResetNowPage({
   });
 
   if (!exist) {
-    toast.warning("El OTP no existe");
-    redirect("/reset-request");
+    redirect("/reset-request?error=otp-missing");
+  }
+
+  if (!exist.isOtpVerified) {
+    redirect(`/reset-request/otp/${otpId}`);
+  }
+
+  if (exist.expiresAt < new Date()) {
+    redirect("/reset-request?error=otp-expired");
   }
 
   return (
@@ -38,8 +44,6 @@ export default async function ResetNowPage({
       <div className="flex w-full flex-col items-center justify-center px-4 py-12 lg:w-1/2 relative">
         <Image src={logoSrc} width={83} height={100} alt="Logo" />
         <div className="mx-auto w-full max-w-md space-y-12">
-          {/* Logo */}
-
           <div className="text-center">
             <h1 className="text-[32px] leading-[120%]  font-semibold text-gray-900">
               Restablecer <span className="text-primary">contraseña</span>
@@ -49,7 +53,6 @@ export default async function ResetNowPage({
             </p>
           </div>
 
-          {/* Componente de formulario */}
           <ResetNowForm otpId={otpId} />
         </div>
       </div>
