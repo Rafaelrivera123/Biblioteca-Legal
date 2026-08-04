@@ -146,7 +146,7 @@ const LegalChatbot = ({
           ...prev,
           {
             role: "model",
-            text: "Esa fue tu pregunta gratis para este documento. Con el **Plan Personal** tienes 20 consultas diarias en todos los documentos, además de resúmenes IA, marcadores y notas.",
+            text: "Esa fue tu pregunta gratis para este documento. Con el **Plan Personal** tienes 20 consultas diarias en todos los documentos, además de resúmenes en lenguaje claro, marcadores y notas.",
           },
         ]);
       }

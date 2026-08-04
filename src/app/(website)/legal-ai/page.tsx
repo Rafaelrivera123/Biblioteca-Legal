@@ -13,22 +13,22 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Asistente Legal IA Honduras",
+  title: "Asistente Legal Honduras",
   description:
-    "Consulta cualquier ley hondureña con inteligencia artificial. Haz preguntas sobre el Código Penal, Código Civil, Constitución y más. Respuestas basadas en la legislación oficial de Honduras.",
+    "Consulta cualquier ley hondureña en lenguaje claro. Haz preguntas sobre el Código Penal, Código Civil, Constitución y más. Respuestas basadas en la legislación oficial de Honduras.",
   keywords: [
-    "asistente legal IA Honduras",
-    "consulta leyes Honduras inteligencia artificial",
+    "asistente legal Honduras",
+    "consulta leyes Honduras",
     "chatbot legal Honduras",
     "preguntas legales Honduras",
-    "IA derecho hondureño",
-    "Código Penal Honduras IA",
+    "derecho hondureño",
+    "Código Penal Honduras consulta",
     "consulta jurídica en línea Honduras",
   ],
   openGraph: {
-    title: "Asistente Legal IA Honduras | Consulta Leyes al Instante",
+    title: "Asistente Legal Honduras | Consulta Leyes al Instante",
     description:
-      "Consulta cualquier ley hondureña con inteligencia artificial. Respuestas basadas en la legislación oficial de Honduras.",
+      "Consulta cualquier ley hondureña en lenguaje claro. Respuestas basadas en la legislación oficial de Honduras.",
     url: "https://www.bibliotecalegalhn.com/legal-ai",
     siteName: "Biblioteca Legal HN",
     locale: "es_HN",
@@ -122,16 +122,16 @@ const Page = async () => {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 text-white text-sm font-medium px-4 py-2 rounded-full mb-6">
             <Sparkles className="w-4 h-4 text-purple-400" />
-            Inteligencia Artificial aplicada al Derecho hondureño
+            Consultas legales en lenguaje claro
           </div>
           <h1 className="text-white font-bold text-[32px] md:text-[48px] leading-[120%] mb-6">
             Consulta cualquier ley hondureña al instante
           </h1>
           <p className="text-gray-300 text-[16px] md:text-[18px] leading-relaxed max-w-2xl mx-auto mb-10">
-            Nuestro asistente legal con inteligencia artificial tiene acceso a
-            toda la legislación de Honduras disponible en Biblioteca Legal HN.
-            Haz preguntas en lenguaje natural y obtén respuestas claras basadas
-            en las leyes y códigos oficiales.
+            Nuestro asistente legal tiene acceso a toda la legislación de
+            Honduras disponible en Biblioteca Legal HN. Haz preguntas en
+            lenguaje natural y obtén respuestas claras basadas en las leyes y
+            códigos oficiales.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
@@ -162,7 +162,7 @@ const Page = async () => {
       <section className="py-20 px-4 bg-white">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-center font-bold text-[28px] md:text-[36px] text-[#1E2A38] mb-4">
-            ¿Qué puede hacer el Asistente Legal IA?
+            ¿Qué puede hacer el Asistente Legal?
           </h2>
           <p className="text-center text-muted-foreground text-[16px] max-w-2xl mx-auto mb-14">
             Diseñado para abogados, estudiantes de derecho y cualquier ciudadano
@@ -311,8 +311,8 @@ const Page = async () => {
             Empieza a consultar la ley hoy
           </h2>
           <p className="text-muted-foreground text-[16px] mb-8">
-            Menos que una fotocopia. Acceso ilimitado a toda la legislación
-            hondureña con inteligencia artificial por solo $5.99 al mes.
+            Menos que una fotocopia. Acceso a toda la legislación hondureña y al
+            asistente legal por solo $5.99 al mes.
           </p>
           <Button
             size="lg"

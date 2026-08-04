@@ -66,8 +66,10 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const menus = [
     { id: 1, href: "/", linkText: "Inicio", tourId: undefined },
     { id: 2, href: "/collections", linkText: "Colección", tourId: undefined },
-    { id: 3, href: "/subscriptions", linkText: "Subscripciones", tourId: "tour-subscriptions" },
-    { id: 4, href: "/contact", linkText: "Contacto", tourId: undefined },
+    { id: 3, href: "/actualizaciones", linkText: "Actualizaciones", tourId: undefined },
+    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: undefined },
+    { id: 5, href: "/subscriptions", linkText: "Subscripciones", tourId: "tour-subscriptions" },
+    { id: 6, href: "/contact", linkText: "Contacto", tourId: undefined },
   ];
 
   useEffect(() => {
@@ -121,18 +123,24 @@ const Navbar = ({ isLoggedin, user }: Props) => {
             </Link>
           </div>
           <div className="hidden md:flex items-center md:gap-x-5 lg:gap-x-10">
-            {menus.map((menu) => (
+            {menus.map((menu) => {
+              const isActive =
+                menu.href === "/"
+                  ? pathname === "/"
+                  : pathname === menu.href || pathname.startsWith(`${menu.href}/`);
+              return (
               <Link
                 key={menu.id}
                 href={menu.href}
                 id={menu.tourId}
                 className={cn(
-                  pathname === menu.href ? "font-semibold" : "font-light"
+                  isActive ? "font-semibold" : "font-light"
                 )}
               >
                 {menu.linkText}
               </Link>
-            ))}
+              );
+            })}
           </div>
           <div className="hidden md:block">
             {isLoggedin ? (
@@ -202,20 +210,27 @@ const Navbar = ({ isLoggedin, user }: Props) => {
               <SheetContent side="top" className="bg-white text-primary">
                 <div className="flex flex-col items-center gap-y-6 mt-6 pb-4">
                   <div className="flex flex-col items-center gap-y-5 w-full">
-                    {menus.map((menu) => (
+                    {menus.map((menu) => {
+                      const isActive =
+                        menu.href === "/"
+                          ? pathname === "/"
+                          : pathname === menu.href ||
+                            pathname.startsWith(`${menu.href}/`);
+                      return (
                       <Link
                         key={menu.id}
                         href={menu.href}
                         className={cn(
                           "min-h-11 flex items-center justify-center w-full text-base",
-                          pathname === menu.href ? "font-semibold" : "font-light"
+                          isActive ? "font-semibold" : "font-light"
                         )}
                       >
                         <SheetClose className="w-full py-2">
                           {menu.linkText}
                         </SheetClose>
                       </Link>
-                    ))}
+                      );
+                    })}
                   </div>
                   {isLoggedin && (
                     <div className="flex flex-col items-center gap-y-3 w-full border-t border-black/10 pt-5">

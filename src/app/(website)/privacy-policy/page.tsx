@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   },
 };
 
+/** Corrige menciones obsoletas de proveedores en el HTML del CMS. */
+function sanitizePrivacyContent(html: string): string {
+  return html
+    .replace(/EdgeStore:\s*almacenamiento de archivos\.?/gi, "Vercel Blob: almacenamiento de archivos.")
+    .replace(/\bEdgeStore\b/gi, "Vercel Blob");
+}
+
 const Page = async () => {
   const data = await prisma.privacyPolicy.findFirst();
 
@@ -34,7 +41,7 @@ const Page = async () => {
       </div>
     );
   } else {
-    content = <ContentViewer content={data.content} />;
+    content = <ContentViewer content={sanitizePrivacyContent(data.content)} />;
   }
 
   return (

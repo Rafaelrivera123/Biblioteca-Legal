@@ -43,8 +43,12 @@ const CookieBanner = () => {
           Usamos cookies propias y de terceros (incluyendo Google AdSense) para
           mejorar tu experiencia, analizar el tráfico y mostrarte publicidad
           relevante. Puedes aceptar todas las cookies o solo las esenciales.{" "}
+          <Link href="/cookie-policy" className="text-primary underline">
+            Política de Cookies
+          </Link>
+          {" · "}
           <Link href="/privacy-policy" className="text-primary underline">
-            Política de Privacidad
+            Privacidad
           </Link>
         </p>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">

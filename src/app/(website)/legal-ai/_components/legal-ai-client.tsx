@@ -174,7 +174,7 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
         </div>
         <h1 className="text-2xl font-bold text-[#1E2A38] mb-3">Análisis Legal IA</h1>
         <p className="text-gray-500 max-w-md mb-2">
-          Consulta toda la legislación hondureña disponible en Biblioteca Legal HN con inteligencia artificial.
+          Consulta toda la legislación hondureña disponible en Biblioteca Legal HN en lenguaje claro.
         </p>
         <p className="text-gray-400 text-sm max-w-md mb-8">
           Esta función es exclusiva del Plan Personal. Obtén acceso ilimitado a leyes, códigos y decretos de Honduras.
