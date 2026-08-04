@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { siteAssets } from "@/helper/assets";
+import FeaturedGuides from "@/components/FeaturedGuides";
 import FeaturedLegalUpdates from "@/components/FeaturedLegalUpdates";
 import HomeContact from "@/components/HomeContact";
 import OurServices from "@/components/OurServices";
@@ -110,6 +111,7 @@ export default async function Home() {
         </div>
       </div>
       <FeaturedLegalUpdates />
+      <FeaturedGuides />
       <OurServices />
       <PlatformStats />
       <ResearchTools />

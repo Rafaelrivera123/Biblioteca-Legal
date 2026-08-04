@@ -1,3 +1,4 @@
+import { getAllGuides } from "@/content/guias";
 import { prisma } from "@/lib/db";
 import { isSubstantialLegalUpdate } from "@/lib/legal-update-quality";
 import { SITE_URL } from "@/lib/seo";
@@ -19,6 +20,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}`, priority: 1, changeFrequency: "weekly", lastModified: now },
     { url: `${SITE_URL}/collections`, priority: 0.9, changeFrequency: "daily", lastModified: now },
     { url: `${SITE_URL}/actualizaciones`, priority: 0.8, changeFrequency: "weekly", lastModified: now },
+    { url: `${SITE_URL}/guias`, priority: 0.85, changeFrequency: "weekly", lastModified: now },
+    ...getAllGuides().map((guide) => ({
+      url: `${SITE_URL}/guias/${guide.slug}`,
+      priority: 0.7,
+      changeFrequency: "monthly" as const,
+      lastModified: safeDate(`${guide.updatedAt}T12:00:00`),
+    })),
     { url: `${SITE_URL}/gacetas`, priority: 0.6, changeFrequency: "weekly", lastModified: now },
     { url: `${SITE_URL}/legal-ai`, priority: 0.8, changeFrequency: "monthly", lastModified: now },
     { url: `${SITE_URL}/about-us`, priority: 0.5, changeFrequency: "yearly", lastModified: now },
