@@ -16,21 +16,33 @@ interface Message {
 interface Props {
   isLoggedin: boolean;
   hasSubscription: boolean;
+  freeChatRemaining?: number;
 }
 
 const DAILY_LIMIT = 20;
 
-const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
+const LegalAiClient = ({
+  isLoggedin,
+  hasSubscription,
+  freeChatRemaining = 0,
+}: Props) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      text: "Hola, soy tu asistente legal con acceso a toda la legislación hondureña disponible en Biblioteca Legal HN. Puedes hacerme preguntas legales o subir un documento o imagen para análisis.",
+      text: hasSubscription
+        ? "Hola, soy tu asistente legal con acceso a toda la legislación hondureña disponible en Biblioteca Legal HN. Puedes hacerme preguntas legales o subir un documento o imagen para análisis."
+        : `Hola, soy tu asistente legal. Tienes ${freeChatRemaining} consultas IA gratis. Con el Plan Personal obtienes 20 al día y puedes subir archivos.`,
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [remaining, setRemaining] = useState<number>(DAILY_LIMIT);
+  const [remaining, setRemaining] = useState<number>(
+    hasSubscription ? DAILY_LIMIT : freeChatRemaining
+  );
   const [limitReached, setLimitReached] = useState(false);
+  const [quotaExhausted, setQuotaExhausted] = useState(
+    !hasSubscription && freeChatRemaining <= 0
+  );
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState<"image" | "pdf" | null>(null);
@@ -125,6 +137,19 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
         return;
       }
 
+      if (data.freeQuotaExhausted || res.status === 403) {
+        setQuotaExhausted(true);
+        setRemaining(0);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: "Ya usaste tus consultas IA gratis. Activa el Plan Personal para continuar.",
+          },
+        ]);
+        return;
+      }
+
       if (!res.ok) {
         setMessages((prev) => [
           ...prev,
@@ -136,6 +161,7 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
       if (typeof data.remaining === "number") {
         setRemaining(data.remaining);
+        if (!hasSubscription && data.remaining <= 0) setQuotaExhausted(true);
       }
     } catch {
       setMessages((prev) => [
@@ -166,7 +192,7 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
       .replace(/\n/g, "<br/>");
   };
 
-  if (!isLoggedin || !hasSubscription) {
+  if (!isLoggedin || (!hasSubscription && quotaExhausted)) {
     return (
       <div className="min-h-[calc(100vh-60px)] flex flex-col items-center justify-center px-4 text-center">
         <div className="w-16 h-16 rounded-full bg-[#1E2A38]/10 flex items-center justify-center mb-6">
@@ -177,7 +203,9 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
           Consulta toda la legislación hondureña disponible en Biblioteca Legal HN en lenguaje claro.
         </p>
         <p className="text-gray-400 text-sm max-w-md mb-8">
-          Esta función es exclusiva del Plan Personal. Obtén acceso ilimitado a leyes, códigos y decretos de Honduras.
+          {isLoggedin
+            ? "Ya usaste tus consultas IA gratis. El Plan Personal te da 20 consultas al día, resúmenes y notas."
+            : "Inicia sesión para usar consultas IA de cortesía, o activa el Plan Personal."}
         </p>
         <Button
           className="bg-[#1E2A38] text-white hover:bg-[#1E2A38]/90 rounded-full px-8"
@@ -218,7 +246,9 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
             </p>
           </div>
           <div className="text-xs text-gray-400 whitespace-nowrap w-full sm:w-auto sm:ml-auto">
-            {remaining} / {DAILY_LIMIT} consultas hoy
+            {hasSubscription
+              ? `${remaining} / ${DAILY_LIMIT} consultas hoy`
+              : `${remaining} consultas IA gratis restantes`}
           </div>
         </div>
       </div>

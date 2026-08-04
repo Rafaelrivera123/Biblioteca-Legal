@@ -3,6 +3,7 @@ import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import {
   DAILY_CHAT_LIMIT,
+  FREE_AI_CHAT_LIMIT,
   fileToBase64,
   getDocumentScopedArticles,
   getGlobalRelevantArticles,
@@ -25,13 +26,15 @@ async function handleLegalChat(req: NextRequest) {
     const userId = cu?.user?.id ?? null;
     let isAdmin = false;
     let hasSubscription = false;
+    let freeChatUsed = 0;
 
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true },
+        select: { role: true, freeChatUsed: true },
       });
       isAdmin = user?.role === "admin";
+      freeChatUsed = user?.freeChatUsed ?? 0;
       hasSubscription = isAdmin || (await isSubscribed());
     }
 
@@ -41,7 +44,6 @@ async function handleLegalChat(req: NextRequest) {
     let file: File | null = null;
     let documentId: string | undefined;
     let documentName: string | undefined;
-    let isFreeTrial = false;
     let scoped = false;
 
     if (contentType.includes("multipart/form-data")) {
@@ -58,11 +60,12 @@ async function handleLegalChat(req: NextRequest) {
       history = body.history ?? [];
       documentId = body.documentId;
       documentName = body.documentName;
-      isFreeTrial = !!body.isFreeTrial;
       scoped = !!body.scoped;
     }
 
-    if (!scoped && !isLoggedin) {
+    const usingFreeQuota = !hasSubscription;
+
+    if (!isLoggedin) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
@@ -70,29 +73,32 @@ async function handleLegalChat(req: NextRequest) {
       if (!message?.trim() || !documentName) {
         return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
       }
-      if (!hasSubscription) {
-        if (!isFreeTrial) {
-          return NextResponse.json({ error: "Sin suscripción activa" }, { status: 403 });
-        }
-        // Free trial requires login to prevent anonymous abuse
-        if (!isLoggedin) {
-          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-        }
-        if (!documentId) {
-          return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-        }
+    } else if (!message?.trim() && !file) {
+      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+    }
+
+    if (usingFreeQuota) {
+      if (freeChatUsed >= FREE_AI_CHAT_LIMIT) {
+        return NextResponse.json(
+          {
+            error: "Cuota gratuita agotada",
+            freeQuotaExhausted: true,
+            remaining: 0,
+          },
+          { status: 403 }
+        );
       }
-    } else {
-      if (!hasSubscription) {
-        return NextResponse.json({ error: "Sin suscripción activa" }, { status: 403 });
-      }
-      if (!message?.trim() && !file) {
-        return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+      // Global free chat is text-only (no file uploads) to control cost.
+      if (!scoped && file) {
+        return NextResponse.json(
+          { error: "Subir archivos requiere Plan Personal", freeQuotaExhausted: true },
+          { status: 403 }
+        );
       }
     }
 
     const today = new Date().toISOString().split("T")[0];
-    if (isLoggedin && hasSubscription && !isAdmin && userId) {
+    if (hasSubscription && !isAdmin && userId) {
       const usage = await prisma.chatUsage.findUnique({
         where: { userId_date: { userId, date: today } },
       });
@@ -179,25 +185,35 @@ async function handleLegalChat(req: NextRequest) {
       return NextResponse.json({ error: "Sin respuesta de IA" }, { status: 500 });
     }
 
-    if (isLoggedin && hasSubscription && !isAdmin && userId) {
+    let remaining: number | null = null;
+
+    if (isAdmin) {
+      remaining = 999;
+    } else if (usingFreeQuota && userId) {
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: { freeChatUsed: { increment: 1 } },
+        select: { freeChatUsed: true },
+      });
+      remaining = Math.max(0, FREE_AI_CHAT_LIMIT - updated.freeChatUsed);
+    } else if (hasSubscription && userId) {
       await prisma.chatUsage.upsert({
         where: { userId_date: { userId, date: today } },
         update: { count: { increment: 1 } },
         create: { userId, date: today, count: 1 },
       });
-    }
-
-    let remaining: number | null = null;
-    if (isAdmin) {
-      remaining = 999;
-    } else if (isLoggedin && hasSubscription && userId) {
       const updatedUsage = await prisma.chatUsage.findUnique({
         where: { userId_date: { userId, date: today } },
       });
       remaining = DAILY_CHAT_LIMIT - (updatedUsage?.count ?? 1);
     }
 
-    return NextResponse.json({ reply, remaining });
+    return NextResponse.json({
+      reply,
+      remaining,
+      freeQuota: usingFreeQuota,
+      freeQuotaLimit: usingFreeQuota ? FREE_AI_CHAT_LIMIT : undefined,
+    });
   } catch (err) {
     console.error("[legal-chat] ERROR:", String(err));
     return NextResponse.json({ error: String(err) }, { status: 500 });

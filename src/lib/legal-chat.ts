@@ -2,6 +2,8 @@ import { getQueryEmbedding } from "@/lib/embeddings";
 import { prisma } from "@/lib/db";
 
 export const DAILY_CHAT_LIMIT = 20;
+/** Lifetime free AI chats for non-subscribed logged-in users (server-tracked). */
+export { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 export const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 export const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
 export const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";

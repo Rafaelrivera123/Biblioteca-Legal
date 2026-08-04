@@ -15,20 +15,32 @@ interface Message {
 interface Props {
   isLoggedin: boolean;
   hasSubscription: boolean;
+  freeChatRemaining?: number;
 }
 
 const DAILY_LIMIT = 20;
 
-const LegalAIChatbot = ({ hasSubscription }: Props) => {
+const LegalAIChatbot = ({
+  isLoggedin,
+  hasSubscription,
+  freeChatRemaining = 0,
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(DAILY_LIMIT);
+  const [remaining, setRemaining] = useState<number | null>(
+    hasSubscription ? DAILY_LIMIT : freeChatRemaining
+  );
   const [limitReached, setLimitReached] = useState(false);
+  const [quotaExhausted, setQuotaExhausted] = useState(
+    !hasSubscription && freeChatRemaining <= 0
+  );
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const canChat =
+    hasSubscription || (isLoggedin && !quotaExhausted && freeChatRemaining > 0);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -52,7 +64,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
   }, [messages, isMinimized]);
 
   const handleOpen = () => {
-    if (!hasSubscription) {
+    if (!canChat) {
       setShowSubscribeModal(true);
       return;
     }
@@ -100,7 +112,21 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
         return;
       }
 
-      if (res.status === 401 || res.status === 403) {
+      if (data.freeQuotaExhausted || res.status === 403) {
+        setQuotaExhausted(true);
+        setRemaining(0);
+        setShowSubscribeModal(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: "Ya usaste tus consultas IA gratis. Activa el Plan Personal para seguir.",
+          },
+        ]);
+        return;
+      }
+
+      if (res.status === 401) {
         setShowSubscribeModal(true);
         setMessages((prev) => prev.slice(0, -1));
         return;
@@ -117,6 +143,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
       if (typeof data.remaining === "number") {
         setRemaining(data.remaining);
+        if (!hasSubscription && data.remaining <= 0) setQuotaExhausted(true);
       }
     } catch {
       setMessages((prev) => [
@@ -148,6 +175,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
       <SubscribeModal
         open={showSubscribeModal}
         onClose={() => setShowSubscribeModal(false)}
+        source="home_chat"
       />
 
       <AnimatePresence>
@@ -228,7 +256,9 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
                 <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 border-b border-purple-100">
                   <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
                   <p className="text-[11px] text-purple-700">
-                    Acceso a toda la legislación hondureña disponible
+                    {hasSubscription
+                      ? "Acceso a toda la legislación hondureña disponible"
+                      : `${remaining ?? freeChatRemaining} consultas IA gratis restantes`}
                   </p>
                 </div>
 

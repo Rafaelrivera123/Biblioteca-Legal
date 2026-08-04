@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 import { siteAssets } from "@/helper/assets";
 import FeaturedGuides from "@/components/FeaturedGuides";
 import FeaturedLegalUpdates from "@/components/FeaturedLegalUpdates";
@@ -52,11 +53,13 @@ export default async function Home() {
   const userId = cu?.user?.id ?? null;
   let hasSubscription = false;
   let isAdmin = false;
+  let freeChatRemaining = FREE_AI_CHAT_LIMIT;
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         role: true,
+        freeChatUsed: true,
         userSubscription: {
           select: { isActive: true, currentPeriodEnd: true },
         },
@@ -69,6 +72,10 @@ export default async function Home() {
         user?.userSubscription?.isActive &&
         new Date(user.userSubscription.currentPeriodEnd) > new Date()
       );
+    freeChatRemaining = Math.max(
+      0,
+      FREE_AI_CHAT_LIMIT - (user?.freeChatUsed ?? 0)
+    );
   }
   return (
     <>
@@ -86,9 +93,9 @@ export default async function Home() {
             Tu Biblioteca Jurídica Virtual
           </h1>
           <p className="text-white font-normal text-[14px] md:text-[18px] leading-[120%] mt-[25px] max-w-[600px]">
-            Consulta el texto completo de leyes y códigos de Honduras, gratis, y
-            sigue las reformas publicadas en La Gaceta explicadas en lenguaje
-            claro.
+            Lee leyes y códigos de Honduras completos, gratis. Usa IA para
+            entender cada artículo en segundos y sigue las reformas de La Gaceta
+            en lenguaje claro.
           </p>
           <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-4 mt-[40px] md:mt-[60px]">
             <Button size="lg" asChild>
@@ -100,7 +107,9 @@ export default async function Home() {
               asChild
               className="border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary"
             >
-              <Link href="/actualizaciones">Ver Actualizaciones</Link>
+              <Link href={isLoggedin ? "/subscriptions" : "/sign-up"}>
+                {isLoggedin ? "Ver Plan Personal" : "Crear cuenta gratis"}
+              </Link>
             </Button>
             {!isLoggedin && (
               <Button size="lg" asChild>
@@ -120,6 +129,7 @@ export default async function Home() {
       <LegalAIChatbot
         isLoggedin={isLoggedin}
         hasSubscription={hasSubscription}
+        freeChatRemaining={freeChatRemaining}
       />
     </>
   );

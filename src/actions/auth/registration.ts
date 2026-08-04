@@ -2,6 +2,7 @@
 import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/db";
+import { sendNurtureWelcome } from "@/lib/nurture";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 
 export async function registeruser(
@@ -58,6 +59,15 @@ export async function registeruser(
           email: parsedData.email,
         },
       });
+    }
+
+    try {
+      await sendNurtureWelcome({
+        email: newUser.email,
+        firstName: newUser.first_name,
+      });
+    } catch (emailErr) {
+      console.error("Welcome nurture email failed:", emailErr);
     }
 
     return {

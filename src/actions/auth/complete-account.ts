@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { sendNurtureWelcome } from "@/lib/nurture";
 import {
   completeAccountSchema,
   CompleteAccountSchemaType,
@@ -65,6 +66,17 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
         create: { email },
         update: {},
       });
+    }
+
+    if (!current.accountCompleted) {
+      try {
+        await sendNurtureWelcome({
+          email: email || current.email,
+          firstName: first_name,
+        });
+      } catch (emailErr) {
+        console.error("Welcome nurture email failed:", emailErr);
+      }
     }
 
     return {
