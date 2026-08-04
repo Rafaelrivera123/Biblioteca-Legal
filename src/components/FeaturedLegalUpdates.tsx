@@ -59,19 +59,23 @@ export default async function FeaturedLegalUpdates() {
   if (posts.length === 0) return null;
 
   return (
-    <section className="bg-white py-14 px-4 sm:px-6 lg:px-8 border-b border-black/5">
+    <section className="bg-slate-800 py-14 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div className="max-w-2xl">
-            <h2 className="text-primary text-[22px] md:text-3xl font-bold leading-tight">
+            <h2 className="text-white text-[22px] md:text-3xl font-bold leading-tight">
               Actualizaciones legales recientes
             </h2>
-            <p className="text-muted-foreground text-sm md:text-base mt-2 leading-relaxed">
+            <p className="text-gray-300 text-sm md:text-base mt-2 leading-relaxed">
               Reformas, nuevas leyes y derogaciones publicadas en La Gaceta,
               explicadas en lenguaje claro con el texto antes y después.
             </p>
           </div>
-          <Button variant="outline" asChild className="shrink-0 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            asChild
+            className="shrink-0 self-start sm:self-auto border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+          >
             <Link href="/actualizaciones">
               Ver todas
               <ArrowRight className="ml-2 w-4 h-4" />
@@ -88,7 +92,7 @@ export default async function FeaturedLegalUpdates() {
               <Link
                 key={post.id}
                 href={`/actualizaciones/${post.slug}`}
-                className="block border border-black/10 rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all bg-slate-50/40"
+                className="block rounded-xl border border-white/10 bg-white/5 p-5 transition-all hover:border-white/25 hover:bg-white/10"
               >
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <span
@@ -98,15 +102,15 @@ export default async function FeaturedLegalUpdates() {
                     {config.label}
                   </span>
                   {post.gacetaNumber && (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-[11px] text-gray-400">
                       Gaceta N° {post.gacetaNumber}
                     </span>
                   )}
                 </div>
-                <h3 className="font-semibold text-primary text-[15px] leading-snug mb-2 line-clamp-2">
+                <h3 className="font-semibold text-white text-[15px] leading-snug mb-2 line-clamp-2">
                   {post.title}
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                <p className="text-sm text-gray-300 leading-relaxed line-clamp-3">
                   {post.summary}
                 </p>
               </Link>

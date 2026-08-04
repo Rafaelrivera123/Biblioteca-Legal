@@ -20,7 +20,7 @@ export default function FeaturedGuides() {
   if (guides.length === 0) return null;
 
   return (
-    <section className="bg-slate-50 py-14 px-4 sm:px-6 lg:px-8 border-b border-black/5">
+    <section className="bg-white py-14 px-4 sm:px-6 lg:px-8 border-b border-black/5">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div className="max-w-2xl">
@@ -32,7 +32,11 @@ export default function FeaturedGuides() {
               Gaceta y entender reformas — más allá del texto legal puro.
             </p>
           </div>
-          <Button variant="outline" asChild className="shrink-0 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            asChild
+            className="shrink-0 self-start sm:self-auto border-slate-300 bg-transparent text-slate-800 hover:bg-slate-100 hover:text-slate-900"
+          >
             <Link href="/guias">
               Ver todas las guías
               <ArrowRight className="ml-2 w-4 h-4" />
@@ -45,7 +49,7 @@ export default function FeaturedGuides() {
             <Link
               key={guide.slug}
               href={`/guias/${guide.slug}`}
-              className="block border border-black/10 rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all bg-white"
+              className="block border border-black/10 rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all bg-slate-50/60"
             >
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-primary/20 bg-primary/5 text-primary mb-3">
                 <BookOpen className="w-3 h-3" />

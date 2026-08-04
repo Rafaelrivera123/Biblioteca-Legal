@@ -110,11 +110,11 @@ export default async function Home() {
           </div>
         </div>
       </div>
-      <FeaturedLegalUpdates />
-      <FeaturedGuides />
+      <ResearchTools />
       <OurServices />
       <PlatformStats />
-      <ResearchTools />
+      <FeaturedLegalUpdates />
+      <FeaturedGuides />
       {!isLoggedin && <CTA />}
       <HomeContact />
       <LegalAIChatbot

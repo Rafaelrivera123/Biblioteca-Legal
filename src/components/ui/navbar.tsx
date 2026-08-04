@@ -66,10 +66,10 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const menus = [
     { id: 1, href: "/", linkText: "Inicio", tourId: undefined },
     { id: 2, href: "/collections", linkText: "Colección", tourId: undefined },
-    { id: 3, href: "/actualizaciones", linkText: "Actualizaciones", tourId: undefined },
-    { id: 4, href: "/guias", linkText: "Guías", tourId: undefined },
-    { id: 5, href: "/gacetas", linkText: "Gacetas", tourId: undefined },
-    { id: 6, href: "/subscriptions", linkText: "Subscripciones", tourId: "tour-subscriptions" },
+    { id: 3, href: "/gacetas", linkText: "Gacetas", tourId: undefined },
+    { id: 4, href: "/actualizaciones", linkText: "Actualizaciones", tourId: undefined },
+    { id: 5, href: "/guias", linkText: "Guías", tourId: undefined },
+    { id: 6, href: "/subscriptions", linkText: "Suscripciones", tourId: "tour-subscriptions" },
   ];
 
   useEffect(() => {

@@ -19,13 +19,13 @@ const FEATURES = [
 
 export default function ResearchTools() {
   return (
-    <section className="py-16 px-4 md:py-24">
+    <section className="bg-white py-16 px-4 md:py-24 border-b border-black/5">
       <div className="mx-auto max-w-4xl text-center">
         <h2 className="my-8 text-2xl font-bold text-[#D4AF37]">
           Buscador Legal
         </h2>
         <h3 className="my-4 text-2xl font-bold text-[#1E2A38] md:text-[40px]">
-          Búsqueda de Artículos Global 
+          Búsqueda de Artículos Global
         </h3>
         <p className="mb-10 font-medium text-[#1E2A38] md:text-lg">
           Busca por número de artículo, nombre de la ley o decreto, una
@@ -35,7 +35,7 @@ export default function ResearchTools() {
           plataforma.
         </p>
         <div className="relative mx-auto max-w-3xl">
-          <div className="relative z-10 rounded-xl bg-white p-6 shadow-xl">
+          <div className="relative z-10 rounded-xl border border-black/10 bg-slate-50 p-6 shadow-xl">
             <div className="mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               {FEATURES.map(({ icon: Icon, label }) => (
                 <span
