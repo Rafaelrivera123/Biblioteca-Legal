@@ -103,7 +103,9 @@ const Navbar = ({ isLoggedin, user }: Props) => {
         pathname === "/"
           ? "text-primary"
           : pathname.startsWith("/collections/") ||
-              pathname.startsWith("/account")
+              pathname.startsWith("/account") ||
+              pathname.startsWith("/actualizaciones") ||
+              pathname.startsWith("/guias")
             ? "text-black"
             : scrolling
               ? "text-primary"
