@@ -90,20 +90,20 @@ export default async function Home() {
             sigue las reformas publicadas en La Gaceta explicadas en lenguaje
             claro.
           </p>
-          <div className="flex flex-wrap items-center gap-x-6 sm:gap-x-[40px] gap-y-4 mt-[40px] md:mt-[60px]">
+          <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-4 mt-[40px] md:mt-[60px]">
             <Button size="lg" asChild>
-              <Link href="/actualizaciones">Ver Actualizaciones</Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
               <Link href="/collections">Explorar Colección</Link>
             </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              asChild
+              className="border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary"
+            >
+              <Link href="/actualizaciones">Ver Actualizaciones</Link>
+            </Button>
             {!isLoggedin && (
-              <Button
-                variant="ghost"
-                size="lg"
-                asChild
-                className="text-white hover:text-white hover:bg-white/10"
-              >
+              <Button size="lg" asChild>
                 <Link href="/login">Iniciar sesión</Link>
               </Button>
             )}
