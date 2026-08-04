@@ -4,8 +4,17 @@ import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Balanced cost cap: enough for large Gacetas without unbounded Sonnet bills.
-const MAX_CHARS = 500_000;
+// Cap de input para el análisis Sonnet. Antes era 500k (~125k+ tokens de
+// input) y una sola Gaceta densa podía costar varios dólares y/o truncar
+// la respuesta. 120k caracteres (~30k tokens) alcanza para detectar las
+// 1–5 actualizaciones relevantes; PDFs más grandes se piden dividir.
+const MAX_CHARS = 120_000;
+
+// Tope de páginas del PDF que mandamos a Claude como documento cuando
+// pdf-parse falla. Cada página se factura como texto + imagen; enviar una
+// Gaceta completa (50–200 páginas) quemaba créditos y a menudo fallaba por
+// timeout/contexto. 3 páginas bastan para una oración de descripción.
+export const DESCRIPTION_PDF_MAX_PAGES = 3;
 
 interface ReformArticleChange {
   gacetaNumber: string;
@@ -77,10 +86,27 @@ function truncateErrorMessage(message: string, maxLen = 800): string {
  * de Oxford (ej. ["a", "b", "c"] -> "a, b y c"), para armar la descripción
  * corta de la Gaceta en una sola oración legible.
  */
-function joinSpanishList(parts: string[]): string {
+export function joinSpanishList(parts: string[]): string {
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
   return `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
+}
+
+/** Recorta a un máximo de palabras, con ellipsis si hace falta. */
+export function capWords(text: string, maxWords = 40): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return `${words.slice(0, maxWords).join(" ")}…`;
+}
+
+/**
+ * Arma un resumen corto (máx. 40 palabras) a partir de actualizaciones ya
+ * identificadas (títulos/tipos). Costo cero de IA — se usa al procesar y
+ * también desde "Generar con IA" cuando ya hay drafts/publicados.
+ */
+export function buildGacetaDescriptionFromParts(parts: string[]): string | null {
+  if (parts.length === 0) return null;
+  return capWords(`Esta edición trae ${joinSpanishList(parts)}.`);
 }
 
 /**
@@ -108,10 +134,37 @@ function buildGacetaDescription(analysis: AnalysisResult): string | null {
     return `la derogación de ${item.lawName}`;
   });
 
-  const sentence = `Esta edición trae ${joinSpanishList(parts)}.`;
-  const words = sentence.trim().split(/\s+/);
-  if (words.length <= 40) return sentence;
-  return `${words.slice(0, 40).join(" ")}…`;
+  return buildGacetaDescriptionFromParts(parts);
+}
+
+/**
+ * Misma idea que `buildGacetaDescription`, pero a partir de posts ya
+ * guardados en LegalUpdatePost (title + type), sin volver a llamar a la IA.
+ */
+export function buildGacetaDescriptionFromUpdates(
+  updates: { type: string; title: string }[]
+): string | null {
+  if (updates.length === 0) return null;
+
+  const parts = updates.map((u) => {
+    const title = u.title.trim();
+    if (u.type === "REFORM") {
+      if (/^reforma\b/i.test(title)) {
+        return title.charAt(0).toLowerCase() + title.slice(1);
+      }
+      return `reforma relacionada con ${title}`;
+    }
+    if (u.type === "NEW_LAW") return `la nueva ley "${title}"`;
+    if (u.type === "REPEAL") {
+      if (/^derogaci/i.test(title)) {
+        return `la ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+      }
+      return `la derogación de ${title}`;
+    }
+    return title;
+  });
+
+  return buildGacetaDescriptionFromParts(parts);
 }
 
 function slugify(text: string): string {
@@ -357,6 +410,36 @@ export async function extractPdfTextForDescription(
   }
 }
 
+/**
+ * Devuelve un PDF nuevo con solo las primeras `maxPages` páginas. Se usa
+ * antes de mandar el archivo a Claude como documento: así no se factura
+ * (ni se intenta parsear) una Gaceta de decenas/centenas de páginas solo
+ * para escribir una oración de descripción.
+ */
+export async function slicePdfFirstPages(
+  pdfData: Buffer,
+  maxPages = DESCRIPTION_PDF_MAX_PAGES
+): Promise<{ buffer: Buffer; totalPages: number; usedPages: number }> {
+  assertPdfMagic(pdfData);
+  const { PDFDocument } = await import("pdf-lib");
+  const source = await PDFDocument.load(pdfData, { ignoreEncryption: true });
+  const totalPages = source.getPageCount();
+  const usedPages = Math.min(maxPages, totalPages);
+  if (usedPages >= totalPages) {
+    return { buffer: pdfData, totalPages, usedPages: totalPages };
+  }
+
+  const out = await PDFDocument.create();
+  const indices = Array.from({ length: usedPages }, (_, i) => i);
+  const copied = await out.copyPages(source, indices);
+  for (const page of copied) out.addPage(page);
+  return {
+    buffer: Buffer.from(await out.save()),
+    totalPages,
+    usedPages,
+  };
+}
+
 async function analyzeGacetaText(
   gacetaNumber: string,
   gacetaText: string,
@@ -385,39 +468,37 @@ async function analyzeGacetaText(
   const stream = anthropic.messages.stream(
     {
       model: "claude-sonnet-5",
-      // Antes en 16000: con Gacetas que traen varias reformas grandes (texto
-      // "antes"/"después" transcrito literalmente por artículo) la respuesta
-      // se cortaba antes de cerrar el JSON, y JSON.parse reventaba con
-      // "Unexpected end of JSON input" en vez de un error entendible. Se
-      // sube el techo bastante para que eso deje de pasar en la práctica.
-      max_tokens: 16000,
+      // 8000 basta con contexts cortos (≤120 palabras) + before/after
+      // esenciales. El techo anterior de 16000 incentivaba respuestas
+      // enormes, más caras y más propensas a timeout/corte.
+      max_tokens: 8000,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Texto completo de La Gaceta N° ${gacetaNumber} (extraído del PDF oficial):\n\n${gacetaText}`,
+              text: `Texto de La Gaceta N° ${gacetaNumber} (extraído del PDF oficial):\n\n${gacetaText}`,
             },
             {
               type: "text",
               text: `Eres un auditor legislativo experto en la legislación de la República de Honduras.
 
-Analiza el texto completo de esta Gaceta Oficial e identifica las actualizaciones legales que de verdad importan — entre 1 y 5 en total, NUNCA fuerces llegar a un número fijo. Si esta Gaceta solo trae 1 cambio relevante, reporta solo 1. Si trae varios cambios de peso real (reformas a leyes importantes, nuevas leyes, derogaciones), reporta hasta 5, priorizando por impacto real sobre ciudadanos, empresas o el sistema legal. Ignora contenido de trámite puramente administrativo sin relevancia jurídica salvo que no haya nada más relevante en la Gaceta.
+Analiza el texto de esta Gaceta Oficial e identifica las actualizaciones legales que de verdad importan — entre 1 y 5 en total, NUNCA fuerces llegar a un número fijo. Si esta Gaceta solo trae 1 cambio relevante, reporta solo 1. Si trae varios cambios de peso real (reformas a leyes importantes, nuevas leyes, derogaciones), reporta hasta 5, priorizando por impacto real sobre ciudadanos, empresas o el sistema legal. Ignora contenido de trámite puramente administrativo sin relevancia jurídica salvo que no haya nada más relevante en la Gaceta.
 
 Para cada item identificado, clasifícalo como:
-- "REFORM" si modifica artículos de una ley ya existente. Debes extraer, para cada artículo modificado, el texto "before" (redacción anterior) y "after" (redacción nueva), transcritos literalmente del texto de la Gaceta. Si el texto anterior no aparece en la Gaceta, describe conceptualmente el cambio en "before" sin inventar la redacción literal.
+- "REFORM" si modifica artículos de una ley ya existente. Extrae, para cada artículo modificado, "before" y "after". Prefiere transcripción literal corta; si el texto es muy largo, resume el cambio en 2–4 oraciones fieles sin inventar. Máximo 6 artículos por reforma.
 - "NEW_LAW" si crea una ley, decreto, reglamento o disposición nueva.
 - "REPEAL" si deroga una ley o disposición existente.
 
 Bajo ninguna circunstancia inventes o deduzcas números de artículos, decretos o textos que no estén explícitamente en el texto provisto.
 
-Para el campo "context" de cada item, escribe entre 3 y 5 párrafos en español (mínimo 280, máximo 500 palabras). Estructura: (1) qué cambia exactamente y en qué consiste, con el mayor detalle concreto posible; (2) el marco legal o institucional relevante; (3) antecedentes o motivo del cambio si el texto lo menciona; (4) implicaciones prácticas concretas, diferenciando el impacto para ciudadanos, empresas y/o abogados según corresponda. No repitas los datos técnicos (decreto, gaceta, fecha) dentro del "context"; esos van en campos separados. No rellenes con relleno genérico — si el texto no da para el mínimo de palabras con contenido real, entrega lo que sí esté respaldado, aunque quede más corto. Evita reutilizar las mismas frases de transición entre items distintos.
+Para el campo "context" de cada item, escribe 1 o 2 párrafos cortos en español (máximo 120 palabras): qué cambia y una implicación práctica concreta. No repitas decreto/gaceta/fecha dentro de "context". Sin relleno genérico.
 
 Cuando el item sea una reforma o derogación de una ley que coincida con el catálogo de documentos que te doy abajo, usa exactamente el "name" del catálogo como "lawName" para que se pueda enlazar.
 
 Catálogo actual de la biblioteca legal:
-${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })), null, 2)}
+${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })))}
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin bloques de código, con esta forma exacta:
 {

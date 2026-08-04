@@ -62,11 +62,9 @@ export function EditDescriptionButton({
     });
   }
 
-  // Genera un borrador con IA y lo pone en el textarea — no guarda solo.
-  // El admin revisa (y puede editar) antes de darle "Guardar". Funciona
-  // aunque la Gaceta todavía no tenga actualizaciones legales generadas:
-  // en ese caso el Server Action lee el PDF original directo (ver
-  // `generateGacetaDescriptionAI` en actions.ts).
+  // Genera un borrador y lo pone en el textarea — no guarda solo.
+  // Si ya hay actualizaciones legales, arma la oración sin gastar tokens;
+  // si no, usa Haiku con un extracto corto del PDF.
   function handleGenerate() {
     startGenerating(() => {
       generateGacetaDescriptionAI(id)
@@ -76,7 +74,13 @@ export function EditDescriptionButton({
             return;
           }
           setValue(res.description);
-          toast.success("Descripción generada con IA. Revísala y dale Guardar.");
+          if (res.source === "updates") {
+            toast.success(
+              "Descripción armada desde las actualizaciones (sin costo de IA). Revísala y dale Guardar."
+            );
+          } else {
+            toast.success("Descripción generada con IA. Revísala y dale Guardar.");
+          }
         })
         .catch((err: unknown) => {
           toast.error(err instanceof Error ? err.message : "No se pudo generar la descripción con IA.");
@@ -102,9 +106,9 @@ export function EditDescriptionButton({
         <div className="space-y-2 pt-2">
           <p className="text-sm text-muted-foreground">
             Se muestra en la tarjeta pública de /gacetas. Máximo {MAX_WORDS}{" "}
-            palabras. Puedes escribirla a mano o generarla con IA — funciona
-            incluso si esta Gaceta todavía no tiene actualizaciones legales
-            generadas.
+            palabras. Si ya procesaste esta Gaceta, se arma sola desde las
+            actualizaciones (sin gastar créditos). Si no, usa un extracto
+            corto del PDF con IA.
           </p>
 
           <button

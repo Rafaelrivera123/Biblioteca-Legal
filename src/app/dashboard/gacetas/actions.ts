@@ -5,18 +5,21 @@ import { del } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import {
+  buildGacetaDescriptionFromUpdates,
+  capWords,
+  DESCRIPTION_PDF_MAX_PAGES,
   extractPdfTextForDescription,
   loadGacetaPdfBuffer,
   processPendingGacetas,
+  slicePdfFirstPages,
 } from "@/lib/gaceta-processor";
 import { revalidatePath } from "next/cache";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Tope para mandar el PDF entero a Claude como documento cuando pdf-parse
-// no puede leerlo. Más grande que esto suele romper memoria/tiempo en
-// Hobby; el admin puede escribir la descripción a mano.
-const MAX_PDF_BYTES_FOR_DOCUMENT_API = 15 * 1024 * 1024;
+// Tras recortar a DESCRIPTION_PDF_MAX_PAGES, el PDF es chico; este tope
+// solo evita mandar basura enorme si el slice fallara.
+const MAX_SLICED_PDF_BYTES = 5 * 1024 * 1024;
 
 async function requireAdmin() {
   const session = await auth();
@@ -28,15 +31,40 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * Recorta a un máximo de palabras, igual que `buildGacetaDescription` en
- * gaceta-processor.ts. Se duplica acá (en vez de importarla) para no
- * depender de que ese módulo exporte un helper interno — este archivo ya
- * hace su propia llamada a la IA con un prompt distinto.
+ * Traduce errores típicos de Anthropic / red a mensajes accionables en
+ * español. Antes el admin veía dumps crudos o el toast genérico de Next.
  */
-function capWords(text: string, maxWords = 40): string {
-  const words = text.trim().split(/\s+/);
-  if (words.length <= maxWords) return text.trim();
-  return `${words.slice(0, maxWords).join(" ")}…`;
+function friendlyAiError(err: unknown): string {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    return "Falta configurar ANTHROPIC_API_KEY en el entorno del servidor.";
+  }
+
+  const status =
+    err && typeof err === "object" && "status" in err
+      ? Number((err as { status?: unknown }).status)
+      : undefined;
+  const message = errorMessage(err);
+
+  if (status === 401 || /invalid.*api.?key|authentication/i.test(message)) {
+    return "La clave de Anthropic (ANTHROPIC_API_KEY) es inválida o no está autorizada.";
+  }
+  if (status === 429 || /rate.?limit|too many requests/i.test(message)) {
+    return "Se alcanzó el límite de uso de la API de Anthropic. Espera un momento e intenta de nuevo.";
+  }
+  if (status === 413 || /request.?too.?large|payload/i.test(message)) {
+    return "El archivo es demasiado grande para la IA. Escribe la descripción a mano o divide el PDF.";
+  }
+  if (
+    (err instanceof Error && err.name === "APIConnectionTimeoutError") ||
+    /timed? ?out/i.test(message)
+  ) {
+    return "La IA tardó demasiado en responder. Intenta de nuevo; si sigue fallando, escribe la descripción a mano.";
+  }
+  if (/credit|billing|quota|insufficient/i.test(message)) {
+    return "No hay crédito / cuota disponible en la cuenta de Anthropic. Revisa el billing e intenta de nuevo.";
+  }
+
+  return message || "No se pudo generar la descripción con IA. Intenta de nuevo o escríbela a mano.";
 }
 
 /**
@@ -166,20 +194,13 @@ export async function updateGacetaDescription(
   }
 }
 
-// Cuánto texto del PDF le pasamos a la IA cuando no hay actualizaciones
-// legales generadas todavía (ver `generateGacetaDescriptionAI` abajo). No
-// necesitamos el análisis completo artículo por artículo para escribir una
-// sola oración de resumen general, así que basta con un extracto — esto
-// mantiene la llamada rápida y barata en vez de repetir el análisis
-// completo de `analyzeGacetaText`. Bajado de 150,000 a 30,000: para
-// caracterizar de qué trata una Gaceta en una sola oración genérica, las
-// primeras ~30k caracteres (varias páginas de decretos/acuerdos) ya son de
-// sobra, sin pérdida de calidad detectada en la práctica, y corta el input
-// de esta llamada a una quinta parte.
-const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 30_000;
+// Extracto para descripción con Haiku. Una oración de tarjeta no necesita
+// el PDF entero: ~8k caracteres (~2k tokens) bastan y cortan el costo vs
+// los 30k/150k anteriores.
+const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 8_000;
 
 type DescriptionResult =
-  | { ok: true; description: string }
+  | { ok: true; description: string; source: "updates" | "ai-text" | "ai-pdf" }
   | { ok: false; message: string };
 
 const FORMAT_INSTRUCTION = `No agregues ninguna introducción, saludo, ni explicación de que estás cumpliendo la instrucción (nada de "De acuerdo a lo solicitado...", "Aquí está...", etc.). No uses viñetas, markdown ni comillas. Responde ÚNICAMENTE con este formato exacto, sin nada antes ni después: <description>tu oración aquí</description>`;
@@ -191,11 +212,14 @@ async function askHaikuForDescription(
   // es innecesariamente caro para esto. haiku-4-5 da el mismo resultado a
   // una fracción del costo por token — mismo modelo que ya usa
   // batch-create/route.ts para tareas igual de simples.
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [{ role: "user", content }],
-  });
+  const response = await anthropic.messages.create(
+    {
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 200,
+      messages: [{ role: "user", content }],
+    },
+    { timeout: 60_000 }
+  );
 
   const block = response.content[0];
   const rawText = block?.type === "text" ? block.text.trim() : "";
@@ -210,20 +234,35 @@ async function askHaikuForDescription(
 }
 
 /**
- * Cuando pdf-parse no puede leer el PDF (InvalidPDFException — común con
- * algunos PDFs oficiales de La Gaceta), mandamos el binario directo a
- * Claude como documento. Su parser suele tolerar PDFs que el pdf.js viejo
- * de pdf-parse rechaza.
+ * Último recurso: pdf-parse no pudo leer el PDF. Mandamos SOLO las
+ * primeras páginas a Claude (document API). Enviar la Gaceta entera era
+ * la causa principal de errores y de quemar créditos (cada página se
+ * cobra como texto + imagen).
  */
 async function describeFromPdfDocument(
   pdfBuffer: Buffer,
   gacetaNumber: string
 ): Promise<string> {
-  if (pdfBuffer.length > MAX_PDF_BYTES_FOR_DOCUMENT_API) {
+  let sliced: { buffer: Buffer; totalPages: number; usedPages: number };
+  try {
+    sliced = await slicePdfFirstPages(pdfBuffer, DESCRIPTION_PDF_MAX_PAGES);
+  } catch (err) {
+    console.error("[describeFromPdfDocument] slice falló:", err);
     throw new Error(
-      "Este PDF es demasiado grande para generar la descripción automáticamente. Escríbela a mano o divide el archivo."
+      "No se pudo preparar el PDF para la IA (estructura no soportada). Escribe la descripción a mano."
     );
   }
+
+  if (sliced.buffer.length > MAX_SLICED_PDF_BYTES) {
+    throw new Error(
+      "Este PDF es demasiado denso incluso en las primeras páginas. Escríbela a mano."
+    );
+  }
+
+  const pageNote =
+    sliced.totalPages > sliced.usedPages
+      ? ` (solo las primeras ${sliced.usedPages} de ${sliced.totalPages} páginas, para ahorrar costo)`
+      : "";
 
   return askHaikuForDescription([
     {
@@ -231,33 +270,24 @@ async function describeFromPdfDocument(
       source: {
         type: "base64",
         media_type: "application/pdf",
-        data: pdfBuffer.toString("base64"),
+        data: sliced.buffer.toString("base64"),
       },
     },
     {
       type: "text",
-      text: `Eres un editor de contenido legal para Honduras. Este es el PDF de La Gaceta N° ${gacetaNumber} (diario oficial de Honduras). Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}`,
+      text: `Eres un editor de contenido legal para Honduras. Este es un extracto del PDF de La Gaceta N° ${gacetaNumber}${pageNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}`,
     },
   ]);
 }
 
 /**
- * Genera con IA una descripción corta (≤40 palabras) de qué contiene una
- * Gaceta, para el botón "Generar con IA" del modal de edición. NO la
- * guarda — solo la devuelve para que el admin la revise en el textarea y
- * la confirme con "Guardar" (ver `updateGacetaDescription`).
+ * Genera una descripción corta (≤40 palabras) para el botón "Generar con IA".
+ * NO la guarda — el admin revisa en el textarea y confirma con Guardar.
  *
- * Si la Gaceta ya tiene actualizaciones legales generadas (reformas, leyes
- * nuevas, derogaciones), arma la descripción a partir de esas — es lo más
- * preciso y barato. Si todavía NO tiene ninguna (Gaceta pendiente, en cola,
- * o procesada pero sin cambios relevantes detectados), el botón igual debe
- * funcionar: en ese caso leemos el PDF original directo y le pedimos a la
- * IA un resumen general de qué trae, sin pasar por el análisis completo.
- *
- * Devuelve `{ ok, ... }` en vez de tirar: en producción Next.js redacta
- * cualquier Error de Server Action a un mensaje genérico, así que un throw
- * dejaba al admin viendo solo "An error occurred in the Server Components
- * render..." sin saber que el PDF no se pudo leer.
+ * Orden de costo (barato → caro):
+ * 1. Si ya hay actualizaciones legales → armar la oración SIN llamar a la IA.
+ * 2. Si no: extracto corto de texto (Haiku).
+ * 3. Si pdf-parse falla: primeras 3 páginas vía document API (Haiku).
  */
 export async function generateGacetaDescriptionAI(
   id: string
@@ -273,20 +303,15 @@ export async function generateGacetaDescriptionAI(
 
     const updates = await prisma.legalUpdatePost.findMany({
       where: { gacetaNumber: gaceta.number },
-      select: { title: true, summary: true, type: true },
+      select: { title: true, type: true },
+      orderBy: { createdAt: "asc" },
+      take: 8,
     });
 
-    if (updates.length > 0) {
-      const list = updates
-        .map((u, i) => `${i + 1}. [${u.type}] ${u.title} — ${u.summary}`)
-        .join("\n");
-      const description = await askHaikuForDescription(
-        `Eres un editor de contenido legal para Honduras. A partir de las actualizaciones legales que identificamos en La Gaceta N° ${gaceta.number}, escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma qué contiene esta edición para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}
-
-Actualizaciones identificadas:
-${list}`
-      );
-      return { ok: true, description };
+    // Camino gratis: ya procesamos esta Gaceta y tenemos títulos.
+    const free = buildGacetaDescriptionFromUpdates(updates);
+    if (free) {
+      return { ok: true, description: free, source: "updates" };
     }
 
     const pdfBuffer = await loadGacetaPdfBuffer(gaceta.pdfUrl, gaceta.pdfData);
@@ -304,24 +329,23 @@ ${list}`
 Texto de la Gaceta:
 ${excerpt}`
       );
-      return { ok: true, description };
+      return { ok: true, description, source: "ai-text" };
     } catch (textErr) {
       // pdf-parse falla con InvalidPDFException en algunos PDFs oficiales;
-      // el parser de documentos de Claude suele poder leerlos igual.
+      // el parser de documentos de Claude suele poder leerlos igual — pero
+      // SOLO con las primeras páginas, no el PDF entero.
       console.warn(
-        `[generateGacetaDescriptionAI] pdf-parse falló para ${gaceta.number}, probando document API:`,
+        `[generateGacetaDescriptionAI] pdf-parse falló para ${gaceta.number}, probando document API (máx ${DESCRIPTION_PDF_MAX_PAGES} págs):`,
         textErr
       );
       const description = await describeFromPdfDocument(pdfBuffer, gaceta.number);
-      return { ok: true, description };
+      return { ok: true, description, source: "ai-pdf" };
     }
   } catch (err) {
     console.error("[generateGacetaDescriptionAI]", err);
     return {
       ok: false,
-      message:
-        errorMessage(err) ||
-        "No se pudo generar la descripción con IA. Intenta de nuevo o escríbela a mano.",
+      message: friendlyAiError(err),
     };
   }
 }
@@ -333,10 +357,8 @@ ${excerpt}`
 const MAX_GACETAS_PER_CLICK = 5;
 
 /**
- * Dispara el mismo procesamiento que corre el cron, pero al toque, para que
- * el admin no tenga que esperar al próximo horario programado para probar
- * que una Gaceta recién subida se procesa bien. A diferencia del cron, cada
- * click procesa como máximo MAX_GACETAS_PER_CLICK Gacetas.
+ * Dispara el procesamiento manual de Gacetas pendientes. Cada click
+ * procesa como máximo MAX_GACETAS_PER_CLICK Gacetas.
  *
  * El 250_000 que estaba acá antes dejaba solo ~50s de margen bajo los 300s
  * de `maxDuration` (ver page.tsx) para todo el trabajo de una Gaceta además
