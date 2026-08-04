@@ -159,7 +159,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
             transition={{ duration: 0.2 }}
             onClick={handleOpen}
             className="fixed right-4 sm:right-6 z-50 fab-offset flex items-center gap-3 bg-[#1E2A38] hover:bg-[#1E2A38]/90 transition-colors rounded-2xl shadow-xl px-3 sm:px-4 py-3 max-w-[calc(100vw-2rem)]"
-            aria-label="Abrir asistente legal IA"
+            aria-label="Abrir asistente legal"
           >
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
               <Scale className="w-5 h-5 text-white" />
@@ -167,7 +167,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
             <div className="text-left min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-white font-semibold text-[13px] leading-none truncate">
-                  Asistente Legal IA
+                  Asistente Legal
                 </p>
                 <Sparkles className="w-3 h-3 text-purple-300 shrink-0" />
               </div>
@@ -196,7 +196,7 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[#1E2A38] leading-none">
-                    Asistente Legal IA
+                    Asistente Legal
                   </p>
                   {!isMinimized && (
                     <p className="text-[11px] text-gray-400 mt-0.5">

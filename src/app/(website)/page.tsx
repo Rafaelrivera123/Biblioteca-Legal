@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { siteAssets } from "@/helper/assets";
+import FeaturedGuides from "@/components/FeaturedGuides";
+import FeaturedLegalUpdates from "@/components/FeaturedLegalUpdates";
 import HomeContact from "@/components/HomeContact";
 import OurServices from "@/components/OurServices";
 import PlatformStats from "@/components/PlatformStats";
@@ -84,27 +86,32 @@ export default async function Home() {
             Tu Biblioteca Jurídica Virtual
           </h1>
           <p className="text-white font-normal text-[14px] md:text-[18px] leading-[120%] mt-[25px] max-w-[600px]">
-            Accede a documentos legales, leyes y decretos actualizados en una
-            sola plataforma centralizada.
+            Consulta el texto completo de leyes y códigos de Honduras, gratis, y
+            sigue las reformas publicadas en La Gaceta explicadas en lenguaje
+            claro.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 sm:gap-x-[40px] gap-y-4 mt-[40px] md:mt-[60px]">
-            {isLoggedin ? (
-              <Button size="lg" asChild>
-                <Link href="/collections">Ver Colección</Link>
+            <Button size="lg" asChild>
+              <Link href="/actualizaciones">Ver Actualizaciones</Link>
+            </Button>
+            <Button variant="outline" size="lg" asChild>
+              <Link href="/collections">Explorar Colección</Link>
+            </Button>
+            {!isLoggedin && (
+              <Button
+                variant="ghost"
+                size="lg"
+                asChild
+                className="text-white hover:text-white hover:bg-white/10"
+              >
+                <Link href="/login">Iniciar sesión</Link>
               </Button>
-            ) : (
-              <>
-                <Button size="lg" asChild>
-                  <Link href="/subscriptions">Registrarse</Link>
-                </Button>
-                <Button variant="outline" size="lg" asChild>
-                  <Link href="/login">Iniciar sesión</Link>
-                </Button>
-              </>
             )}
           </div>
         </div>
       </div>
+      <FeaturedLegalUpdates />
+      <FeaturedGuides />
       <OurServices />
       <PlatformStats />
       <ResearchTools />

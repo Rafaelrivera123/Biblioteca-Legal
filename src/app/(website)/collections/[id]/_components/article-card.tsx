@@ -21,25 +21,29 @@ interface PremiumTeaserProps {
   onUnlock: () => void;
 }
 const PremiumTeaser = ({ onUnlock }: PremiumTeaserProps) => (
-  <div className="mb-4">
+  <div className="mb-4 space-y-2">
+    <p className="text-[11px] text-muted-foreground leading-relaxed">
+      El texto legal completo de este artículo es gratuito y puede leerse sin
+      suscripción.
+    </p>
     <button
       onClick={onUnlock}
-      className="w-full flex items-center justify-between gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-3 hover:from-purple-100 hover:to-indigo-100 transition-colors group"
+      className="w-full flex items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 hover:bg-slate-100 transition-colors group"
     >
       <div className="flex items-center gap-2 text-left">
-        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-          <Crown className="w-4 h-4 text-purple-600" />
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <Crown className="w-4 h-4 text-primary" />
         </div>
         <div>
-          <p className="text-xs font-semibold text-purple-700">
-            Resumen IA, marcadores y notas
+          <p className="text-xs font-semibold text-primary">
+            Resumen en lenguaje claro, marcadores y notas
           </p>
-          <p className="text-[11px] text-purple-500">
-            Disponible con el Plan Personal — $5.99/mes
+          <p className="text-[11px] text-muted-foreground">
+            Herramientas opcionales con el Plan Personal — $5.99/mes
           </p>
         </div>
       </div>
-      <span className="text-[11px] font-semibold text-purple-600 border border-purple-300 rounded-full px-3 py-1 shrink-0 group-hover:bg-white transition-colors">
+      <span className="text-[11px] font-semibold text-primary border border-primary/30 rounded-full px-3 py-1 shrink-0 group-hover:bg-white transition-colors">
         Ver plan
       </span>
     </button>
@@ -188,7 +192,7 @@ const ArticleCard = ({
                   onClick={handleSummaryClick}
                 >
                   <Sparkles className="w-3 h-3" />
-                  Resumen IA
+                  Resumen claro
                   {showSummary
                     ? <ChevronUp className="w-3 h-3" />
                     : <ChevronDown className="w-3 h-3" />}
@@ -201,7 +205,7 @@ const ArticleCard = ({
                   className="flex items-center gap-1 text-xs border border-purple-300 text-purple-600 rounded-md px-2 py-1 hover:bg-purple-50 transition-colors"
                 >
                   <Sparkles className="w-3 h-3" />
-                  Resumen IA disponible
+                  Resumen en lenguaje claro
                 </button>
               )}
               {hasSubscription && !isColorPickerOpen && !isCommentOpen && (
@@ -261,7 +265,7 @@ const ArticleCard = ({
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                     <div className="flex items-center gap-1 mb-1">
                       <Sparkles className="w-3 h-3 text-purple-600" />
-                      <span className="text-xs font-semibold text-purple-700">Resumen generado por IA</span>
+                      <span className="text-xs font-semibold text-purple-700">Resumen en lenguaje claro</span>
                     </div>
                     <p className="text-sm text-purple-900 leading-relaxed">{data.aiSummary}</p>
                   </div>

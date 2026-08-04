@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { filterSubstantialLegalUpdates } from "@/lib/legal-update-quality";
 import { Metadata } from "next";
 import Link from "next/link";
 import HeaderSection from "@/components/shared/sections/header";
@@ -68,15 +69,19 @@ async function getGacetasWithContext() {
         select: {
           slug: true,
           title: true,
+          summary: true,
+          content: true,
           type: true,
           gacetaNumber: true,
+          relatedDocumentId: true,
           relatedDocument: { select: { name: true } },
         },
       })
     : [];
 
-  const updatesByGaceta = new Map<string, typeof updates>();
-  updates.forEach((u) => {
+  const substantialUpdates = filterSubstantialLegalUpdates(updates);
+  const updatesByGaceta = new Map<string, typeof substantialUpdates>();
+  substantialUpdates.forEach((u) => {
     if (!u.gacetaNumber) return;
     const list = updatesByGaceta.get(u.gacetaNumber) ?? [];
     list.push(u);

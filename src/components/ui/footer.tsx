@@ -7,6 +7,9 @@ export default function Footer() {
   const quickLinks = [
     { name: "Inicio", href: "/" },
     { name: "Colección", href: "/collections" },
+    { name: "Actualizaciones", href: "/actualizaciones" },
+    { name: "Guías", href: "/guias" },
+    { name: "Gacetas", href: "/gacetas" },
     { name: "Suscripciones", href: "/subscriptions" },
     { name: "Contacto", href: "/contact" },
   ];
@@ -15,6 +18,7 @@ export default function Footer() {
     { name: "Acerca de", href: "/about-us" },
     { name: "Términos y Condiciones", href: "/terms-and-condition" },
     { name: "Política de Privacidad", href: "/privacy-policy" },
+    { name: "Política de Cookies", href: "/cookie-policy" },
     { name: "Política de Reembolso", href: "/refund-policy" },
   ];
 

@@ -6,7 +6,6 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Raleway } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
-import Script from "next/script";
 import "./globals.css";
 
 const raleway = Raleway({
@@ -75,14 +74,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        {/* El script de AdSense solo se carga en páginas de contenido (/collections/[id]). */}
         <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
         <link rel="dns-prefetch" href="https://googletagmanager.com" />
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5685390714020326"
-          crossOrigin="anonymous"
-          strategy="lazyOnload"
-        />
       </head>
       <body className={cn(raleway.className, poppins.variable, "")}>
         <AppProvider>{children}</AppProvider>

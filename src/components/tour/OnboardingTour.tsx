@@ -142,11 +142,11 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
         ],
       });
 
-      // Paso 4 - Resumen IA
+      // Paso 4 - Resumen en lenguaje claro
       tour.addStep({
         id: "ai-summary",
-        title: "Resumen IA por artículo",
-        text: "Cada artículo tiene un resumen generado por inteligencia artificial que explica su contenido en lenguaje claro. Exclusivo para suscriptores.",
+        title: "Resumen en lenguaje claro",
+        text: "Cada artículo puede incluir un resumen que explica su contenido en lenguaje claro. Disponible para suscriptores (los primeros artículos del documento son gratis).",
         attachTo: { element: "#tour-ai-summary", on: "bottom" },
         buttons: [
           {
@@ -165,7 +165,7 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       // Paso 5 - Chatbot
       tour.addStep({
         id: "chatbot",
-        title: "Asistente legal IA",
+        title: "Asistente legal",
         text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos. Hasta 20 consultas diarias para suscriptores.",
         attachTo: { element: "#tour-chatbot", on: "top" },
         buttons: [
@@ -190,7 +190,7 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       tour.addStep({
         id: "finish",
         title: "Desbloquea todo el potencial",
-        text: "Suscríbete para acceder a los resúmenes IA, el asistente legal, resaltado de artículos, marcadores y notas privadas.",
+        text: "Suscríbete para acceder a los resúmenes en lenguaje claro, el asistente legal, resaltado de artículos, marcadores y notas privadas.",
         attachTo: { element: "#tour-subscriptions", on: "bottom" },
         buttons: [
           {

@@ -37,7 +37,7 @@ const SubscribeModal = ({ open, onClose }: Props) => {
         <ul className="text-left space-y-2 mt-3">
           <li className="flex items-start gap-2 text-[13px] text-gray-700">
             <Scale className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
-            <span><strong>Asistente Legal IA</strong> — consulta cualquier ley hondureña al instante</span>
+            <span><strong>Asistente Legal</strong> — consulta cualquier ley hondureña al instante</span>
           </li>
           <li className="flex items-start gap-2 text-[13px] text-gray-700">
             <Sparkles className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />

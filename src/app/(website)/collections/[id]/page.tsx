@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import AdSenseScript from "@/components/ads/AdSenseScript";
 import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
@@ -151,6 +152,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
 
   return (
     <div>
+      {!hasSubscription && <AdSenseScript />}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

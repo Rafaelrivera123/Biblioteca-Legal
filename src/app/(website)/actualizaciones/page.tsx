@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { filterSubstantialLegalUpdates } from "@/lib/legal-update-quality";
 import { Metadata } from "next";
 import Link from "next/link";
 import { FileText, PlusCircle, XCircle } from "lucide-react";
@@ -34,9 +35,11 @@ async function getPublishedUpdates() {
       slug: true,
       title: true,
       summary: true,
+      content: true,
       type: true,
       gacetaNumber: true,
       publishedAt: true,
+      relatedDocumentId: true,
       relatedDocument: {
         select: { name: true, slug: true, id: true },
       },
@@ -47,7 +50,8 @@ async function getPublishedUpdates() {
   // un String (ej. "37,183"), así que un `orderBy` de Prisma lo ordenaría
   // alfabéticamente (mal) — se ordena acá en JS con `parseGacetaNumber`,
   // que sí compara los números reales sin importar la coma de miles.
-  return posts.sort(
+  // Además se ocultan avisos thin (marcas, licitaciones, etc.) del listado público.
+  return filterSubstantialLegalUpdates(posts).sort(
     (a, b) => parseGacetaNumber(b.gacetaNumber) - parseGacetaNumber(a.gacetaNumber)
   );
 }

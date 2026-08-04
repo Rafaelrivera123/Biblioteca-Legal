@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { isSubstantialLegalUpdate } from "@/lib/legal-update-quality";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -80,11 +81,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
   const title = buildSeoTitle(post.title);
   const description = buildSeoDescription(post.summary);
+  const isThin = !isSubstantialLegalUpdate(post);
+  const shouldNoIndex = post.status === "draft" || isThin;
   return {
     title,
     description,
     alternates: { canonical: url },
-    robots: post.status === "draft" ? { index: false, follow: false } : undefined,
+    robots: shouldNoIndex ? { index: false, follow: false } : undefined,
     openGraph: {
       title: post.title,
       description,
