@@ -39,8 +39,8 @@ const LegalAIChatbot = ({
   );
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const canChat =
-    hasSubscription || (isLoggedin && !quotaExhausted && freeChatRemaining > 0);
+  // After messages are used, `quotaExhausted` (not the initial prop) is source of truth.
+  const canChat = hasSubscription || (isLoggedin && !quotaExhausted);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {

@@ -47,7 +47,8 @@ const LegalChatbot = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const canChat = hasSubscription || (!quotaExhausted && isLoggedin);
+  // After messages are used, `quotaExhausted` (not the initial prop) is source of truth.
+  const canChat = hasSubscription || (isLoggedin && !quotaExhausted);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
