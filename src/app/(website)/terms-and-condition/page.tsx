@@ -5,7 +5,21 @@ import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms & Condition",
+  title: "Términos y Condiciones",
+  description:
+    "Lee los términos y condiciones de uso de Biblioteca Legal HN, la biblioteca jurídica virtual de Honduras.",
+  openGraph: {
+    title: "Términos y Condiciones | Biblioteca Legal HN",
+    description:
+      "Lee los términos y condiciones de uso de Biblioteca Legal HN.",
+    url: "https://www.bibliotecalegalhn.com/terms-and-condition",
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.bibliotecalegalhn.com/terms-and-condition",
+  },
 };
 
 const Page = async () => {

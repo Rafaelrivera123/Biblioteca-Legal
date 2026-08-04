@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/db";
+import { SITE_URL } from "@/lib/seo";
 import { MetadataRoute } from "next";
 
-export const dynamic = "force-dynamic";
-
-const BASE_URL = "https://www.bibliotecalegalhn.com";
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let documentEntries: MetadataRoute.Sitemap = [];
@@ -27,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // (causaba los 404 reportados por Ahrefs).
       const slug = doc.slug || doc.id;
       return {
-        url: `${BASE_URL}/collections/${slug}`,
+        url: `${SITE_URL}/collections/${slug}`,
         lastModified: new Date(doc.updatedAt),
         changeFrequency: "monthly" as const,
         priority: 0.8,
@@ -35,24 +34,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
 
     updateEntries = updates.map((post) => ({
-      url: `${BASE_URL}/actualizaciones/${post.slug}`,
+      url: `${SITE_URL}/actualizaciones/${post.slug}`,
       lastModified: new Date(post.updatedAt ?? post.publishedAt ?? new Date()),
       changeFrequency: "never" as const,
       priority: 0.6,
     }));
   } catch (error) {
-    console.error("Error generando sitemap:", error);
+    console.error("Error generando valores del sitemap:", error);
   }
 
   const now = new Date();
   return [
-    { url: `${BASE_URL}`, priority: 1, changeFrequency: "weekly", lastModified: now },
-    { url: `${BASE_URL}/collections`, priority: 0.9, changeFrequency: "daily", lastModified: now },
-    { url: `${BASE_URL}/actualizaciones`, priority: 0.8, changeFrequency: "weekly", lastModified: now },
-    { url: `${BASE_URL}/gacetas`, priority: 0.6, changeFrequency: "weekly", lastModified: now },
-    { url: `${BASE_URL}/about-us`, priority: 0.5, changeFrequency: "yearly", lastModified: now },
-    { url: `${BASE_URL}/contact`, priority: 0.5, changeFrequency: "yearly", lastModified: now },
-    { url: `${BASE_URL}/subscriptions`, priority: 0.7, changeFrequency: "monthly", lastModified: now },
+    { url: `${SITE_URL}`, priority: 1, changeFrequency: "weekly", lastModified: now },
+    { url: `${SITE_URL}/collections`, priority: 0.9, changeFrequency: "daily", lastModified: now },
+    { url: `${SITE_URL}/actualizaciones`, priority: 0.8, changeFrequency: "weekly", lastModified: now },
+    { url: `${SITE_URL}/gacetas`, priority: 0.6, changeFrequency: "weekly", lastModified: now },
+    { url: `${SITE_URL}/legal-ai`, priority: 0.8, changeFrequency: "monthly", lastModified: now },
+    { url: `${SITE_URL}/about-us`, priority: 0.5, changeFrequency: "yearly", lastModified: now },
+    { url: `${SITE_URL}/contact`, priority: 0.5, changeFrequency: "yearly", lastModified: now },
+    { url: `${SITE_URL}/subscriptions`, priority: 0.7, changeFrequency: "monthly", lastModified: now },
+    { url: `${SITE_URL}/privacy-policy`, priority: 0.3, changeFrequency: "yearly", lastModified: now },
+    { url: `${SITE_URL}/terms-and-condition`, priority: 0.3, changeFrequency: "yearly", lastModified: now },
+    { url: `${SITE_URL}/refund-policy`, priority: 0.3, changeFrequency: "yearly", lastModified: now },
     ...documentEntries,
     ...updateEntries,
   ];

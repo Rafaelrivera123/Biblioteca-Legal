@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Sobre Nosotros | Biblioteca Legal HN",
+  title: "Sobre Nosotros",
   description:
     "Conoce la historia de Biblioteca Legal HN, la plataforma jurídica virtual de Honduras creada para acercar las leyes y códigos a estudiantes, abogados y ciudadanos.",
   openGraph: {

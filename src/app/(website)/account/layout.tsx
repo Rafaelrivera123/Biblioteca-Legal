@@ -1,6 +1,14 @@
+import { Metadata } from "next";
 import { ReactNode } from "react";
 import AccountSidebar from "./_components/account-sidebar";
 import MobileSidebar from "./_components/mobile-sidebar";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 const AccountLayout = ({ children }: { children: ReactNode }) => {
   return (

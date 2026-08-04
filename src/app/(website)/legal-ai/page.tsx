@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Asistente Legal IA Honduras | Consulta Leyes al Instante",
+  title: "Asistente Legal IA Honduras",
   description:
     "Consulta cualquier ley hondureña con inteligencia artificial. Haz preguntas sobre el Código Penal, Código Civil, Constitución y más. Respuestas basadas en la legislación oficial de Honduras.",
   keywords: [

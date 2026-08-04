@@ -9,7 +9,7 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Colección de Leyes y Códigos | Biblioteca Legal HN",
+  title: "Colección de Leyes y Códigos",
   description:
     "Accede a la colección completa de leyes, códigos, decretos y reglamentos de Honduras. Constitución Política, Código Penal, Código Civil y más, actualizados y de fácil acceso.",
   keywords: [
@@ -43,11 +43,12 @@ const Page = async () => {
   const [categories, documents, totalCount, allPublishedDocuments] = await Promise.all([
     prisma.category.findMany(),
     prisma.document.findMany({
+      where: { published: true },
       take: LIMIT,
       orderBy: { createdAt: "desc" },
       include: { categories: true },
     }),
-    prisma.document.count(),
+    prisma.document.count({ where: { published: true } }),
     // Se usa solo para renderizar un índice completo con enlaces internos
     // reales (server-rendered) hacia cada documento. El grid de arriba es
     // interactivo (búsqueda/paginación client-side) y por sí solo deja sin

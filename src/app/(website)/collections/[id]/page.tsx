@@ -17,6 +17,7 @@ import {
 async function getDocument(id: string) {
   const byCurrent = await prisma.document.findFirst({
     where: {
+      published: true,
       OR: [{ slug: id }, { id }],
     },
   });
@@ -41,7 +42,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const result = await getDocument(params.id);
   if (!result) {
-    return { title: "Documento no encontrado | Biblioteca Legal HN" };
+    return { title: "Documento no encontrado" };
   }
   const document = result.document;
   const name = document.name.trim();
@@ -156,6 +157,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
   });
 
   const faqs = getDocumentFaqs(document, nameWithHonduras, latestUpdatePost);
+  const documentUrl = `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`;
 
   return (
     <div>
@@ -170,7 +172,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
             description:
               document.short_description?.trim() ||
               `Texto completo del ${nameWithHonduras}`,
-            url: `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`,
+            url: documentUrl,
             inLanguage: "es-HN",
             jurisdictionOf: {
               "@type": "AdministrativeArea",
@@ -181,6 +183,35 @@ const Page = async ({ params }: { params: { id: string } }) => {
               name: "Biblioteca Legal HN",
               url: "https://www.bibliotecalegalhn.com",
             },
+          }),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "Inicio",
+                item: "https://www.bibliotecalegalhn.com",
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: "Colección",
+                item: "https://www.bibliotecalegalhn.com/collections",
+              },
+              {
+                "@type": "ListItem",
+                position: 3,
+                name: nameWithHonduras,
+                item: documentUrl,
+              },
+            ],
           }),
         }}
       />

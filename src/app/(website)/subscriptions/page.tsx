@@ -4,7 +4,26 @@ import HeaderSection from "@/components/shared/sections/header";
 import { getCurrentUserSubscription } from "@/helper/subscription";
 import { siteAssets } from "@/helper/assets";
 import { prisma } from "@/lib/db";
+import { Metadata } from "next";
 import PricingComparison from "./_components/pricing-plan";
+
+export const metadata: Metadata = {
+  title: "Suscripciones",
+  description:
+    "Elige el plan de Biblioteca Legal HN y accede a leyes, códigos, resúmenes con IA y el asistente legal. Recursos jurídicos actualizados de Honduras.",
+  openGraph: {
+    title: "Suscripciones | Biblioteca Legal HN",
+    description:
+      "Accede a leyes, códigos, resúmenes con IA y el asistente legal de Honduras con un plan de Biblioteca Legal HN.",
+    url: "https://www.bibliotecalegalhn.com/subscriptions",
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.bibliotecalegalhn.com/subscriptions",
+  },
+};
 
 const USD_PRICE = 5.99;
 const HNL_RATE = 26.5;

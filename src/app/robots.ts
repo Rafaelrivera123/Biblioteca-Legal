@@ -1,6 +1,5 @@
 import { MetadataRoute } from "next";
-
-const BASE_URL = "https://www.bibliotecalegalhn.com";
+import { SITE_URL } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -11,12 +10,14 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/dashboard/",
           "/account/",
-          "/sign-in/",
+          "/login",
           "/sign-up/",
+          "/reset-request/",
+          "/email-verification/",
           "/api/",
         ],
       },
     ],
-    sitemap: `${BASE_URL}/sitemap.xml`,
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
