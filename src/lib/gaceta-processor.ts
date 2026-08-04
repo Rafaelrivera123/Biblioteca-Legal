@@ -353,33 +353,62 @@ export async function loadGacetaPdfBuffer(
   );
 }
 
-export async function extractPdfText(pdfData: Buffer): Promise<string> {
+function isPdfParseInvalidError(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const message = err instanceof Error ? err.message : String(err);
+  return name === "InvalidPDFException" || /invalid pdf/i.test(message);
+}
+
+/**
+ * Extrae texto con unpdf (PDF.js moderno). pdf-parse usa un motor viejo que
+ * rechaza bastantes PDFs oficiales de La Gaceta; unpdf suele leerlos.
+ */
+async function extractTextWithUnpdf(pdfData: Buffer): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(pdfData));
+  const result = await extractText(pdf, { mergePages: true });
+  const text = (typeof result.text === "string" ? result.text : "").trim();
+  if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
+  return text;
+}
+
+async function extractPdfTextWithFallback(pdfData: Buffer): Promise<string> {
   assertPdfMagic(pdfData);
   try {
     const pdfParse = (await import("pdf-parse")).default;
     const data = await pdfParse(pdfData);
     const text = data.text?.trim() ?? "";
     if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
-    if (text.length > MAX_CHARS) {
-      throw new Error(
-        `Esta Gaceta es demasiado grande para procesarla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
-      );
-    }
     return text;
   } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    const message = err instanceof Error ? err.message : String(err);
-    // pdf-parse (pdf.js) tira InvalidPDFException con PDFs reales que usa
-    // una estructura que su motor viejo no entiende — cifrado, XRef raro,
-    // linealizado a medias, etc. Reescribimos el mensaje para que el admin
-    // vea algo accionable en vez del nombre interno de la librería.
-    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
-      throw new Error(
-        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
-      );
+    // pdf-parse falla con InvalidPDFException / vacío en PDFs oficiales;
+    // unpdf (PDF.js actual) es el plan B barato antes de mandar el binario
+    // a Anthropic (que también rechaza muchos de estos archivos).
+    console.warn(
+      "[extractPdfText] pdf-parse falló, probando unpdf:",
+      err instanceof Error ? err.message : err
+    );
+    try {
+      return await extractTextWithUnpdf(pdfData);
+    } catch (unpdfErr) {
+      if (isPdfParseInvalidError(err) || isPdfParseInvalidError(unpdfErr)) {
+        throw new Error(
+          "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
+        );
+      }
+      throw unpdfErr instanceof Error ? unpdfErr : err;
     }
-    throw err;
   }
+}
+
+export async function extractPdfText(pdfData: Buffer): Promise<string> {
+  const text = await extractPdfTextWithFallback(pdfData);
+  if (text.length > MAX_CHARS) {
+    throw new Error(
+      `Esta Gaceta es demasiado grande para procesarla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
+    );
+  }
+  return text;
 }
 
 /**
@@ -391,23 +420,7 @@ export async function extractPdfText(pdfData: Buffer): Promise<string> {
 export async function extractPdfTextForDescription(
   pdfData: Buffer
 ): Promise<string> {
-  assertPdfMagic(pdfData);
-  try {
-    const pdfParse = (await import("pdf-parse")).default;
-    const data = await pdfParse(pdfData);
-    const text = data.text?.trim() ?? "";
-    if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
-    return text;
-  } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    const message = err instanceof Error ? err.message : String(err);
-    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
-      throw new Error(
-        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
-      );
-    }
-    throw err;
-  }
+  return extractPdfTextWithFallback(pdfData);
 }
 
 /**

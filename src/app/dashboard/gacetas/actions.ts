@@ -45,6 +45,17 @@ function friendlyAiError(err: unknown): string {
       : undefined;
   const message = errorMessage(err);
 
+  // El error que veías en el toast: Anthropic rechaza el binario del PDF
+  // (común con Gacetas oficiales). No tiene sentido reintentar mandando
+  // el mismo archivo; hay que escribir la descripción a mano o reprocesar
+  // cuando ya haya actualizaciones legales (camino gratis).
+  if (
+    /pdf specified was not valid|could not process pdf|not a valid pdf|invalid.*pdf/i.test(
+      message
+    )
+  ) {
+    return "Claude no pudo leer este PDF (formato no soportado o archivo dañado). Escribe la descripción a mano, o procesa la Gaceta primero para armarla desde las actualizaciones.";
+  }
   if (status === 401 || /invalid.*api.?key|authentication/i.test(message)) {
     return "La clave de Anthropic (ANTHROPIC_API_KEY) es inválida o no está autorizada.";
   }
@@ -62,6 +73,10 @@ function friendlyAiError(err: unknown): string {
   }
   if (/credit|billing|quota|insufficient/i.test(message)) {
     return "No hay crédito / cuota disponible en la cuenta de Anthropic. Revisa el billing e intenta de nuevo.";
+  }
+  // Nunca devolver el dump JSON crudo de Anthropic al toast del admin.
+  if (/^\s*\d{3}\s*\{/.test(message) || /"type"\s*:\s*"error"/.test(message)) {
+    return "La IA rechazó la solicitud. Intenta de nuevo o escribe la descripción a mano.";
   }
 
   return message || "No se pudo generar la descripción con IA. Intenta de nuevo o escríbela a mano.";
@@ -234,15 +249,46 @@ async function askHaikuForDescription(
 }
 
 /**
- * Último recurso: pdf-parse no pudo leer el PDF. Mandamos SOLO las
- * primeras páginas a Claude (document API). Enviar la Gaceta entera era
- * la causa principal de errores y de quemar créditos (cada página se
- * cobra como texto + imagen).
+ * Último recurso si ni pdf-parse ni unpdf sacaron texto. Mandamos SOLO
+ * las primeras páginas a Claude (document API). Enviar la Gaceta entera
+ * quemaba créditos y a menudo Anthropic respondía 400 "PDF not valid"
+ * con PDFs oficiales. Si Claude también lo rechaza, devolvemos un error
+ * claro en español (ver friendlyAiError).
  */
 async function describeFromPdfDocument(
   pdfBuffer: Buffer,
-  gacetaNumber: string
+  gacetaNumber: string,
+  pdfUrl: string | null
 ): Promise<string> {
+  const prompt = (pageNote: string) =>
+    `Eres un editor de contenido legal para Honduras. Este es un extracto del PDF de La Gaceta N° ${gacetaNumber}${pageNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}`;
+
+  // 1) Si el PDF ya está en Blob y es chico, Claude lo descarga por URL
+  // (evita base64/pdf-lib, que a veces corrompe PDFs raros). Solo si cabe
+  // en el tope de bytes — Gacetas enormes se recortan abajo.
+  if (pdfUrl && pdfBuffer.length <= MAX_SLICED_PDF_BYTES) {
+    try {
+      return await askHaikuForDescription([
+        {
+          type: "document",
+          source: { type: "url", url: pdfUrl },
+        },
+        { type: "text", text: prompt("") },
+      ]);
+    } catch (urlErr) {
+      console.warn(
+        `[describeFromPdfDocument] URL document falló para ${gacetaNumber}, probando base64 recortado:`,
+        urlErr
+      );
+      // Si Claude dice que el PDF no es válido, no tiene sentido reintentar
+      // el mismo archivo en base64 — salimos con el error amigable.
+      const msg = errorMessage(urlErr);
+      if (/pdf specified was not valid|could not process pdf/i.test(msg)) {
+        throw urlErr;
+      }
+    }
+  }
+
   let sliced: { buffer: Buffer; totalPages: number; usedPages: number };
   try {
     sliced = await slicePdfFirstPages(pdfBuffer, DESCRIPTION_PDF_MAX_PAGES);
@@ -275,7 +321,7 @@ async function describeFromPdfDocument(
     },
     {
       type: "text",
-      text: `Eres un editor de contenido legal para Honduras. Este es un extracto del PDF de La Gaceta N° ${gacetaNumber}${pageNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}`,
+      text: prompt(pageNote),
     },
   ]);
 }
@@ -331,14 +377,18 @@ ${excerpt}`
       );
       return { ok: true, description, source: "ai-text" };
     } catch (textErr) {
-      // pdf-parse falla con InvalidPDFException en algunos PDFs oficiales;
-      // el parser de documentos de Claude suele poder leerlos igual — pero
-      // SOLO con las primeras páginas, no el PDF entero.
+      // pdf-parse + unpdf fallaron. Último intento: document API (pocas
+      // páginas / URL). Muchos PDFs oficiales también los rechaza Claude
+      // con 400 "PDF not valid" — eso se traduce en friendlyAiError.
       console.warn(
-        `[generateGacetaDescriptionAI] pdf-parse falló para ${gaceta.number}, probando document API (máx ${DESCRIPTION_PDF_MAX_PAGES} págs):`,
+        `[generateGacetaDescriptionAI] extracción de texto falló para ${gaceta.number}, probando document API:`,
         textErr
       );
-      const description = await describeFromPdfDocument(pdfBuffer, gaceta.number);
+      const description = await describeFromPdfDocument(
+        pdfBuffer,
+        gaceta.number,
+        gaceta.pdfUrl
+      );
       return { ok: true, description, source: "ai-pdf" };
     }
   } catch (err) {
