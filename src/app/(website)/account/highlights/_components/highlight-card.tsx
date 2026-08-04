@@ -14,8 +14,6 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 interface Props {
-  articleId: string;
-  index: number;
   metaId: string;
   selectedColor: string;
   isBookmarked: boolean;
@@ -25,7 +23,6 @@ interface Props {
 }
 
 const HighlightCard = ({
-  articleId,
   metaId,
   selectedColor,
   isBookmarked,

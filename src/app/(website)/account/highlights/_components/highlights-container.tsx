@@ -117,8 +117,6 @@ const HighlightContainer = () => {
                   {doc.items.map((item) => (
                     <HighlightCard
                       key={item.id}
-                      articleId={item.articleId}
-                      index={0}
                       metaId={item.id}
                       isBookmarked={item.isBookmarked}
                       selectedColor={item.selectedColor ?? "#f0f0f0"}
