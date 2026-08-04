@@ -76,7 +76,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const cu = await auth();
   const isAdmin = cu?.user?.role === "admin";
   const post = await getPost(params.slug, isAdmin);
-  if (!post) return { title: "Actualización no encontrada | Biblioteca Legal HN" };
+  if (!post) return { title: "Actualización no encontrada" };
   const url = `https://www.bibliotecalegalhn.com/actualizaciones/${post.slug}`;
   const title = buildSeoTitle(post.title);
   const description = buildSeoDescription(post.summary);
@@ -119,22 +119,57 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
   return (
     <div className="container max-w-[800px] mt-28 mb-20">
       {!isDraftPreview && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Article",
-              headline: post.title,
-              description: post.summary,
-              url,
-              inLanguage: "es-HN",
-              datePublished: post.publishedAt?.toISOString(),
-              dateModified: post.updatedAt.toISOString(),
-              publisher: { "@type": "Organization", name: "Biblioteca Legal HN", url: "https://www.bibliotecalegalhn.com" },
-            }),
-          }}
-        />
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "Article",
+                headline: post.title,
+                description: post.summary,
+                url,
+                inLanguage: "es-HN",
+                datePublished: post.publishedAt?.toISOString(),
+                dateModified: post.updatedAt.toISOString(),
+                publisher: {
+                  "@type": "Organization",
+                  name: "Biblioteca Legal HN",
+                  url: "https://www.bibliotecalegalhn.com",
+                },
+              }),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  {
+                    "@type": "ListItem",
+                    position: 1,
+                    name: "Inicio",
+                    item: "https://www.bibliotecalegalhn.com",
+                  },
+                  {
+                    "@type": "ListItem",
+                    position: 2,
+                    name: "Actualizaciones",
+                    item: "https://www.bibliotecalegalhn.com/actualizaciones",
+                  },
+                  {
+                    "@type": "ListItem",
+                    position: 3,
+                    name: post.title,
+                    item: url,
+                  },
+                ],
+              }),
+            }}
+          />
+        </>
       )}
       {isDraftPreview && (
         <div className="flex items-center gap-2 mb-6 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-2.5">

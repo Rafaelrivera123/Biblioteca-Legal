@@ -13,7 +13,10 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Biblioteca Legal HN | Leyes y Códigos de Honduras",
+  // absolute evita el template del layout (ya incluye la marca)
+  title: {
+    absolute: "Biblioteca Legal HN | Leyes y Códigos de Honduras",
+  },
   description:
     "La biblioteca jurídica virtual de Honduras. Consulta leyes, códigos, decretos y reglamentos actualizados. Accede al Código Penal, Código Civil, Constitución Política y más.",
   keywords: [

@@ -1,9 +1,17 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 import SIdebar from "./_components/sidebar";
 import Topbar from "./_components/top-bar";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 const DashboardLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();

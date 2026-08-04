@@ -29,7 +29,7 @@ export default function Footer() {
                 src={siteAssets.whiteLogo}
                 height={100}
                 width={100}
-                alt="Logo"
+                alt="Biblioteca Legal HN"
               />
             </div>
             <p className="text-slate-300 text-sm mb-6 leading-relaxed">

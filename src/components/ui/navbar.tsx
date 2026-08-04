@@ -56,7 +56,8 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   };
 
   return (
-    <div
+    <nav
+      aria-label="Principal"
       className={cn(
         "py-3 fixed top-0 z-50 w-full h-[60px] transition duration-300",
         scrolling && "bg-white",
@@ -74,7 +75,12 @@ const Navbar = ({ isLoggedin, user }: Props) => {
         <div className="flex justify-between items-center">
           <div>
             <Link href={"/"} className="bg-red-500">
-              <Image src={logoSrc} width={40} height={40} alt="Logo" />
+              <Image
+                src={logoSrc}
+                width={40}
+                height={40}
+                alt="Biblioteca Legal HN"
+              />
             </Link>
           </div>
           <div className="hidden md:flex items-center md:gap-x-5 lg:gap-x-10">
@@ -184,7 +190,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           </div>
         </div>
       </div>
-    </div>
+    </nav>
   );
 };
 

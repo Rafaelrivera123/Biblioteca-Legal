@@ -9,7 +9,7 @@ const TYPE_CONFIG = {
   REPEAL: { label: "Derogación", icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
 } as const;
 export const metadata: Metadata = {
-  title: "Actualizaciones Legales de Honduras | Biblioteca Legal HN",
+  title: "Actualizaciones Legales de Honduras",
   description:
     "Mantente al día con las reformas, nuevas leyes y derogaciones más recientes publicadas en La Gaceta de Honduras. Resúmenes claros y actualizados semanalmente.",
   alternates: {

@@ -24,13 +24,12 @@ const poppins = Poppins({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export async function generateMetadata(): Promise<Metadata> {
   const data = await prisma.setting.findFirst();
   return {
+    metadataBase: new URL("https://www.bibliotecalegalhn.com"),
     title: {
       default: "Biblioteca Legal HN",
       template: "%s | Biblioteca Legal HN",

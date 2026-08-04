@@ -5,7 +5,21 @@ import { prisma } from "@/lib/db";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Refund Policy",
+  title: "Política de Reembolso",
+  description:
+    "Conoce la política de reembolso de las suscripciones de Biblioteca Legal HN.",
+  openGraph: {
+    title: "Política de Reembolso | Biblioteca Legal HN",
+    description:
+      "Conoce la política de reembolso de las suscripciones de Biblioteca Legal HN.",
+    url: "https://www.bibliotecalegalhn.com/refund-policy",
+    siteName: "Biblioteca Legal HN",
+    locale: "es_HN",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.bibliotecalegalhn.com/refund-policy",
+  },
 };
 
 const Page = async () => {
