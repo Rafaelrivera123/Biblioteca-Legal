@@ -53,7 +53,7 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
     return {
       success: false,
       message:
-        "Esta cuenta usa Google, Facebook o Apple. Inicia sesión con ese método.",
+        "Esta cuenta usa Google o Facebook. Inicia sesión con ese método.",
     };
   }
 

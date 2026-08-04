@@ -28,11 +28,11 @@ const rememberedEmail = Cookies.get("rememberMeEmail");
 const isRemembered = !!rememberedEmail;
 
 type Props = {
-  socialProviders?: Array<"google" | "facebook" | "apple">;
+  socialProviders?: Array<"google" | "facebook">;
 };
 
 export default function LoginForm({
-  socialProviders = ["google", "facebook", "apple"],
+  socialProviders = ["google", "facebook"],
 }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

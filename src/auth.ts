@@ -5,7 +5,6 @@ import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import NextAuth from "next-auth";
 import type { Provider } from "next-auth/providers";
-import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import Facebook from "next-auth/providers/facebook";
 import Google from "next-auth/providers/google";
@@ -32,12 +31,6 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
 if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET) {
   oauthProviders.push(
     Facebook({ allowDangerousEmailAccountLinking: true })
-  );
-}
-
-if (process.env.AUTH_APPLE_ID && process.env.AUTH_APPLE_SECRET) {
-  oauthProviders.push(
-    Apple({ allowDangerousEmailAccountLinking: true })
   );
 }
 
@@ -101,7 +94,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account?.provider === "credentials") return true;
 
       // Always require a real email so we can keep a registry of contacts.
-      // Apple private-relay emails still count (they are valid emails).
       if (!user.email) {
         return "/login?error=EmailRequired";
       }

@@ -44,7 +44,7 @@ export async function changePasswordAction(data: passwordChangeSchemaType) {
     return {
       success: false,
       message:
-        "Tu cuenta no tiene contraseña. Inicia sesión con Google, Facebook o Apple.",
+        "Tu cuenta no tiene contraseña. Inicia sesión con Google o Facebook.",
     };
   }
 

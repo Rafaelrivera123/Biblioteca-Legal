@@ -22,11 +22,11 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 type Props = {
-  socialProviders?: Array<"google" | "facebook" | "apple">;
+  socialProviders?: Array<"google" | "facebook">;
 };
 
 export default function RegistrationForm({
-  socialProviders = ["google", "facebook", "apple"],
+  socialProviders = ["google", "facebook"],
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();

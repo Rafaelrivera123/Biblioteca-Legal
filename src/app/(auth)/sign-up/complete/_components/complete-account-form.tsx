@@ -72,8 +72,8 @@ export default function CompleteAccountForm({
           Confirma tus datos
         </h1>
         <p className="text-sm text-gray-600">
-          Usa tu cuenta de Google, Facebook o Apple para registrarte. Confirma
-          tu nombre y correo para crear tu cuenta en Biblioteca Legal.
+          Usa tu cuenta de Google o Facebook para registrarte. Confirma tu
+          nombre y correo para crear tu cuenta en Biblioteca Legal.
         </p>
 
         <FormField
