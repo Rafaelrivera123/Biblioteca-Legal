@@ -257,6 +257,17 @@ function buildPostFromItem(
   };
 }
 
+function assertPdfMagic(buffer: Buffer): void {
+  // Un PDF válido empieza con "%PDF". Si Blob devolvió HTML/JSON (enlace
+  // roto, auth wall, etc.) o el bytea en Neon está corrupto, pdf-parse
+  // tira InvalidPDFException con poco contexto — mejor fallar acá.
+  if (buffer.length < 5 || buffer.subarray(0, 4).toString("latin1") !== "%PDF") {
+    throw new Error(
+      "El archivo descargado no es un PDF válido (falta la cabecera %PDF). Vuelve a subir la Gaceta."
+    );
+  }
+}
+
 /**
  * Trae los bytes del PDF de una Gaceta. Las Gacetas subidas desde el
  * cambio a Vercel Blob (2026-07-29) solo tienen `pdfUrl`, así que se
@@ -275,10 +286,14 @@ export async function loadGacetaPdfBuffer(
       );
     }
     const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const buffer = Buffer.from(arrayBuffer);
+    assertPdfMagic(buffer);
+    return buffer;
   }
   if (pdfData) {
-    return Buffer.from(pdfData);
+    const buffer = Buffer.from(pdfData);
+    assertPdfMagic(buffer);
+    return buffer;
   }
   throw new Error(
     "Esta Gaceta no tiene archivo guardado (se borró o nunca se subió bien). Vuelve a subirla."
@@ -286,16 +301,60 @@ export async function loadGacetaPdfBuffer(
 }
 
 export async function extractPdfText(pdfData: Buffer): Promise<string> {
-  const pdfParse = (await import("pdf-parse")).default;
-  const data = await pdfParse(pdfData);
-  const text = data.text?.trim() ?? "";
-  if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
-  if (text.length > MAX_CHARS) {
-    throw new Error(
-      `Esta Gaceta es demasiado grande para procesarla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
-    );
+  assertPdfMagic(pdfData);
+  try {
+    const pdfParse = (await import("pdf-parse")).default;
+    const data = await pdfParse(pdfData);
+    const text = data.text?.trim() ?? "";
+    if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
+    if (text.length > MAX_CHARS) {
+      throw new Error(
+        `Esta Gaceta es demasiado grande para procesarla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
+      );
+    }
+    return text;
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    const message = err instanceof Error ? err.message : String(err);
+    // pdf-parse (pdf.js) tira InvalidPDFException con PDFs reales que usa
+    // una estructura que su motor viejo no entiende — cifrado, XRef raro,
+    // linealizado a medias, etc. Reescribimos el mensaje para que el admin
+    // vea algo accionable en vez del nombre interno de la librería.
+    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
+      throw new Error(
+        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
+      );
+    }
+    throw err;
   }
-  return text;
+}
+
+/**
+ * Igual que `extractPdfText`, pero sin el tope de MAX_CHARS: para generar
+ * una descripción corta solo necesitamos un extracto, no el análisis
+ * completo. Si el PDF es enorme, igual devolvemos el texto y el caller
+ * recorta.
+ */
+export async function extractPdfTextForDescription(
+  pdfData: Buffer
+): Promise<string> {
+  assertPdfMagic(pdfData);
+  try {
+    const pdfParse = (await import("pdf-parse")).default;
+    const data = await pdfParse(pdfData);
+    const text = data.text?.trim() ?? "";
+    if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
+    return text;
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    const message = err instanceof Error ? err.message : String(err);
+    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
+      throw new Error(
+        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
+      );
+    }
+    throw err;
+  }
 }
 
 async function analyzeGacetaText(

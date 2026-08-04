@@ -5,7 +5,7 @@ import { del } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import {
-  extractPdfText,
+  extractPdfTextForDescription,
   loadGacetaPdfBuffer,
   processPendingGacetas,
 } from "@/lib/gaceta-processor";
@@ -13,9 +13,18 @@ import { revalidatePath } from "next/cache";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Tope para mandar el PDF entero a Claude como documento cuando pdf-parse
+// no puede leerlo. Más grande que esto suele romper memoria/tiempo en
+// Hobby; el admin puede escribir la descripción a mano.
+const MAX_PDF_BYTES_FOR_DOCUMENT_API = 15 * 1024 * 1024;
+
 async function requireAdmin() {
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("No autorizado");
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -131,16 +140,30 @@ export async function deleteGaceta(id: string) {
  * `buildGacetaDescription` en gaceta-processor.ts), pero el admin puede
  * ajustarla aquí si el resumen automático no queda claro. Un string vacío
  * la deja en null (vuelve al estado "sin descripción").
+ *
+ * Devuelve `{ ok, message }` en vez de tirar: en producción Next.js
+ * redacta cualquier Error de Server Action a un mensaje genérico de
+ * "Server Components render", así que un throw dejaría al admin sin
+ * saber qué falló.
  */
-export async function updateGacetaDescription(id: string, description: string) {
-  await requireAdmin();
-  const trimmed = description.trim();
-  await prisma.gaceta.update({
-    where: { id },
-    data: { description: trimmed.length > 0 ? trimmed : null },
-  });
-  revalidatePath("/dashboard/gacetas");
-  revalidatePath("/gacetas");
+export async function updateGacetaDescription(
+  id: string,
+  description: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await requireAdmin();
+    const trimmed = description.trim();
+    await prisma.gaceta.update({
+      where: { id },
+      data: { description: trimmed.length > 0 ? trimmed : null },
+    });
+    revalidatePath("/dashboard/gacetas");
+    revalidatePath("/gacetas");
+    return { ok: true };
+  } catch (err) {
+    console.error("[updateGacetaDescription]", err);
+    return { ok: false, message: errorMessage(err) || "No se pudo guardar la descripción." };
+  }
 }
 
 // Cuánto texto del PDF le pasamos a la IA cuando no hay actualizaciones
@@ -155,6 +178,69 @@ export async function updateGacetaDescription(id: string, description: string) {
 // de esta llamada a una quinta parte.
 const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 30_000;
 
+type DescriptionResult =
+  | { ok: true; description: string }
+  | { ok: false; message: string };
+
+const FORMAT_INSTRUCTION = `No agregues ninguna introducción, saludo, ni explicación de que estás cumpliendo la instrucción (nada de "De acuerdo a lo solicitado...", "Aquí está...", etc.). No uses viñetas, markdown ni comillas. Responde ÚNICAMENTE con este formato exacto, sin nada antes ni después: <description>tu oración aquí</description>`;
+
+async function askHaikuForDescription(
+  content: Anthropic.MessageCreateParams["messages"][number]["content"]
+): Promise<string> {
+  // Tarea trivial (una sola oración de máximo 40 palabras): claude-sonnet-5
+  // es innecesariamente caro para esto. haiku-4-5 da el mismo resultado a
+  // una fracción del costo por token — mismo modelo que ya usa
+  // batch-create/route.ts para tareas igual de simples.
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 200,
+    messages: [{ role: "user", content }],
+  });
+
+  const block = response.content[0];
+  const rawText = block?.type === "text" ? block.text.trim() : "";
+  if (!rawText) {
+    throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
+  }
+  const text = extractDescriptionTag(rawText);
+  if (!text) {
+    throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
+  }
+  return capWords(text);
+}
+
+/**
+ * Cuando pdf-parse no puede leer el PDF (InvalidPDFException — común con
+ * algunos PDFs oficiales de La Gaceta), mandamos el binario directo a
+ * Claude como documento. Su parser suele tolerar PDFs que el pdf.js viejo
+ * de pdf-parse rechaza.
+ */
+async function describeFromPdfDocument(
+  pdfBuffer: Buffer,
+  gacetaNumber: string
+): Promise<string> {
+  if (pdfBuffer.length > MAX_PDF_BYTES_FOR_DOCUMENT_API) {
+    throw new Error(
+      "Este PDF es demasiado grande para generar la descripción automáticamente. Escríbela a mano o divide el archivo."
+    );
+  }
+
+  return askHaikuForDescription([
+    {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: pdfBuffer.toString("base64"),
+      },
+    },
+    {
+      type: "text",
+      text: `Eres un editor de contenido legal para Honduras. Este es el PDF de La Gaceta N° ${gacetaNumber} (diario oficial de Honduras). Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}`,
+    },
+  ]);
+}
+
 /**
  * Genera con IA una descripción corta (≤40 palabras) de qué contiene una
  * Gaceta, para el botón "Generar con IA" del modal de edición. NO la
@@ -167,71 +253,77 @@ const DESCRIPTION_FALLBACK_EXCERPT_CHARS = 30_000;
  * o procesada pero sin cambios relevantes detectados), el botón igual debe
  * funcionar: en ese caso leemos el PDF original directo y le pedimos a la
  * IA un resumen general de qué trae, sin pasar por el análisis completo.
+ *
+ * Devuelve `{ ok, ... }` en vez de tirar: en producción Next.js redacta
+ * cualquier Error de Server Action a un mensaje genérico, así que un throw
+ * dejaba al admin viendo solo "An error occurred in the Server Components
+ * render..." sin saber que el PDF no se pudo leer.
  */
-export async function generateGacetaDescriptionAI(id: string): Promise<{ description: string }> {
-  await requireAdmin();
+export async function generateGacetaDescriptionAI(
+  id: string
+): Promise<DescriptionResult> {
+  try {
+    await requireAdmin();
 
-  const gaceta = await prisma.gaceta.findUnique({
-    where: { id },
-    select: { number: true, pdfUrl: true, pdfData: true },
-  });
-  if (!gaceta) throw new Error("Gaceta no encontrada.");
+    const gaceta = await prisma.gaceta.findUnique({
+      where: { id },
+      select: { number: true, pdfUrl: true, pdfData: true },
+    });
+    if (!gaceta) return { ok: false, message: "Gaceta no encontrada." };
 
-  const updates = await prisma.legalUpdatePost.findMany({
-    where: { gacetaNumber: gaceta.number },
-    select: { title: true, summary: true, type: true },
-  });
+    const updates = await prisma.legalUpdatePost.findMany({
+      where: { gacetaNumber: gaceta.number },
+      select: { title: true, summary: true, type: true },
+    });
 
-  let prompt: string;
-
-  // Se le pide a la IA que devuelva la oración envuelta en <description>
-  // ...</description> y NADA más — ver `extractDescriptionTag` arriba
-  // sobre por qué (evita frases introductorias que antes rompían tanto el
-  // formato como el recorte de 40 palabras).
-  const formatInstruction = `No agregues ninguna introducción, saludo, ni explicación de que estás cumpliendo la instrucción (nada de "De acuerdo a lo solicitado...", "Aquí está...", etc.). No uses viñetas, markdown ni comillas. Responde ÚNICAMENTE con este formato exacto, sin nada antes ni después: <description>tu oración aquí</description>`;
-
-  if (updates.length > 0) {
-    const list = updates
-      .map((u, i) => `${i + 1}. [${u.type}] ${u.title} — ${u.summary}`)
-      .join("\n");
-    prompt = `Eres un editor de contenido legal para Honduras. A partir de las actualizaciones legales que identificamos en La Gaceta N° ${gaceta.number}, escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma qué contiene esta edición para mostrarla en una tarjeta pública. ${formatInstruction}
+    if (updates.length > 0) {
+      const list = updates
+        .map((u, i) => `${i + 1}. [${u.type}] ${u.title} — ${u.summary}`)
+        .join("\n");
+      const description = await askHaikuForDescription(
+        `Eres un editor de contenido legal para Honduras. A partir de las actualizaciones legales que identificamos en La Gaceta N° ${gaceta.number}, escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma qué contiene esta edición para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}
 
 Actualizaciones identificadas:
-${list}`;
-  } else {
+${list}`
+      );
+      return { ok: true, description };
+    }
+
     const pdfBuffer = await loadGacetaPdfBuffer(gaceta.pdfUrl, gaceta.pdfData);
-    const fullText = await extractPdfText(pdfBuffer);
-    const excerpt = fullText.slice(0, DESCRIPTION_FALLBACK_EXCERPT_CHARS);
-    const truncatedNote =
-      fullText.length > excerpt.length ? " (mostrado parcialmente por su extensión)" : "";
-    prompt = `Eres un editor de contenido legal para Honduras. Este es el texto de La Gaceta N° ${gaceta.number} (diario oficial de Honduras)${truncatedNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${formatInstruction}
+
+    try {
+      const fullText = await extractPdfTextForDescription(pdfBuffer);
+      const excerpt = fullText.slice(0, DESCRIPTION_FALLBACK_EXCERPT_CHARS);
+      const truncatedNote =
+        fullText.length > excerpt.length
+          ? " (mostrado parcialmente por su extensión)"
+          : "";
+      const description = await askHaikuForDescription(
+        `Eres un editor de contenido legal para Honduras. Este es el texto de La Gaceta N° ${gaceta.number} (diario oficial de Honduras)${truncatedNote}. Todavía no tiene un análisis legal generado, así que escribe UNA sola oración en español, natural y clara, de máximo 40 palabras, que resuma de qué trata esta edición en general (por ejemplo, qué tipo de decretos, leyes, acuerdos o avisos contiene), para mostrarla en una tarjeta pública. ${FORMAT_INSTRUCTION}
 
 Texto de la Gaceta:
-${excerpt}`;
+${excerpt}`
+      );
+      return { ok: true, description };
+    } catch (textErr) {
+      // pdf-parse falla con InvalidPDFException en algunos PDFs oficiales;
+      // el parser de documentos de Claude suele poder leerlos igual.
+      console.warn(
+        `[generateGacetaDescriptionAI] pdf-parse falló para ${gaceta.number}, probando document API:`,
+        textErr
+      );
+      const description = await describeFromPdfDocument(pdfBuffer, gaceta.number);
+      return { ok: true, description };
+    }
+  } catch (err) {
+    console.error("[generateGacetaDescriptionAI]", err);
+    return {
+      ok: false,
+      message:
+        errorMessage(err) ||
+        "No se pudo generar la descripción con IA. Intenta de nuevo o escríbela a mano.",
+    };
   }
-
-  // Tarea trivial (una sola oración de máximo 40 palabras): claude-sonnet-5
-  // es innecesariamente caro para esto. haiku-4-5 da el mismo resultado a
-  // una fracción del costo por token — mismo modelo que ya usa
-  // batch-create/route.ts para tareas igual de simples.
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const block = response.content[0];
-  const rawText = block?.type === "text" ? block.text.trim() : "";
-  if (!rawText) {
-    throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
-  }
-
-  const text = extractDescriptionTag(rawText);
-  if (!text) {
-    throw new Error("La IA no devolvió una descripción. Intenta de nuevo.");
-  }
-
-  return { description: capWords(text) };
 }
 
 // Tope de Gacetas por click en "Procesar ahora". Con colas de 100+ Gacetas,
