@@ -1,7 +1,9 @@
 import { auth } from "@/auth";
 import AdSenseScript from "@/components/ads/AdSenseScript";
+import FreePlanMeter from "@/components/ads/FreePlanMeter";
 import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
+import { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 import { notFound, redirect } from "next/navigation";
 import { Metadata } from "next";
 import ArticleContainer from "./_components/article-container";
@@ -119,13 +121,18 @@ const Page = async ({ params }: { params: { id: string } }) => {
     .catch(() => {});
 
   let hasSubscription = false;
+  let freeChatRemaining = FREE_AI_CHAT_LIMIT;
   if (cu?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: cu.user.id },
-      select: { role: true },
+      select: { role: true, freeChatUsed: true },
     });
     hasSubscription =
       user?.role === "admin" || (await isSubscribed());
+    freeChatRemaining = Math.max(
+      0,
+      FREE_AI_CHAT_LIMIT - (user?.freeChatUsed ?? 0)
+    );
   }
 
   // El texto completo del documento (secciones, capítulos y artículos) se
@@ -212,6 +219,9 @@ const Page = async ({ params }: { params: { id: string } }) => {
         hasFullAccess={hasSubscription}
         isLoggedin={isLoggedin}
       />
+      {!hasSubscription && (
+        <FreePlanMeter freeChatRemaining={isLoggedin ? freeChatRemaining : null} />
+      )}
       <ArticleContainer
         documentId={document.id}
         isLoggedin={isLoggedin}
@@ -224,6 +234,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
         documentName={document.name.trim()}
         isLoggedin={isLoggedin}
         hasSubscription={hasSubscription}
+        freeChatRemaining={freeChatRemaining}
       />
     </div>
   );

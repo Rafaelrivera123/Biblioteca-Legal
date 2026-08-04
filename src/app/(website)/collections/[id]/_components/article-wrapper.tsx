@@ -3,6 +3,8 @@ import { useActiveChapterStore, useArticleSearchStore } from "@/store/collection
 import { Article, UserArticleMeta } from "@prisma/client";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ArticleCard from "./article-card";
+import { FREE_SUMMARY_LIMIT } from "@/lib/pricing";
+
 const ADSENSE_CLIENT = "ca-pub-5685390714020326";
 const ADSENSE_SLOT = "6259496363";
 const AD_EVERY_N_ARTICLES = 15;
@@ -95,7 +97,7 @@ const ArticleWrapper = ({
     <div className="space-y-5">
       {sortedData?.map((item, i) => {
         const globalIndex = globalOrderMap.get(item.id) ?? Infinity;
-        const isFreeSummary = globalIndex < 20;
+        const isFreeSummary = globalIndex < FREE_SUMMARY_LIMIT;
         return (
           <div key={item.id}>
             <div

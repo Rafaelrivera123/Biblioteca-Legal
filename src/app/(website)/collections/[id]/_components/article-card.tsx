@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
 import { Article, UserArticleMeta } from "@prisma/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
+import { trackEvent } from "@/lib/analytics";
+import {
+  formatHnl,
+  formatUsd,
+  FREE_SUMMARY_LIMIT,
+  USD_MONTHLY_PRICE,
+} from "@/lib/pricing";
 import { Bookmark, MessageSquare, Sparkles, ChevronDown, ChevronUp, Crown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { memo, useEffect, useRef, useState, useTransition } from "react";
@@ -39,7 +46,8 @@ const PremiumTeaser = ({ onUnlock }: PremiumTeaserProps) => (
             Resumen en lenguaje claro, marcadores y notas
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Herramientas opcionales con el Plan Personal — $5.99/mes
+            Plan Personal — {formatUsd(USD_MONTHLY_PRICE)}/mes (
+            {formatHnl(USD_MONTHLY_PRICE)})
           </p>
         </div>
       </div>
@@ -96,7 +104,7 @@ const ArticleCard = ({
   if (!data?.id) return null;
   const displayLabel = data.articleLabel ?? String(data.articleNumber);
   const isFirstCard = index === 0;
-  // El resumen IA es visible para todos en los primeros 20 artículos del documento.
+  // El resumen IA es visible para todos en los primeros N artículos del documento.
   // Fuera de ese rango, requiere suscripción.
   const canSeeSummary = hasSubscription || isFreeSummary;
   const handleArticleButtonClick = () => {
@@ -111,7 +119,10 @@ const ArticleCard = ({
       setShowSubscribeModal(true);
       return;
     }
-    setShowSummary((prev) => !prev);
+    setShowSummary((prev) => {
+      if (!prev) trackEvent("ai_summary_open", { free: isFreeSummary });
+      return !prev;
+    });
   };
   const invalidateMeta = () => {
     queryClient.invalidateQueries({ queryKey: ["meta-batch"] });
@@ -156,7 +167,11 @@ const ArticleCard = ({
   };
   return (
     <>
-      <SubscribeModal open={showSubscribeModal} onClose={() => setShowSubscribeModal(false)} />
+      <SubscribeModal
+        open={showSubscribeModal}
+        onClose={() => setShowSubscribeModal(false)}
+        source="article_tools"
+      />
       <motion.div
         ref={cardRef}
         layout
@@ -268,6 +283,12 @@ const ArticleCard = ({
                       <span className="text-xs font-semibold text-purple-700">Resumen en lenguaje claro</span>
                     </div>
                     <p className="text-sm text-purple-900 leading-relaxed">{data.aiSummary}</p>
+                    {isFreeSummary && !hasSubscription && (
+                      <p className="text-[11px] text-purple-700/80 mt-2">
+                        Incluido en los primeros {FREE_SUMMARY_LIMIT} artículos.
+                        Plan Personal desbloquea todos los resúmenes.
+                      </p>
+                    )}
                   </div>
                 </motion.div>
               )}

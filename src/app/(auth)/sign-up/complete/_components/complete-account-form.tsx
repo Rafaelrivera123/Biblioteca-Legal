@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { trackEvent } from "@/lib/analytics";
 import {
   completeAccountSchema,
   CompleteAccountSchemaType,
@@ -56,8 +57,9 @@ export default function CompleteAccountForm({
         return;
       }
 
+      trackEvent("sign_up", { method: "oauth" });
       toast.success(result.message);
-      router.push("/");
+      router.push("/collections");
       router.refresh();
     });
   }

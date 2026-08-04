@@ -87,6 +87,10 @@ model User {
   onboardingCompleted Boolean @default(false)
   // false for new OAuth users until they confirm name/email on /sign-up/complete
   accountCompleted Boolean   @default(true)
+  // Lifetime free AI chat messages used (server-side quota for free users)
+  freeChatUsed     Int       @default(0)
+  // Nurture drip: 0=welcome only, 1=tip sent, 2=offer sent
+  nurtureEmailStep Int       @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }

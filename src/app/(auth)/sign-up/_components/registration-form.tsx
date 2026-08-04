@@ -14,6 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { registeruser } from "@/actions/auth/registration";
 import SocialAuthButtons from "@/components/auth/social-auth-buttons";
+import { trackEvent } from "@/lib/analytics";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition } from "react";
@@ -54,6 +55,7 @@ export default function RegistrationForm({
         return;
       }
 
+      trackEvent("sign_up", { method: "credentials" });
       toast.success("¡Cuenta creada exitosamente! Por favor inicia sesión.");
       router.push("/login");
     });

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 import { Metadata } from "next";
 import LegalAiClient from "./_components/legal-ai-client";
 import { Button } from "@/components/ui/button";
@@ -85,12 +86,14 @@ const Page = async () => {
   const cu = await auth();
   const isLoggedin = !!cu;
   let hasSubscription = false;
+  let freeChatRemaining = FREE_AI_CHAT_LIMIT;
 
   if (cu?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: cu.user.id },
       select: {
         role: true,
+        freeChatUsed: true,
         userSubscription: {
           select: { isActive: true, currentPeriodEnd: true },
         },
@@ -104,12 +107,20 @@ const Page = async () => {
         new Date(user.userSubscription.currentPeriodEnd) > new Date()
       );
     }
+    freeChatRemaining = Math.max(
+      0,
+      FREE_AI_CHAT_LIMIT - (user?.freeChatUsed ?? 0)
+    );
   }
 
-  if (hasSubscription) {
+  if (hasSubscription || (isLoggedin && freeChatRemaining > 0)) {
     return (
       <div className="min-h-screen pt-[60px]">
-        <LegalAiClient isLoggedin={isLoggedin} hasSubscription={hasSubscription} />
+        <LegalAiClient
+          isLoggedin={isLoggedin}
+          hasSubscription={hasSubscription}
+          freeChatRemaining={freeChatRemaining}
+        />
       </div>
     );
   }
