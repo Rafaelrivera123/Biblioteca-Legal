@@ -3,11 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { CalendarIcon, Loader2, Pencil, Save } from "lucide-react";
-import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
 import { updateProfile } from "@/actions/profile/update";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -54,13 +54,17 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
     defaultValues: {
       first_name: user?.first_name ?? "",
       last_name: user?.last_name ?? "",
-      image: user?.image || "/default-profile.jpg", // Default profile image
+      image: user?.image || "",
       email: user?.email || "",
       phone: user?.phone || "",
       dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth) : undefined,
       gender: user?.gender || "",
     },
   });
+
+  const initials =
+    `${user?.first_name?.trim()?.[0] ?? ""}${user?.last_name?.trim()?.[0] ?? ""}`.toUpperCase() ||
+    "U";
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -157,12 +161,16 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
                     }}
                     className="h-full w-full rounded-full relative flex justify-center items-center"
                   >
-                    <Image
-                      src={field.value || "/default-profile.jpg"}
-                      alt="perfil"
-                      fill
-                      className="rounded-full object-cover text-tourHub-green-dark bg-gray-100"
-                    />
+                    <Avatar className="h-full w-full">
+                      <AvatarImage
+                        src={field.value || undefined}
+                        alt="perfil"
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="bg-gray-100 text-tourHub-green-dark text-2xl font-medium">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
                   </motion.div>
                   {imageLoader && (
                     <Loader2 className="animate-spin h-5 w-5 absolute" />

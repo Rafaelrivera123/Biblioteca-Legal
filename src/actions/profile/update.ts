@@ -28,14 +28,20 @@ export async function updateProfile(data: ProfileSchemaType) {
   }
 
   try {
+    const placeholderImages = new Set(["", "/default-profile.jpg", "/placeholder.svg"]);
+    const image = parsedData.data.image?.trim();
     const updatedUser = await prisma.user.update({
       where: {
         id: cu.user.id,
       },
-      data: parsedData.data,
+      data: {
+        ...parsedData.data,
+        image: image && !placeholderImages.has(image) ? image : null,
+      },
     });
 
     revalidatePath("/account");
+    revalidatePath("/", "layout");
 
     return {
       success: true,
