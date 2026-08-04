@@ -10,6 +10,7 @@ import {
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import { trackEvent } from "@/lib/analytics";
 import {
+  ANNUAL_DISCOUNT_PERCENT,
   formatHnl,
   formatUsd,
   USD_ANNUAL_PRICE,
@@ -93,7 +94,8 @@ const SubscribeModal = ({ open, onClose, source = "paywall" }: Props) => {
         </ul>
         <p className="text-[12px] text-gray-400 mt-2">
           {formatUsd(USD_MONTHLY_PRICE)}/mes ({formatHnl(USD_MONTHLY_PRICE)}) ·
-          Anual {formatUsd(USD_ANNUAL_PRICE)}/año — 50% menos que 12 meses
+          Anual {formatUsd(USD_ANNUAL_PRICE)}/año — {ANNUAL_DISCOUNT_PERCENT}% de
+          descuento vs 12 meses
         </p>
         <div className="flex flex-col gap-3 mt-3">
           <Button
@@ -110,7 +112,7 @@ const SubscribeModal = ({ open, onClose, source = "paywall" }: Props) => {
             disabled={loading}
             onClick={() => handleSubscribe("annual")}
           >
-            Activar anual (50% off)
+            Activar anual ({ANNUAL_DISCOUNT_PERCENT}% off)
           </Button>
           <Button
             variant="ghost"

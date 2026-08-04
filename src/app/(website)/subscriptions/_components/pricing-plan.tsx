@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import {
+  ANNUAL_DISCOUNT_PERCENT,
   formatHnl,
   formatUsd,
   USD_ANNUAL_PRICE,
@@ -135,9 +136,9 @@ export default function PricingComparison({
     <div className="container mx-auto py-[100px]">
       <p className="text-center text-sm text-muted-foreground mb-10 max-w-xl mx-auto">
         El texto completo de las leyes es gratis. Paga solo por velocidad: IA,
-        notas y lectura sin anuncios. Anual = 50% vs 12 meses mensuales (
-        {formatUsd(USD_ANNUAL_PRICE)}/año en lugar de{" "}
-        {formatUsd(USD_MONTHLY_PRICE * 12)}).
+        notas y lectura sin anuncios. Anual = {ANNUAL_DISCOUNT_PERCENT}% de
+        descuento vs 12 meses mensuales ({formatUsd(USD_ANNUAL_PRICE)}/año en
+        lugar de {formatUsd(USD_MONTHLY_PRICE * 12)}).
       </p>
       <div className="flex flex-col md:flex-row justify-center gap-10 flex-wrap">
         {/* Free Plan */}
@@ -202,7 +203,7 @@ export default function PricingComparison({
         {/* Personal Annual */}
         <Card className="relative bg-white border-2 border-gray-200 w-full md:max-w-[334px] shadow-[0px_4px_12px_0px_#0000001A]">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[11px] font-semibold px-3 py-1 rounded-full">
-            50% menos que 12 meses
+            {ANNUAL_DISCOUNT_PERCENT}% de descuento
           </div>
           <CardHeader className="text-start pb-8">
             <CardTitle className="text-xl font-semibold text-primary mb-2">
