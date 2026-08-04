@@ -47,7 +47,11 @@ export function EditDescriptionButton({
   function handleSave() {
     startTransition(() => {
       updateGacetaDescription(id, value)
-        .then(() => {
+        .then((res) => {
+          if (!res.ok) {
+            toast.error(res.message);
+            return;
+          }
           toast.success("Descripción actualizada.");
           setOpen(false);
           router.refresh();
@@ -67,6 +71,10 @@ export function EditDescriptionButton({
     startGenerating(() => {
       generateGacetaDescriptionAI(id)
         .then((res) => {
+          if (!res.ok) {
+            toast.error(res.message);
+            return;
+          }
           setValue(res.description);
           toast.success("Descripción generada con IA. Revísala y dale Guardar.");
         })
