@@ -61,3 +61,18 @@ export const forgetPassword = z.object({
 });
 
 export type ForgetPasswordType = z.infer<typeof forgetPassword>;
+
+// Complete OAuth account (confirm name/email + accept terms)
+export const completeAccountSchema = z.object({
+  first_name: z.string().min(1, { message: "El nombre es obligatorio" }),
+  last_name: z.string().min(1, { message: "El apellido es obligatorio" }),
+  email: z.string().email({ message: "Correo inválido" }),
+  terms: z.literal(true, {
+    errorMap: () => ({
+      message: "Debes aceptar los Términos de Servicio",
+    }),
+  }),
+  promotion: z.boolean().default(true).optional(),
+});
+
+export type CompleteAccountSchemaType = z.infer<typeof completeAccountSchema>;

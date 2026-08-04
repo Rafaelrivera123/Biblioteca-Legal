@@ -1,5 +1,6 @@
 import HeaderSection from "@/components/shared/sections/header";
 import { siteAssets } from "@/helper/assets";
+import { getEnabledSocialProviders } from "@/lib/social-providers";
 import RegistrationForm from "./_components/registration-form";
 
 const Page = () => {
@@ -20,7 +21,7 @@ const Page = () => {
             Completa el siguiente formulario para crear tu cuenta
           </p>
         </div>
-        <RegistrationForm />
+        <RegistrationForm socialProviders={getEnabledSocialProviders()} />
       </div>
     </div>
   );

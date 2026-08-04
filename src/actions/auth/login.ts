@@ -48,8 +48,19 @@ export async function loginAction({ data, userAgent, ipAddress }: Props) {
     };
   }
 
-  // 3. Validate password
-  const isPasswordValid = await bcrypt.compare(parsedData.password, user.password);
+  // 3. Validate password (OAuth-only users have no password)
+  if (!user.password) {
+    return {
+      success: false,
+      message:
+        "Esta cuenta usa Google, Facebook o Apple. Inicia sesión con ese método.",
+    };
+  }
+
+  const isPasswordValid = await bcrypt.compare(
+    parsedData.password,
+    user.password
+  );
   if (!isPasswordValid) {
     return { success: false, message: "Incorrect password." };
   }

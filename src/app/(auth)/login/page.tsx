@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { logoSrc, siteAssets } from "@/helper/assets";
+import { getEnabledSocialProviders } from "@/lib/social-providers";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -13,6 +14,9 @@ export default async function LoginPage({
   const cu = await auth();
 
   if (cu) {
+    if (cu.user.accountCompleted === false) {
+      redirect("/sign-up/complete");
+    }
     const destination =
       searchParams?.redirectTo?.startsWith("/")
         ? searchParams.redirectTo
@@ -56,7 +60,7 @@ export default async function LoginPage({
 
           {/* Componente de formulario de inicio de sesión */}
           <Suspense fallback={null}>
-            <LoginForm />
+            <LoginForm socialProviders={getEnabledSocialProviders()} />
           </Suspense>
         </div>
       </div>

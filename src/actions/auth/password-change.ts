@@ -40,6 +40,14 @@ export async function changePasswordAction(data: passwordChangeSchemaType) {
     };
   }
 
+  if (!user.password) {
+    return {
+      success: false,
+      message:
+        "Tu cuenta no tiene contraseña. Inicia sesión con Google, Facebook o Apple.",
+    };
+  }
+
   const isPasswordValid = await bcrypt.compare(
     parsedData.data.currentPassword,
     user.password

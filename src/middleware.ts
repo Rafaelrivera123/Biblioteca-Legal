@@ -9,6 +9,18 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
   const isAdmin = req.auth?.user?.role === "admin";
+  const accountCompleted = req.auth?.user?.accountCompleted !== false;
+
+  // Force OAuth users to finish creating their account (confirm name + email).
+  if (
+    isLoggedIn &&
+    !accountCompleted &&
+    !pathname.startsWith("/sign-up/complete") &&
+    !pathname.startsWith("/api/auth") &&
+    pathname !== "/logout"
+  ) {
+    return NextResponse.redirect(new URL("/sign-up/complete", req.url));
+  }
 
   if (pathname.startsWith("/dashboard") && (!isLoggedIn || !isAdmin)) {
     const loginUrl = new URL("/login", req.url);
@@ -46,12 +58,10 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/api/users/:path*",
-    "/api/companies/:path*",
-    "/api/validate-documents",
-    "/api/documents/import",
-    "/api/dashboard/:path*",
+    /*
+     * Account-completion gate + admin route protection.
+     * Skip static assets and payment webhooks.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|api/webhook|api/gacetas/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
