@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import WelcomeEmail from "@/email-templates/welcome-email";
 import { prisma } from "@/lib/db";
-import { resend } from "@/lib/resend";
+import { supersendtx } from "@/lib/supersendtx";
 import { generatePassword } from "@/lib/utils";
 import {
   companySchema,
@@ -124,7 +124,7 @@ export async function addEmployee(data: EmployeeAddSchemaType) {
         throw new Error("Failed to create a new user.");
       }
       // send email
-      await resend.emails.send({
+      await supersendtx.emails.send({
         from: "Biblioteca Legal <support@bibliotecalegalhn.com>",
         to: [newUser.email as string],
         subject: "Welcome to Biblioteca Legal - Your Account is Ready",
