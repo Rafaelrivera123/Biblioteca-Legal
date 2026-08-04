@@ -23,7 +23,7 @@ export default function NurtureOfferEmail({
     <Html>
       <Head />
       <Preview>
-        Plan Personal desde $5.99/mes — o anual a mitad de precio
+        Plan Personal desde $5.99/mes — o anual con 30% de descuento
       </Preview>
       <Tailwind>
         <Body className="bg-gray-50 font-sans">
@@ -39,8 +39,8 @@ export default function NurtureOfferEmail({
                 El texto de las leyes sigue gratis. El Plan Personal desbloquea
                 IA, notas y lectura sin anuncios —{" "}
                 <strong>$5.99/mes (L158.74)</strong>, o el plan anual a{" "}
-                <strong>$35.94/año (L952.41)</strong> — la mitad de lo que
-                costarían 12 meses mensuales.
+                <strong>$50.32/año (L1333.48)</strong> — 30% de descuento vs 12
+                meses mensuales.
               </Text>
               <Button
                 href={`${siteUrl}/subscriptions`}

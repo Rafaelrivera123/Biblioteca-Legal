@@ -9,11 +9,11 @@ import PricingComparison from "./_components/pricing-plan";
 export const metadata: Metadata = {
   title: "Suscripciones",
   description:
-    "Elige el plan de Biblioteca Legal HN: resúmenes con IA, asistente legal, notas y lectura sin anuncios. Mensual o anual a mitad de precio.",
+    "Elige el plan de Biblioteca Legal HN: resúmenes con IA, asistente legal, notas y lectura sin anuncios. Mensual o anual con 30% de descuento.",
   openGraph: {
     title: "Suscripciones | Biblioteca Legal HN",
     description:
-      "Accede a resúmenes con IA, asistente legal y herramientas de estudio. Plan anual a la mitad del precio de 12 meses.",
+      "Accede a resúmenes con IA, asistente legal y herramientas de estudio. Plan anual con 30% de descuento vs 12 meses.",
     url: "https://www.bibliotecalegalhn.com/subscriptions",
     siteName: "Biblioteca Legal HN",
     locale: "es_HN",

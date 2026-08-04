@@ -82,7 +82,7 @@ export async function processNurtureDrip(limit = 50) {
         await supersendtx.emails.send({
           from: FROM,
           to: [user.email],
-          subject: "Plan Personal: mensual o anual a mitad de precio",
+          subject: "Plan Personal: mensual o anual con 30% de descuento",
           react: NurtureOfferEmail({
             firstName: user.first_name || "amigo/a",
             siteUrl: SITE_URL,
