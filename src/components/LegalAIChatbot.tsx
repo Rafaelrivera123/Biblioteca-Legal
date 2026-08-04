@@ -158,20 +158,20 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
             exit={{ scale: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={handleOpen}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#1E2A38] hover:bg-[#1E2A38]/90 transition-colors rounded-2xl shadow-xl px-4 py-3"
+            className="fixed right-4 sm:right-6 z-50 fab-offset flex items-center gap-3 bg-[#1E2A38] hover:bg-[#1E2A38]/90 transition-colors rounded-2xl shadow-xl px-3 sm:px-4 py-3 max-w-[calc(100vw-2rem)]"
             aria-label="Abrir asistente legal IA"
           >
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
               <Scale className="w-5 h-5 text-white" />
             </div>
-            <div className="text-left">
+            <div className="text-left min-w-0">
               <div className="flex items-center gap-1.5">
-                <p className="text-white font-semibold text-[13px] leading-none">
+                <p className="text-white font-semibold text-[13px] leading-none truncate">
                   Asistente Legal IA
                 </p>
-                <Sparkles className="w-3 h-3 text-purple-300" />
+                <Sparkles className="w-3 h-3 text-purple-300 shrink-0" />
               </div>
-              <p className="text-white/60 text-[11px] mt-1 leading-tight max-w-[160px]">
+              <p className="text-white/60 text-[11px] mt-1 leading-tight max-w-[160px] hidden sm:block">
                 Consulta cualquier ley hondureña al instante
               </p>
             </div>
@@ -186,8 +186,8 @@ const LegalAIChatbot = ({ hasSubscription }: Props) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 w-auto sm:w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
-            style={{ height: isMinimized ? "56px" : "500px", transition: "height 0.2s ease" }}
+            className="fixed right-4 left-4 sm:left-auto sm:right-6 z-50 fab-offset w-auto sm:w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
+            style={{ height: isMinimized ? "56px" : "min(500px, calc(100dvh - 8rem))", transition: "height 0.2s ease" }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">

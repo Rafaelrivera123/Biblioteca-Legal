@@ -25,7 +25,7 @@ const Page = async () => {
         />
       </div>
 
-      <div className="flex flex-wrap gap-x-[60px] gap-y-[30px] mt-10 sm:mt-[80px]">
+      <div className="flex flex-wrap gap-3 sm:gap-x-8 sm:gap-y-6 mt-10 sm:mt-[80px]">
         {allCategories.map((item) => (
           <CategoryCard key={item.id} data={item} />
         ))}

@@ -100,8 +100,8 @@ export default function AddArticleModal({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent className="min-w-[800px] overflow-y-auto p-0">
-        <ScrollArea className="max-h-[80vh] p-8 ">
+      <AlertDialogContent className="w-[calc(100%-2rem)] max-w-4xl overflow-y-auto p-0">
+        <ScrollArea className="max-h-[80dvh] p-4 sm:p-8">
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}

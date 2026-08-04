@@ -63,7 +63,7 @@ export default function CompanyContactModal({ trigger }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent className="min-w-[600px]">
+      <AlertDialogContent className="w-[calc(100%-2rem)] max-w-xl">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -137,11 +137,11 @@ export default function CompanyContactModal({ trigger }: Props) {
               )}
             />
 
-            <div className="flex justify-end gap-x-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-x-4">
               <Button
                 type="button"
                 variant="outline"
-                className="text-primary hover:text-primary/80"
+                className="text-primary hover:text-primary/80 w-full sm:w-auto"
                 disabled={pending}
                 onClick={() => {
                   form.reset();
@@ -150,7 +150,7 @@ export default function CompanyContactModal({ trigger }: Props) {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending} className="w-full sm:w-auto">
                 Enviar{" "}
                 {pending && <Loader2 className="ml-2 animate-spin w-4 h-4" />}
               </Button>

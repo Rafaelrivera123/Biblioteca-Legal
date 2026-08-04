@@ -115,8 +115,8 @@ const LegalUpdateCard = ({ data }: Props) => {
   };
   return (
     <>
-      <div className="border-[1px] border-[#1E2A3866]/40 py-[15px] px-[20px] rounded-[8px] bg-white flex items-center justify-between gap-x-[20px]">
-        <div className="min-w-0">
+      <div className="border-[1px] border-[#1E2A3866]/40 py-[15px] px-[16px] sm:px-[20px] rounded-[8px] bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-x-[20px]">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-primary/30 text-primary">
               {TYPE_LABEL[data.type]}
@@ -137,14 +137,14 @@ const LegalUpdateCard = ({ data }: Props) => {
             </span>
           </div>
           <p className="font-medium truncate">{data.title}</p>
-          <p className="text-sm text-muted-foreground truncate">{data.summary}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2 sm:truncate">{data.summary}</p>
           {data.relatedDocument && (
-            <p className="text-[11px] text-primary mt-1">
+            <p className="text-[11px] text-primary mt-1 truncate">
               Relacionado: {data.relatedDocument.name}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-x-1 shrink-0">
+        <div className="flex items-center gap-x-1 shrink-0 self-end sm:self-auto">
           {canUploadGaceta && (
             <Button
               size="icon"

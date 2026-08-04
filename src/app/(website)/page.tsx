@@ -70,7 +70,7 @@ export default async function Home() {
   }
   return (
     <>
-      <div className="h-screen md:h-[80vh] lg:h-screen w-full flex justify-start items-center relative overflow-hidden">
+      <div className="min-h-[100dvh] md:min-h-[80vh] lg:min-h-screen w-full flex justify-start items-center relative overflow-hidden pt-[60px]">
         <Image
           src={siteAssets.homeHero}
           alt="Biblioteca Jurídica Virtual Honduras"
@@ -79,15 +79,15 @@ export default async function Home() {
           quality={75}
           className="object-cover md:object-right-top object-center"
         />
-        <div className="container relative z-10">
-          <h1 className="text-primary font-bold text-[35px] md:text-[40px] lg:text-[60px] leading-[120%]">
+        <div className="container relative z-10 py-8">
+          <h1 className="text-primary font-bold text-[32px] sm:text-[35px] md:text-[40px] lg:text-[60px] leading-[120%]">
             Tu Biblioteca Jurídica Virtual
           </h1>
           <p className="text-white font-normal text-[14px] md:text-[18px] leading-[120%] mt-[25px] max-w-[600px]">
             Accede a documentos legales, leyes y decretos actualizados en una
             sola plataforma centralizada.
           </p>
-          <div className="flex flex-wrap items-center gap-x-[40px] gap-y-4 mt-[40px] md:mt-[60px]">
+          <div className="flex flex-wrap items-center gap-x-6 sm:gap-x-[40px] gap-y-4 mt-[40px] md:mt-[60px]">
             {isLoggedin ? (
               <Button size="lg" asChild>
                 <Link href="/collections">Ver Colección</Link>

@@ -16,14 +16,14 @@ const MobileSidebar = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button className="w-fit" onClick={() => setOpen((p) => !p)}>
-          Account Menu
+        <Button className="w-full sm:w-fit min-h-11" onClick={() => setOpen((p) => !p)}>
+          Menú de cuenta
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="bottom">
+      <SheetContent side="bottom" className="max-h-[85dvh]">
         <SheetHeader>
-          <SheetTitle>Menus</SheetTitle>
+          <SheetTitle>Menú</SheetTitle>
         </SheetHeader>
 
         <AccountSidebar onTabClick={() => setOpen((p) => !p)} />

@@ -155,7 +155,7 @@ const ArticleReviewModal = ({ documentId, documentName, documentData, open, onCl
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { setReimportStep("idle"); setParsedSections(null); onClose(); } }}>
-      <DialogContent className="max-w-[700px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-[700px] max-h-[80dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-primary text-[20px]">
             Revisión de artículos — {documentName}

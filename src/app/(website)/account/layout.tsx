@@ -12,19 +12,19 @@ export const metadata: Metadata = {
 
 const AccountLayout = ({ children }: { children: ReactNode }) => {
   return (
-    <div className="container space-y-10 md:grid h-auto grid-cols-6 pt-[80px] md:pt-[100px] w-full min-h-screen">
+    <div className="container space-y-6 md:space-y-10 md:grid h-auto grid-cols-6 pt-[80px] md:pt-[100px] pb-10 w-full min-h-screen px-4">
       {/* Sidebar column */}
       <div className="col-span-6 md:col-span-1">
         <div className="hidden md:block">
           <AccountSidebar />
         </div>
-        <div className="md:hidden w-full h-fit ">
+        <div className="md:hidden w-full h-fit">
           <MobileSidebar />
         </div>
       </div>
 
       {/* Main content */}
-      <div className="col-span-6 md:col-span-5 md:px-4 lg:px-6 h-full ">
+      <div className="col-span-6 md:col-span-5 md:px-4 lg:px-6 h-full min-w-0">
         <div>{children}</div>
       </div>
     </div>

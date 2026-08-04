@@ -54,12 +54,12 @@ async function getPublishedUpdates() {
 const ActualizacionesPage = async () => {
   const posts = await getPublishedUpdates();
   return (
-    <div className="container max-w-[900px] mt-28 mb-20">
-      <div className="text-center mb-12">
-        <h1 className="font-bold text-[30px] md:text-[40px] leading-[120%] mb-4">
+    <div className="container max-w-[900px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4">
+      <div className="text-center mb-8 sm:mb-12">
+        <h1 className="font-bold text-[26px] sm:text-[30px] md:text-[40px] leading-[120%] mb-4">
           Actualizaciones Legales de Honduras
         </h1>
-        <p className="text-muted-foreground text-base max-w-[650px] mx-auto leading-relaxed">
+        <p className="text-muted-foreground text-sm sm:text-base max-w-[650px] mx-auto leading-relaxed">
           Reformas, nuevas leyes y derogaciones publicadas en La Gaceta, explicadas de forma
           clara para abogados, estudiantes y ciudadanos.
         </p>

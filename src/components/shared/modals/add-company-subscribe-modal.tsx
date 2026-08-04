@@ -88,15 +88,15 @@ export default function AddCompanySubscribeModal({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent className="min-w-[650px]">
+      <AlertDialogContent className="w-[calc(100%-2rem)] max-w-2xl">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="flex items-center justify-between gap-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <FormField
                 control={form.control}
                 name="currentPeriodStart"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="flex flex-col flex-1 min-w-0">
                     <FormLabel>From</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -104,7 +104,7 @@ export default function AddCompanySubscribeModal({
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-[240px] pl-3 text-left font-normal text-primary hover:text-primary/80",
+                              "w-full sm:w-[240px] pl-3 text-left font-normal text-primary hover:text-primary/80",
                               !field.value && ""
                             )}
                           >
@@ -132,14 +132,18 @@ export default function AddCompanySubscribeModal({
                 )}
               />
 
-              <Button variant="outline" className="text-primary mt-5" disabled>
+              <Button
+                variant="outline"
+                className="text-primary sm:mt-5 self-center rotate-90 sm:rotate-0"
+                disabled
+              >
                 <ArrowRightLeft />
               </Button>
               <FormField
                 control={form.control}
                 name="currentPeriodEnd"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="flex flex-col flex-1 min-w-0">
                     <FormLabel>To</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -147,7 +151,7 @@ export default function AddCompanySubscribeModal({
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-[240px] pl-3 text-left font-normal text-primary hover:text-primary/80",
+                              "w-full sm:w-[240px] pl-3 text-left font-normal text-primary hover:text-primary/80",
                               !field.value && ""
                             )}
                           >
@@ -194,10 +198,10 @@ export default function AddCompanySubscribeModal({
                 </FormItem>
               )}
             />
-            <div className="flex justify-end gap-x-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-x-4">
               <Button
                 variant="outline"
-                className="text-primary hover:text-primary/80"
+                className="text-primary hover:text-primary/80 w-full sm:w-auto"
                 onClick={() => {
                   form.reset();
                   setOpen(false);
@@ -207,7 +211,7 @@ export default function AddCompanySubscribeModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending} className="w-full sm:w-auto">
                 Continue
                 {pending && <Loader2 className="animate-spin" />}
               </Button>

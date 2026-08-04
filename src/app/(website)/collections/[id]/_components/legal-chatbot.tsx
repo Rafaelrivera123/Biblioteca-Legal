@@ -187,7 +187,7 @@ const LegalChatbot = ({
             onClick={handleOpen}
             id="tour-chatbot"
             className={cn(
-              "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors",
+              "fixed right-4 sm:right-6 z-50 fab-offset w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors",
               hasSubscription || !trialUsed
                 ? "bg-[#1E2A38] hover:bg-[#1E2A38]/90"
                 : "bg-gray-400 hover:bg-gray-500"
@@ -205,8 +205,8 @@ const LegalChatbot = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 w-auto sm:w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
-            style={{ height: isMinimized ? "56px" : "500px", transition: "height 0.2s ease" }}
+            className="fixed right-4 left-4 sm:left-auto sm:right-6 z-50 fab-offset w-auto sm:w-[340px] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
+            style={{ height: isMinimized ? "56px" : "min(500px, calc(100dvh - 8rem))", transition: "height 0.2s ease" }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">

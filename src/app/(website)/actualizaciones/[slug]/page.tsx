@@ -117,7 +117,7 @@ const ActualizacionDetailPage = async ({ params }: { params: { slug: string } })
   const isDraftPreview = post.status === "draft";
 
   return (
-    <div className="container max-w-[800px] mt-28 mb-20">
+    <div className="container max-w-[800px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4">
       {!isDraftPreview && (
         <>
           <script

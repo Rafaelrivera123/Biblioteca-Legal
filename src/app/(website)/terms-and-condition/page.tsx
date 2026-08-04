@@ -29,7 +29,7 @@ const Page = async () => {
 
   if (!data) {
     content = (
-      <div className="h-[600px] flex justify-center items-center">
+      <div className="min-h-[40vh] flex justify-center items-center py-16">
         Contenido no publicado
       </div>
     );
@@ -45,7 +45,7 @@ const Page = async () => {
         description=""
       />
 
-      <div className="container mr-auto py-10 lg:py-20 max-w-[850px]">
+      <div className="container mx-auto py-10 lg:py-20 max-w-[850px] px-4">
         {content}
       </div>
     </div>

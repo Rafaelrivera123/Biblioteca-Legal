@@ -68,8 +68,24 @@
   * {
     @apply border-border;
   }
+  html {
+    @apply overflow-x-hidden;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
+  }
+}
+
+/* Lift floating action buttons above the cookie consent bar */
+.fab-offset {
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+html.cookie-banner-visible .fab-offset {
+  bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  html.cookie-banner-visible .fab-offset {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

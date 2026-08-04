@@ -37,9 +37,9 @@ const CategoryCard = ({ data }: Props) => {
   };
   return (
     <>
-      <div className="border-[1px] border-[#1E2A3866]/40 py-[15px] px-[20px] rounded-[8px] bg-white flex items-center gap-x-[60px]">
-        {data.name}
-        <div>
+      <div className="border-[1px] border-[#1E2A3866]/40 py-[15px] px-[20px] rounded-[8px] bg-white flex items-center justify-between gap-x-4 w-full sm:w-auto min-w-0 sm:min-w-[220px]">
+        <span className="truncate">{data.name}</span>
+        <div className="flex items-center shrink-0">
           <AddCategoryDialog
             initialData={data}
             trigger={
