@@ -72,7 +72,7 @@ const HighlightContainer = () => {
   let content;
   if (isLoading) {
     content = (
-      <div className="min-h-[600px] flex items-center justify-center">
+      <div className="min-h-[40vh] flex items-center justify-center py-16">
         <Loader2 className="animate-spin" />
       </div>
     );

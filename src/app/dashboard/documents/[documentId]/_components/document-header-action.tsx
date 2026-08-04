@@ -52,16 +52,21 @@ const DocumentHeaderAction = ({ documentId, document }: Props) => {
 
   return (
     <>
-      <div className="flex items-center gap-x-[20px]">
+      <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
         <Button
           variant="outline"
-          className="text-primary hover:text-primary/80"
+          className="text-primary hover:text-primary/80 flex-1 sm:flex-none"
           onClick={statusChange}
           disabled={pending}
         >
           {document.published ? "Unpublish" : "Publish"}
         </Button>
-        <Button variant="destructive" size="icon" onClick={() => setOpen(true)}>
+        <Button
+          variant="destructive"
+          size="icon"
+          className="shrink-0"
+          onClick={() => setOpen(true)}
+        >
           <Trash />
         </Button>
       </div>

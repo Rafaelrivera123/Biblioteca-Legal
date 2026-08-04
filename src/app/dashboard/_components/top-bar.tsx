@@ -28,7 +28,7 @@ const Topbar = ({ name }: Props) => {
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 lg:hidden"
+          className="shrink-0 lg:hidden h-11 w-11"
           onClick={toggleSidebar}
           aria-label="Abrir menú"
         >

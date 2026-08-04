@@ -90,11 +90,11 @@ const ArticleContainer = ({
     }
   }, [documentId]);
   return (
-    <div className="container min-h-[calc(100vh-600px)]">
+    <div className="container min-h-[50vh] px-4 pb-24 lg:pb-10">
       {/* Botón flotante para abrir el índice en móvil y tablet */}
       <button
         onClick={() => setIsIndexOpen(true)}
-        className="lg:hidden fixed bottom-6 left-6 z-40 flex items-center gap-2 bg-primary text-white text-sm font-medium px-4 py-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+        className="lg:hidden fixed left-4 sm:left-6 z-40 fab-offset flex items-center gap-2 bg-primary text-white text-sm font-medium px-4 py-3 min-h-11 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
         aria-label="Abrir índice del documento"
       >
         <List className="w-4 h-4" />

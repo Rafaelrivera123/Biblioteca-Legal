@@ -83,6 +83,10 @@ const GacetasPage = async ({
           Todavía no has subido ninguna Gaceta.
         </p>
       ) : (
+        <>
+        <p className="text-xs text-muted-foreground mb-2 sm:hidden">
+          Desliza horizontalmente para ver todas las columnas.
+        </p>
         <div className="border rounded-xl overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-muted/50">
@@ -174,6 +178,7 @@ const GacetasPage = async ({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

@@ -38,13 +38,15 @@ const ResponsiveDialog = ({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[85vh]">
+        <DrawerContent className="h-[85dvh] max-h-[85dvh]">
           <DrawerHeader>
             <DrawerTitle>{title}</DrawerTitle>
             <DrawerDescription>{description}</DrawerDescription>
           </DrawerHeader>
 
-          <ScrollArea className="p-4 h-[90vh]">{children}</ScrollArea>
+          <ScrollArea className="flex-1 min-h-0 px-4 pb-4 h-[calc(85dvh-5rem)]">
+            {children}
+          </ScrollArea>
         </DrawerContent>
       </Drawer>
     );

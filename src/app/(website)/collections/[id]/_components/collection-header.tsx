@@ -86,7 +86,7 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
             <DocumentSearch documentId={document.id} />
             <Button
               variant="outline"
-              className="text-primary hover:text-primary/80"
+              className="text-primary hover:text-primary/80 w-full sm:w-auto"
               disabled={loading}
               onClick={watchListHandle}
             >
@@ -97,7 +97,12 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
               ) : (
                 <Clock />
               )}{" "}
-              {isWatched ? "Eliminar la lista de seguimiento" : "Guardar"}
+              <span className="sm:hidden">
+                {isWatched ? "Quitar de seguidos" : "Guardar"}
+              </span>
+              <span className="hidden sm:inline">
+                {isWatched ? "Eliminar la lista de seguimiento" : "Guardar"}
+              </span>
             </Button>
           </div>
         )}
@@ -105,16 +110,18 @@ const CollectionHeader = ({ document, hasFullAccess, isLoggedin }: Props) => {
 
       {/* Barra sticky que aparece al hacer scroll */}
       {hasFullAccess && isScrolled && (
-        <div className="fixed top-[64px] left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/10 shadow-sm py-3 px-4">
-          <div className="container mx-auto flex items-center gap-3 max-w-[800px]">
-            <div className="flex-1">
+        <div className="fixed top-[60px] left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-black/10 shadow-sm py-3 px-4">
+          <div className="container mx-auto flex items-center gap-2 sm:gap-3 max-w-[800px]">
+            <div className="flex-1 min-w-0">
               <DocumentSearch documentId={document.id} />
             </div>
             <Button
               variant="outline"
-              className="text-primary hover:text-primary/80 shrink-0"
+              size="icon"
+              className="text-primary hover:text-primary/80 shrink-0 h-10 w-10"
               disabled={loading}
               onClick={watchListHandle}
+              aria-label={isWatched ? "Quitar de seguidos" : "Guardar"}
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={16} />

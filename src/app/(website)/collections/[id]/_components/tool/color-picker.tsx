@@ -73,7 +73,7 @@ const ColorPicker = ({
         exit={{ scale: 0 }}
         transition={{ duration: 0.2 }}
         className={cn(
-          "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+          "w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 touch-manipulation",
           color.bgClass,
           color.hoverClass
         )}
@@ -91,24 +91,26 @@ const ColorPicker = ({
       </motion.button>
     ))}
     <motion.button
-      className="p-1.5 rounded-full hover:bg-gray-200 ml-3"
+      className="p-2.5 sm:p-2 rounded-full hover:bg-gray-200 ml-1 sm:ml-3 min-h-10 min-w-10 flex items-center justify-center touch-manipulation"
       onClick={onOpenComment}
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       exit={{ scale: 0 }}
       transition={{ duration: 0.2 }}
+      aria-label="Agregar nota"
     >
-      <Mail size={16} />
+      <Mail size={18} />
     </motion.button>
     <motion.button
-      className="p-1.5 rounded-full hover:bg-gray-200"
+      className="p-2.5 sm:p-2 rounded-full hover:bg-gray-200 min-h-10 min-w-10 flex items-center justify-center touch-manipulation"
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       exit={{ scale: 0 }}
       transition={{ duration: 0.2 }}
       onClick={onBookmark}
+      aria-label={isBookmarked ? "Quitar marcador" : "Agregar marcador"}
     >
-      <Bookmark size={16} className={cn(isBookmarked && "fill-[#1E2A38] ")} />
+      <Bookmark size={18} className={cn(isBookmarked && "fill-[#1E2A38] ")} />
     </motion.button>
   </motion.div>
 );

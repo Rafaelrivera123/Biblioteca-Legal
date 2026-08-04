@@ -59,6 +59,7 @@ function UserAvatar({
 const Navbar = ({ isLoggedin, user }: Props) => {
   const [isPending, startTransition] = useTransition();
   const [scrolling, setScrolling] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const pathname = usePathname();
 
@@ -174,40 +175,72 @@ const Navbar = ({ isLoggedin, user }: Props) => {
             )}
           </div>
 
-          <div className="md:hidden flex items-center gap-x-4">
+          <div className="md:hidden flex items-center gap-x-3">
             <div>
               {!isLoggedin && (
-                <Button size="sm" asChild>
+                <Button size="sm" asChild className="min-h-10">
                   <Link href="/login">Iniciar sesión</Link>
                 </Button>
               )}
               {isLoggedin && (
-                <Link href="/account" className="flex items-center">
-                  <UserAvatar user={user} />
+                <Link href="/account" className="flex items-center min-h-10 min-w-10 justify-center">
+                  <UserAvatar user={user} className="h-9 w-9" />
                 </Link>
               )}
             </div>
-            <Sheet>
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" className="p-1" size="icon">
-                  <Menu />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11"
+                  aria-label="Abrir menú"
+                >
+                  <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="top" className="bg-white text-primary">
-                <div className="flex flex-col items-center gap-y-8 mt-6">
-                  <div className="flex flex-col items-center gap-y-5">
+                <div className="flex flex-col items-center gap-y-6 mt-6 pb-4">
+                  <div className="flex flex-col items-center gap-y-5 w-full">
                     {menus.map((menu) => (
                       <Link
                         key={menu.id}
                         href={menu.href}
-                        className={`${
+                        className={cn(
+                          "min-h-11 flex items-center justify-center w-full text-base",
                           pathname === menu.href ? "font-semibold" : "font-light"
-                        }`}
+                        )}
                       >
-                        <SheetClose>{menu.linkText}</SheetClose>
+                        <SheetClose className="w-full py-2">
+                          {menu.linkText}
+                        </SheetClose>
                       </Link>
                     ))}
                   </div>
+                  {isLoggedin && (
+                    <div className="flex flex-col items-center gap-y-3 w-full border-t border-black/10 pt-5">
+                      <Button
+                        className="w-full max-w-xs text-primary hover:text-primary/90"
+                        variant="outline"
+                        asChild
+                      >
+                        <Link href="/account" onClick={() => setMobileOpen(false)}>
+                          Cuenta
+                        </Link>
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          setMobileOpen(false);
+                          await onLogout();
+                        }}
+                        className="w-full max-w-xs text-primary hover:text-primary/90"
+                        variant="outline"
+                        disabled={isPending}
+                      >
+                        Cerrar sesión
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

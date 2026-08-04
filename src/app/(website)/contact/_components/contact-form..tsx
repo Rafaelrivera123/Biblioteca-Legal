@@ -47,7 +47,7 @@ export default function ContactForm() {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-[30px] max-w-[600px] mx-auto border-[1px] border-black/10 px-[15px] py-[15px]"
+        className="space-y-[30px] w-full max-w-[600px] mx-auto border-[1px] border-black/10 px-4 py-4 sm:px-[15px] sm:py-[15px]"
       >
         <FormField
           control={form.control}

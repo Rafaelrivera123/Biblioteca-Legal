@@ -204,20 +204,20 @@ const LegalAiClient = ({ isLoggedin, hasSubscription }: Props) => {
     <div className="flex flex-col h-[calc(100vh-60px)]">
       {/* Header */}
       <div className="border-b border-gray-100 px-4 py-4 bg-white shrink-0">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#1E2A38]/10 flex items-center justify-center">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#1E2A38]/10 flex items-center justify-center shrink-0">
             <Scale className="w-5 h-5 text-[#1E2A38]" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-base font-semibold text-[#1E2A38] leading-none">
               Análisis Legal IA
             </h1>
             <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              Basado en la legislación hondureña de Biblioteca Legal HN
+              <Sparkles className="w-3 h-3 shrink-0" />
+              <span className="truncate">Legislación hondureña</span>
             </p>
           </div>
-          <div className="ml-auto text-xs text-gray-400">
+          <div className="text-xs text-gray-400 whitespace-nowrap w-full sm:w-auto sm:ml-auto">
             {remaining} / {DAILY_LIMIT} consultas hoy
           </div>
         </div>

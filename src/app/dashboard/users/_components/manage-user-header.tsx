@@ -9,7 +9,7 @@ const ManageUserHeader = () => {
   return (
     <div className="w-full sm:w-auto">
       <Input
-        className="w-full sm:min-w-[400px]"
+        className="w-full max-w-full md:min-w-[320px] lg:min-w-[400px]"
         placeholder="Search by name, email..."
         endIcon={Search}
         value={query}
