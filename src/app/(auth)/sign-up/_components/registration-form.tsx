@@ -54,8 +54,8 @@ export default function RegistrationForm({
         return;
       }
 
-      toast.success("¡Cuenta creada exitosamente! Por favor inicia sesión.");
-      router.push("/login");
+      toast.success("¡Cuenta creada! Revisa tu correo para verificar tu cuenta.");
+      router.push("/sign-up/confirmation");
     });
   }
 

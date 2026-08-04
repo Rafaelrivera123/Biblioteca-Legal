@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
 import { loginAction } from "@/actions/auth/login";
+import { sendMagicLink } from "@/actions/auth/magic-link";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -35,6 +36,8 @@ export default function LoginForm({
   socialProviders = ["google", "facebook"],
 }: Props) {
   const [showPassword, setShowPassword] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pending, startTransition] = useTransition();
   const [isMounted, setMounted] = useState(false);
@@ -107,6 +110,24 @@ export default function LoginForm({
   }
 
   const loading = isLoading || pending;
+
+  async function onMagicLinkSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setIsLoading(true);
+
+    startTransition(() => {
+      sendMagicLink(magicLinkEmail || form.getValues("email"))
+        .then((res) => {
+          if (!res.success) {
+            toast.error(res.message);
+            return;
+          }
+          toast.success(res.message);
+          setShowMagicLink(false);
+        })
+        .finally(() => setIsLoading(false));
+    });
+  }
 
   if (!isMounted) return;
 
@@ -217,6 +238,44 @@ export default function LoginForm({
           </Button>
         </form>
       </Form>
+
+      {showMagicLink ? (
+        <form onSubmit={onMagicLinkSubmit} className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Ingresa tu correo y te enviaremos un enlace para iniciar sesión.
+          </p>
+          <Input
+            type="email"
+            placeholder="Correo electrónico"
+            value={magicLinkEmail}
+            onChange={(event) => setMagicLinkEmail(event.target.value)}
+            disabled={loading}
+            className="border-primary border-[1px] min-h-[45px]"
+            startIcon={Mail}
+          />
+          <Button type="submit" variant="outline" className="w-full" disabled={loading}>
+            Enviar enlace de acceso
+          </Button>
+          <button
+            type="button"
+            className="w-full text-sm text-primary hover:underline"
+            onClick={() => setShowMagicLink(false)}
+          >
+            Volver al inicio de sesión con contraseña
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="w-full text-sm text-primary hover:underline"
+          onClick={() => {
+            setMagicLinkEmail(form.getValues("email"));
+            setShowMagicLink(true);
+          }}
+        >
+          Iniciar sesión con enlace por correo
+        </button>
+      )}
 
       <SocialAuthButtons callbackUrl="/" providers={socialProviders} />
 

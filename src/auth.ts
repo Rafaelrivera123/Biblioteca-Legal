@@ -1,5 +1,6 @@
 import { getUserByEmail, getUserById } from "@/helper/user";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/supersendtx";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -8,6 +9,7 @@ import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import Facebook from "next-auth/providers/facebook";
 import Google from "next-auth/providers/google";
+import SuperSendTX from "supersendtx/authjs";
 import { authConfig } from "./auth.config";
 
 function splitFullName(fullName?: string | null) {
@@ -42,6 +44,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   providers: [
     ...oauthProviders,
+    ...(process.env.SUPERSENDTX_API_KEY
+      ? [
+          SuperSendTX({
+            from: "noreply@bibliotecalegalhn.com",
+            async sendVerificationRequest({ identifier, url }) {
+              await sendTransactionalEmail({
+                to: identifier,
+                subject: "Tu enlace para iniciar sesión — Biblioteca Legal",
+                html: `<p>Haz clic en el siguiente enlace para iniciar sesión en Biblioteca Legal:</p><p><a href="${url}">Iniciar sesión</a></p>`,
+                text: `Inicia sesión en Biblioteca Legal: ${url}`,
+                reply_to: identifier,
+              });
+            },
+          }) as unknown as Provider,
+        ]
+      : []),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },

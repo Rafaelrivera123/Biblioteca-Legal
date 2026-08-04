@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import OtpEmail from "@/email-templates/otp-share-template";
 import { prisma } from "@/lib/db";
-import { supersendtx } from "@/lib/supersendtx";
+import { sendTransactionalEmail } from "@/lib/supersendtx";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 
@@ -55,13 +55,13 @@ export async function sendOtp(email: string) {
     });
 
     // Enviar OTP por correo electrónico
-    await supersendtx.emails.send({
-      from: "Biblioteca Legal <support@bibliotecalegalhn.com>",
-      to: [nuevaSolicitud.email as string],
+    await sendTransactionalEmail({
+      to: nuevaSolicitud.email as string,
       subject: "Código para restablecer tu contraseña",
       react: OtpEmail({
         otpCode: nuevaSolicitud.otp.toString(),
       }),
+      reply_to: nuevaSolicitud.email as string,
     });
 
     return {

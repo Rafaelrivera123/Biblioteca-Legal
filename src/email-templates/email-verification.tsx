@@ -15,7 +15,11 @@ interface EmailVerificationProps {
   verificationUrl?: string;
 }
 
-const baseUrl = process.env.AUTH_URL ? `https://${process.env.AUTH_URL}` : "";
+const baseUrl = process.env.AUTH_URL
+  ? process.env.AUTH_URL.startsWith("http")
+    ? process.env.AUTH_URL.replace(/\/$/, "")
+    : `https://${process.env.AUTH_URL.replace(/\/$/, "")}`
+  : process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? "";
 
 export const EmailVerification = ({
   username = "Simón",

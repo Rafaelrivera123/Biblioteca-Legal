@@ -1,6 +1,7 @@
 "use server";
 import bcrypt from "bcryptjs";
 
+import { createAndSendVerificationEmail } from "@/actions/auth/verify-email";
 import { prisma } from "@/lib/db";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 
@@ -47,9 +48,14 @@ export async function registeruser(
         first_name: parsedData.first_name,
         last_name: parsedData.last_name,
         paddleCustomerId,
-        emailVerified: new Date(), // Por ahora asumimos que el correo ya está verificado
+        emailVerified: null,
       },
     });
+
+    await createAndSendVerificationEmail(
+      parsedData.email,
+      parsedData.first_name || parsedData.email
+    );
 
     // Suscribir al boletín si eligió recibir promociones
     if (parsedData.promotion) {
