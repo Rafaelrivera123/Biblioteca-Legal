@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { loginFormSchema, LoginFormValues } from "@/schemas/auth";
 import Cookies from "js-cookie"; // Import js-cookie for cookie retrieval
+import SocialAuthButtons from "@/components/auth/social-auth-buttons";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -26,7 +27,13 @@ import { toast } from "sonner";
 const rememberedEmail = Cookies.get("rememberMeEmail");
 const isRemembered = !!rememberedEmail;
 
-export default function LoginForm() {
+type Props = {
+  socialProviders?: Array<"google" | "facebook" | "apple">;
+};
+
+export default function LoginForm({
+  socialProviders = ["google", "facebook", "apple"],
+}: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -37,12 +44,21 @@ export default function LoginForm() {
     searchParams.get("redirectTo") ??
     searchParams.get("callbackUrl") ??
     undefined;
+  const authError = searchParams.get("error");
 
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (authError === "EmailRequired") {
+      toast.error(
+        "No pudimos obtener tu correo. Permite el acceso al email o regístrate manualmente."
+      );
+    }
+  }, [authError]);
 
   // Initialize the form
   const form = useForm<LoginFormValues>({
@@ -201,6 +217,8 @@ export default function LoginForm() {
           </Button>
         </form>
       </Form>
+
+      <SocialAuthButtons callbackUrl="/" providers={socialProviders} />
 
       {/* Enlace para registrarse */}
       <div className="text-center text-sm">

@@ -1,61 +1,64 @@
 "use client";
+
+import { completeAccountAction } from "@/actions/auth/complete-account";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { registeruser } from "@/actions/auth/registration";
-import SocialAuthButtons from "@/components/auth/social-auth-buttons";
-import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
+import {
+  completeAccountSchema,
+  CompleteAccountSchemaType,
+} from "@/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 type Props = {
-  socialProviders?: Array<"google" | "facebook" | "apple">;
+  defaultValues: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  /** When true, email came from the provider and should stay read-only. */
+  emailLocked?: boolean;
 };
 
-export default function RegistrationForm({
-  socialProviders = ["google", "facebook", "apple"],
+export default function CompleteAccountForm({
+  defaultValues,
+  emailLocked = true,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const form = useForm<RegistrationSchemaType>({
-    resolver: zodResolver(registrationSchema),
+  const form = useForm<CompleteAccountSchemaType>({
+    resolver: zodResolver(completeAccountSchema),
     defaultValues: {
-      first_name: "",
-      last_name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
+      ...defaultValues,
       terms: false as unknown as true,
       promotion: true,
     },
   });
 
-  function onSubmit(values: RegistrationSchemaType) {
+  function onSubmit(values: CompleteAccountSchemaType) {
     startTransition(async () => {
-      // Pass empty string as paddleCustomerId since registration is now free
-      const result = await registeruser(values, "");
-
+      const result = await completeAccountAction(values);
       if (!result.success) {
         toast.error(result.message || "Error al crear la cuenta.");
         return;
       }
 
-      toast.success("¡Cuenta creada exitosamente! Por favor inicia sesión.");
-      router.push("/login");
+      toast.success(result.message);
+      router.push("/");
+      router.refresh();
     });
   }
 
@@ -66,8 +69,13 @@ export default function RegistrationForm({
         className="space-y-[20px] max-w-[730px] mx-auto py-10"
       >
         <h1 className="text-black font-semibold text-[20px] leading-[120%]">
-          Información personal
+          Confirma tus datos
         </h1>
+        <p className="text-sm text-gray-600">
+          Usa tu cuenta de Google, Facebook o Apple para registrarte. Confirma
+          tu nombre y correo para crear tu cuenta en Biblioteca Legal.
+        </p>
+
         <FormField
           control={form.control}
           name="first_name"
@@ -81,6 +89,7 @@ export default function RegistrationForm({
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="last_name"
@@ -94,6 +103,7 @@ export default function RegistrationForm({
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="email"
@@ -104,6 +114,8 @@ export default function RegistrationForm({
                 <Input
                   placeholder="Ingresa tu correo electrónico"
                   type="email"
+                  readOnly={emailLocked}
+                  className={emailLocked ? "bg-gray-50" : undefined}
                   {...field}
                 />
               </FormControl>
@@ -111,47 +123,8 @@ export default function RegistrationForm({
             </FormItem>
           )}
         />
-        <h1 className="text-black font-semibold text-[20px] leading-[120%] pt-[30px]">
-          Seguridad de la cuenta
-        </h1>
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Contraseña</FormLabel>
-              <FormControl>
-                <PasswordInput placeholder="Ingresa tu contraseña" {...field} />
-              </FormControl>
-              <FormDescription>
-                La contraseña debe tener al menos 8 caracteres e incluir
-                mayúsculas, minúsculas y números.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="confirmPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Confirmar contraseña</FormLabel>
-              <FormControl>
-                <PasswordInput
-                  placeholder="Confirma tu contraseña"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+
         <div className="space-y-3 pt-[20px]">
-          <p className="text-black font-medium text-[12px] md:text-[14px] mb-[20px]">
-            Al crear una cuenta, aceptas nuestros Términos de servicio y
-            Política de privacidad.
-          </p>
           <FormField
             control={form.control}
             name="terms"
@@ -193,17 +166,11 @@ export default function RegistrationForm({
             )}
           />
         </div>
+
         <div className="pt-[30px]">
-          <SubmitButton isLoading={isPending}>Registrarse</SubmitButton>
+          <SubmitButton isLoading={isPending}>Crear mi cuenta</SubmitButton>
         </div>
       </form>
-
-      <div className="max-w-[730px] mx-auto pb-10">
-        <SocialAuthButtons
-          callbackUrl="/sign-up/complete"
-          providers={socialProviders}
-        />
-      </div>
     </Form>
   );
 }

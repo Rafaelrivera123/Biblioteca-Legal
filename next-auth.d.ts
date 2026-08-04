@@ -4,6 +4,7 @@ import { type DefaultJWT } from "next-auth/jwt";
 
 export type ExtendedUser = DefaultSession["user"] & {
   role: Role;
+  accountCompleted: boolean;
 };
 
 declare module "next-auth" {
@@ -13,11 +14,13 @@ declare module "next-auth" {
 
   interface User {
     role?: Role;
+    accountCompleted?: boolean;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     role?: Role;
+    accountCompleted?: boolean;
   }
 }

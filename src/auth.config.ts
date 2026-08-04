@@ -16,6 +16,11 @@ export const authConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role?: Role }).role;
+        if ((user as { accountCompleted?: boolean }).accountCompleted !== undefined) {
+          token.accountCompleted = (
+            user as { accountCompleted?: boolean }
+          ).accountCompleted;
+        }
       }
       return token;
     },
@@ -25,6 +30,7 @@ export const authConfig = {
       }
       if (session.user) {
         session.user.role = token.role as Role;
+        session.user.accountCompleted = token.accountCompleted !== false;
       }
       return session;
     },
@@ -34,5 +40,6 @@ export const authConfig = {
   },
   pages: {
     signIn: "/login",
+    newUser: "/sign-up/complete",
   },
 } satisfies NextAuthConfig;

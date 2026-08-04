@@ -57,8 +57,10 @@ model Gaceta {
 }
 model User {
   id               String    @id @default(cuid())
-  first_name       String
-  last_name        String
+  // Auth.js OAuth adapter writes `name`; we also keep first/last for the app.
+  name             String?
+  first_name       String    @default("")
+  last_name        String    @default("")
   email            String    @unique
   emailVerified    DateTime?
   image            String?
@@ -69,7 +71,8 @@ model User {
   country          String?
   career           String?
   role             Role      @default(user)
-  password         String
+  // Optional so Google/Facebook/Apple users can register without a password.
+  password         String?
   paddleCustomerId String?
   accounts         Account[]
   sessions         Session[]
@@ -82,6 +85,8 @@ model User {
   company          Company?  @relation(fields: [companyId], references: [id])
   chatUsages       ChatUsage[]
   onboardingCompleted Boolean @default(false)
+  // false for new OAuth users until they confirm name/email on /sign-up/complete
+  accountCompleted Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
