@@ -8,7 +8,6 @@ import { useEffect, useState, useTransition } from "react";
 import { logoutAction } from "@/actions/auth/logout";
 import { logoSrc } from "@/helper/assets";
 import { cn } from "@/lib/utils";
-import { User } from "@prisma/client";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -16,12 +15,21 @@ import { Button } from "../ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "../ui/sheet";
 import FramerDropdown from "./framer-dropdown";
 
+export type NavbarUser = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  image: string | null;
+  role: string;
+};
+
 interface Props {
   isLoggedin: boolean;
-  user: User | null;
+  user: NavbarUser | null;
 }
 
-function getUserInitials(user: User | null) {
+function getUserInitials(user: NavbarUser | null) {
   const first = user?.first_name?.trim()?.[0] ?? "";
   const last = user?.last_name?.trim()?.[0] ?? "";
   const initials = `${first}${last}`.toUpperCase();
@@ -33,7 +41,7 @@ function UserAvatar({
   id,
   className,
 }: {
-  user: User | null;
+  user: NavbarUser | null;
   id?: string;
   className?: string;
 }) {

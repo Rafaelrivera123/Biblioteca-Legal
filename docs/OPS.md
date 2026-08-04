@@ -40,5 +40,5 @@
 
 - Monthly Personal: `NEXT_PUBLIC_PRICE_ID` ($5.99/mo).
 - Annual Personal: `NEXT_PUBLIC_ANNUAL_PRICE_ID` ($50.32/yr = 30% off 12× monthly). Create the annual price in Paddle Billing and set the env on Vercel.
-- After schema changes (`freeChatUsed`, `nurtureEmailStep`), run `npx prisma db push` against Neon.
+- Schema drift: Vercel `build` runs `prisma db push` so additive columns ship with deploy. For an emergency without redeploy: `npm run db:push` (or `npx prisma db execute --file scripts/add-user-freemium-columns.sql`) against the production `DATABASE_URL`.
 - Nurture drip cron: `GET /api/nurture/drip` daily at 14:00 UTC (requires `CRON_SECRET` / Vercel cron).

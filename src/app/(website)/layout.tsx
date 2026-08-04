@@ -12,8 +12,18 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;
   if (cu?.user?.id) {
+    // Select only navbar fields — avoid SELECT * so additive User columns
+    // cannot take down every website page before db push lands.
     user = await prisma.user.findUnique({
       where: { id: cu.user.id },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        image: true,
+        role: true,
+      },
     });
   }
 
