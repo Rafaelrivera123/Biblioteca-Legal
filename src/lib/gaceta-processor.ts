@@ -4,8 +4,24 @@ import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Balanced cost cap: enough for large Gacetas without unbounded Sonnet bills.
-const MAX_CHARS = 500_000;
+// ── Costo del análisis (objetivo: < ~$0.01 / Gaceta) ──────────────────
+// Haiku 4.5 ≈ $1/MTok input + $5/MTok output. Con ~4k tokens de input
+// (extracto) + ~500–800 de output cortos ⇒ ~$0.006–$0.01. Sonnet con
+// 100k+ chars y contexts largos era ~$0.30–$0.50+ por Gaceta.
+const ANALYSIS_MODEL = "claude-haiku-4-5-20251001";
+/** Caracteres del PDF que mandamos a la IA (el resto se ignora). */
+const ANALYSIS_INPUT_CHARS = 16_000;
+/** Tope de salida: items cortos, sin ensayos. */
+const ANALYSIS_MAX_TOKENS = 2_000;
+const ANALYSIS_TIMEOUT_MS = 60_000;
+
+// Tope local al extraer texto (memoria). NO se manda entero a la IA —
+// solo ANALYSIS_INPUT_CHARS. Si el PDF supera esto, pedimos dividirlo.
+const MAX_EXTRACT_CHARS = 500_000;
+
+// Tope de páginas del PDF que mandamos a Claude como documento cuando
+// pdf-parse/unpdf fallan. Cada página se factura como texto + imagen.
+export const DESCRIPTION_PDF_MAX_PAGES = 3;
 
 interface ReformArticleChange {
   gacetaNumber: string;
@@ -77,10 +93,27 @@ function truncateErrorMessage(message: string, maxLen = 800): string {
  * de Oxford (ej. ["a", "b", "c"] -> "a, b y c"), para armar la descripción
  * corta de la Gaceta en una sola oración legible.
  */
-function joinSpanishList(parts: string[]): string {
+export function joinSpanishList(parts: string[]): string {
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
   return `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
+}
+
+/** Recorta a un máximo de palabras, con ellipsis si hace falta. */
+export function capWords(text: string, maxWords = 40): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return `${words.slice(0, maxWords).join(" ")}…`;
+}
+
+/**
+ * Arma un resumen corto (máx. 40 palabras) a partir de actualizaciones ya
+ * identificadas (títulos/tipos). Costo cero de IA — se usa al procesar y
+ * también desde "Generar con IA" cuando ya hay drafts/publicados.
+ */
+export function buildGacetaDescriptionFromParts(parts: string[]): string | null {
+  if (parts.length === 0) return null;
+  return capWords(`Esta edición trae ${joinSpanishList(parts)}.`);
 }
 
 /**
@@ -108,10 +141,37 @@ function buildGacetaDescription(analysis: AnalysisResult): string | null {
     return `la derogación de ${item.lawName}`;
   });
 
-  const sentence = `Esta edición trae ${joinSpanishList(parts)}.`;
-  const words = sentence.trim().split(/\s+/);
-  if (words.length <= 40) return sentence;
-  return `${words.slice(0, 40).join(" ")}…`;
+  return buildGacetaDescriptionFromParts(parts);
+}
+
+/**
+ * Misma idea que `buildGacetaDescription`, pero a partir de posts ya
+ * guardados en LegalUpdatePost (title + type), sin volver a llamar a la IA.
+ */
+export function buildGacetaDescriptionFromUpdates(
+  updates: { type: string; title: string }[]
+): string | null {
+  if (updates.length === 0) return null;
+
+  const parts = updates.map((u) => {
+    const title = u.title.trim();
+    if (u.type === "REFORM") {
+      if (/^reforma\b/i.test(title)) {
+        return title.charAt(0).toLowerCase() + title.slice(1);
+      }
+      return `reforma relacionada con ${title}`;
+    }
+    if (u.type === "NEW_LAW") return `la nueva ley "${title}"`;
+    if (u.type === "REPEAL") {
+      if (/^derogaci/i.test(title)) {
+        return `la ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+      }
+      return `la derogación de ${title}`;
+    }
+    return title;
+  });
+
+  return buildGacetaDescriptionFromParts(parts);
 }
 
 function slugify(text: string): string {
@@ -300,33 +360,95 @@ export async function loadGacetaPdfBuffer(
   );
 }
 
-export async function extractPdfText(pdfData: Buffer): Promise<string> {
+function isPdfParseInvalidError(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const message = err instanceof Error ? err.message : String(err);
+  return name === "InvalidPDFException" || /invalid pdf/i.test(message);
+}
+
+/**
+ * Extrae texto con unpdf (PDF.js moderno). pdf-parse usa un motor viejo que
+ * rechaza bastantes PDFs oficiales de La Gaceta; unpdf suele leerlos.
+ */
+async function extractTextWithUnpdf(pdfData: Buffer): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(pdfData));
+  const result = await extractText(pdf, { mergePages: true });
+  const text = (typeof result.text === "string" ? result.text : "").trim();
+  if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
+  return text;
+}
+
+async function extractPdfTextWithFallback(pdfData: Buffer): Promise<string> {
   assertPdfMagic(pdfData);
   try {
     const pdfParse = (await import("pdf-parse")).default;
     const data = await pdfParse(pdfData);
     const text = data.text?.trim() ?? "";
     if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
-    if (text.length > MAX_CHARS) {
-      throw new Error(
-        `Esta Gaceta es demasiado grande para procesarla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
-      );
-    }
     return text;
   } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    const message = err instanceof Error ? err.message : String(err);
-    // pdf-parse (pdf.js) tira InvalidPDFException con PDFs reales que usa
-    // una estructura que su motor viejo no entiende — cifrado, XRef raro,
-    // linealizado a medias, etc. Reescribimos el mensaje para que el admin
-    // vea algo accionable en vez del nombre interno de la librería.
-    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
-      throw new Error(
-        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
-      );
+    // pdf-parse falla con InvalidPDFException / vacío en PDFs oficiales;
+    // unpdf (PDF.js actual) es el plan B barato antes de mandar el binario
+    // a Anthropic (que también rechaza muchos de estos archivos).
+    console.warn(
+      "[extractPdfText] pdf-parse falló, probando unpdf:",
+      err instanceof Error ? err.message : err
+    );
+    try {
+      return await extractTextWithUnpdf(pdfData);
+    } catch (unpdfErr) {
+      if (isPdfParseInvalidError(err) || isPdfParseInvalidError(unpdfErr)) {
+        throw new Error(
+          "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
+        );
+      }
+      throw unpdfErr instanceof Error ? unpdfErr : err;
     }
-    throw err;
   }
+}
+
+export async function extractPdfText(pdfData: Buffer): Promise<string> {
+  const text = await extractPdfTextWithFallback(pdfData);
+  if (text.length > MAX_EXTRACT_CHARS) {
+    throw new Error(
+      `Esta Gaceta es demasiado grande para leerla de una vez (${text.length.toLocaleString()} caracteres). Divide el PDF en partes y súbelas por separado.`
+    );
+  }
+  return text;
+}
+
+/**
+ * Recorta el texto que se manda a la IA. Las Gacetas oficiales suelen
+ * poner decretos/acuerdos relevantes al inicio; mandar 100k+ chars era
+ * lo que llevaba el costo a decenas de centavos.
+ */
+function selectAnalysisExcerpt(gacetaText: string): string {
+  if (gacetaText.length <= ANALYSIS_INPUT_CHARS) return gacetaText;
+  return gacetaText.slice(0, ANALYSIS_INPUT_CHARS);
+}
+
+/**
+ * Solo manda al prompt las leyes del catálogo que aparecen en el extracto
+ * (o un subconjunto corto). El catálogo completo inflaba el input gratis.
+ */
+function selectRelevantDocuments(
+  excerpt: string,
+  documents: { id: string; name: string; law_number: string }[]
+): { id: string; name: string; law_number: string }[] {
+  const lower = excerpt.toLowerCase();
+  const matched = documents.filter((d) => {
+    const name = d.name?.trim();
+    const num = d.law_number?.trim();
+    return (
+      (!!name && lower.includes(name.toLowerCase())) ||
+      (!!num && lower.includes(num.toLowerCase()))
+    );
+  });
+  if (matched.length > 0) return matched.slice(0, 30);
+  // Sin coincidencias: catálogo mínimo para que pueda enlazar si acierta
+  // el nombre; 40 entradas cortas cuestan poco vs mandar todo.
+  return documents.slice(0, 40);
 }
 
 /**
@@ -338,23 +460,37 @@ export async function extractPdfText(pdfData: Buffer): Promise<string> {
 export async function extractPdfTextForDescription(
   pdfData: Buffer
 ): Promise<string> {
+  return extractPdfTextWithFallback(pdfData);
+}
+
+/**
+ * Devuelve un PDF nuevo con solo las primeras `maxPages` páginas. Se usa
+ * antes de mandar el archivo a Claude como documento: así no se factura
+ * (ni se intenta parsear) una Gaceta de decenas/centenas de páginas solo
+ * para escribir una oración de descripción.
+ */
+export async function slicePdfFirstPages(
+  pdfData: Buffer,
+  maxPages = DESCRIPTION_PDF_MAX_PAGES
+): Promise<{ buffer: Buffer; totalPages: number; usedPages: number }> {
   assertPdfMagic(pdfData);
-  try {
-    const pdfParse = (await import("pdf-parse")).default;
-    const data = await pdfParse(pdfData);
-    const text = data.text?.trim() ?? "";
-    if (!text) throw new Error("No se pudo extraer texto del PDF (vacío)");
-    return text;
-  } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    const message = err instanceof Error ? err.message : String(err);
-    if (name === "InvalidPDFException" || /invalid pdf/i.test(message)) {
-      throw new Error(
-        "No se pudo leer este PDF (estructura no soportada o archivo dañado). Prueba volver a subirlo; si sigue fallando, escribe la descripción a mano."
-      );
-    }
-    throw err;
+  const { PDFDocument } = await import("pdf-lib");
+  const source = await PDFDocument.load(pdfData, { ignoreEncryption: true });
+  const totalPages = source.getPageCount();
+  const usedPages = Math.min(maxPages, totalPages);
+  if (usedPages >= totalPages) {
+    return { buffer: pdfData, totalPages, usedPages: totalPages };
   }
+
+  const out = await PDFDocument.create();
+  const indices = Array.from({ length: usedPages }, (_, i) => i);
+  const copied = await out.copyPages(source, indices);
+  for (const page of copied) out.addPage(page);
+  return {
+    buffer: Buffer.from(await out.save()),
+    totalPages,
+    usedPages,
+  };
 }
 
 async function analyzeGacetaText(
@@ -362,98 +498,48 @@ async function analyzeGacetaText(
   gacetaText: string,
   documents: { id: string; name: string; law_number: string }[]
 ): Promise<AnalysisResult> {
-  // Con max_tokens tan alto (64000, ver comentario abajo), la API de
-  // Anthropic estima que algunas Gacetas grandes pueden tardar más de 10
-  // minutos y exige usar streaming para esas peticiones (si no, el SDK
-  // tira un error antes de intentarlo, para no dejar al cliente colgado
-  // esperando). Por eso la llamada va en modo stream y esperamos a
-  // finalMessage(), que devuelve el mismo objeto que .create() (mismo
-  // content, stop_reason, usage) una vez termina de generarse todo.
-  //
-  // El timeout acá (180s) es DELIBERADAMENTE más chico que los 300s de
-  // `maxDuration` de la función completa. Antes estaba en 250_000, dejando
-  // solo ~50s de margen para todo lo demás (descarga del PDF, pdf-parse,
-  // varias escrituras a Prisma). En la práctica ese margen no alcanzaba:
-  // Vercel mataba la función a la fuerza ANTES de que este timeout llegara
-  // a dispararse, y como el kill es un SIGKILL (no una excepción de JS), el
-  // bloque catch de processPendingGacetas nunca llegaba a correr — la
-  // Gaceta se quedaba en "processing" para siempre, sin error visible en
-  // ningún lado. Con 180s acá, sí queda margen real (~100-120s) para el
-  // resto del trabajo dentro del tope de 300s, así que este timeout SIEMPRE
-  // se dispara primero como una excepción normal de JS, capturable, y la
-  // Gaceta pasa a "failed" con un mensaje claro en vez de quedar atascada.
-  const stream = anthropic.messages.stream(
-    {
-      model: "claude-sonnet-5",
-      // Antes en 16000: con Gacetas que traen varias reformas grandes (texto
-      // "antes"/"después" transcrito literalmente por artículo) la respuesta
-      // se cortaba antes de cerrar el JSON, y JSON.parse reventaba con
-      // "Unexpected end of JSON input" en vez de un error entendible. Se
-      // sube el techo bastante para que eso deje de pasar en la práctica.
-      max_tokens: 16000,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Texto completo de La Gaceta N° ${gacetaNumber} (extraído del PDF oficial):\n\n${gacetaText}`,
-            },
-            {
-              type: "text",
-              text: `Eres un auditor legislativo experto en la legislación de la República de Honduras.
+  const excerpt = selectAnalysisExcerpt(gacetaText);
+  const catalog = selectRelevantDocuments(excerpt, documents);
+  const truncatedNote =
+    gacetaText.length > excerpt.length
+      ? ` (extracto de los primeros ${excerpt.length.toLocaleString()} caracteres de ${gacetaText.length.toLocaleString()}; prioriza lo que aparezca aquí)`
+      : "";
 
-Analiza el texto completo de esta Gaceta Oficial e identifica las actualizaciones legales que de verdad importan — entre 1 y 5 en total, NUNCA fuerces llegar a un número fijo. Si esta Gaceta solo trae 1 cambio relevante, reporta solo 1. Si trae varios cambios de peso real (reformas a leyes importantes, nuevas leyes, derogaciones), reporta hasta 5, priorizando por impacto real sobre ciudadanos, empresas o el sistema legal. Ignora contenido de trámite puramente administrativo sin relevancia jurídica salvo que no haya nada más relevante en la Gaceta.
-
-Para cada item identificado, clasifícalo como:
-- "REFORM" si modifica artículos de una ley ya existente. Debes extraer, para cada artículo modificado, el texto "before" (redacción anterior) y "after" (redacción nueva), transcritos literalmente del texto de la Gaceta. Si el texto anterior no aparece en la Gaceta, describe conceptualmente el cambio en "before" sin inventar la redacción literal.
-- "NEW_LAW" si crea una ley, decreto, reglamento o disposición nueva.
-- "REPEAL" si deroga una ley o disposición existente.
-
-Bajo ninguna circunstancia inventes o deduzcas números de artículos, decretos o textos que no estén explícitamente en el texto provisto.
-
-Para el campo "context" de cada item, escribe entre 3 y 5 párrafos en español (mínimo 280, máximo 500 palabras). Estructura: (1) qué cambia exactamente y en qué consiste, con el mayor detalle concreto posible; (2) el marco legal o institucional relevante; (3) antecedentes o motivo del cambio si el texto lo menciona; (4) implicaciones prácticas concretas, diferenciando el impacto para ciudadanos, empresas y/o abogados según corresponda. No repitas los datos técnicos (decreto, gaceta, fecha) dentro del "context"; esos van en campos separados. No rellenes con relleno genérico — si el texto no da para el mínimo de palabras con contenido real, entrega lo que sí esté respaldado, aunque quede más corto. Evita reutilizar las mismas frases de transición entre items distintos.
-
-Cuando el item sea una reforma o derogación de una ley que coincida con el catálogo de documentos que te doy abajo, usa exactamente el "name" del catálogo como "lawName" para que se pueda enlazar.
-
-Catálogo actual de la biblioteca legal:
-${JSON.stringify(documents.map((d) => ({ name: d.name, law_number: d.law_number })), null, 2)}
-
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin bloques de código, con esta forma exacta:
-{
-  "reforms": [{"type":"REFORM","lawName":"...","lawNumber":"...","legalSource":"...","gacetaNumber":"${gacetaNumber}","publicationDate":"...","context":"...","changes":[{"gacetaNumber":"${gacetaNumber}","articleLabel":"...","before":"...","after":"..."}]}],
-  "newLaws": [{"type":"NEW_LAW","lawName":"...","decreeNumber":"...","gacetaNumber":"${gacetaNumber}","effectiveDate":"...","context":"...","summary":"..."}],
-  "repeals": [{"type":"REPEAL","lawName":"...","repealingInstrument":"...","gacetaNumber":"${gacetaNumber}","date":"...","context":"..."}]
-}
-Si no hay nada fidedigno para una sección, devuelve un array vacío para esa sección. No agregues campos adicionales.`,
-            },
-          ],
-        },
-      ],
-    },
-    { timeout: 180_000 }
-  );
-
-  // Acumulamos el texto nosotros mismos a partir del evento "text" del
-  // stream, en vez de leerlo de response.content[0].text después de
-  // finalMessage(): se detectó que a veces finalMessage() devuelve
-  // stop_reason correcto (ej. "end_turn", osea que la IA sí terminó de
-  // generar todo) pero con el array "content" vacío, dejando el texto en
-  // 0 caracteres aunque la respuesta real sí se generó completa. Leer el
-  // texto directo del stream evita depender de esa reconstrucción.
-  let rawText = "";
-  stream.on("text", (textDelta) => {
-    rawText += textDelta;
-  });
-
+  // Haiku + extracto corto: no hace falta streaming (el request es chico).
+  // Timeout 60s deja margen amplio bajo los 300s de maxDuration.
   let response;
   try {
-    response = await stream.finalMessage();
+    response = await anthropic.messages.create(
+      {
+        model: ANALYSIS_MODEL,
+        max_tokens: ANALYSIS_MAX_TOKENS,
+        messages: [
+          {
+            role: "user",
+            content: `Eres un auditor legislativo de Honduras. Del texto de La Gaceta N° ${gacetaNumber}${truncatedNote}, identifica entre 0 y 5 actualizaciones legales RELEVANTES (reformas, leyes nuevas, derogaciones). No fuerces un número. Ignora trámites administrativos menores.
+
+Reglas de economía (obligatorias):
+- "context": máximo 40 palabras.
+- "summary" (NEW_LAW): máximo 40 palabras.
+- REFORM "changes": máximo 3 artículos; "before"/"after" en máximo 2 oraciones cada uno (resumen fiel, no transcripción larga).
+- No inventes decretos, artículos ni textos que no estén en el extracto.
+- Si una ley del catálogo coincide, usa exactamente su "name" como lawName.
+
+Catálogo (subset):
+${JSON.stringify(catalog.map((d) => ({ name: d.name, law_number: d.law_number })))}
+
+Texto:
+${excerpt}
+
+Responde ÚNICAMENTE JSON válido (sin markdown) con esta forma:
+{"reforms":[{"type":"REFORM","lawName":"...","lawNumber":"...","legalSource":"...","gacetaNumber":"${gacetaNumber}","publicationDate":"...","context":"...","changes":[{"gacetaNumber":"${gacetaNumber}","articleLabel":"...","before":"...","after":"..."}]}],"newLaws":[{"type":"NEW_LAW","lawName":"...","decreeNumber":"...","gacetaNumber":"${gacetaNumber}","effectiveDate":"...","context":"...","summary":"..."}],"repeals":[{"type":"REPEAL","lawName":"...","repealingInstrument":"...","gacetaNumber":"${gacetaNumber}","date":"...","context":"..."}]}
+Arrays vacíos si no hay nada fidedigno.`,
+          },
+        ],
+      },
+      { timeout: ANALYSIS_TIMEOUT_MS }
+    );
   } catch (err: unknown) {
-    // Distinguimos el timeout (nombre "APIConnectionTimeoutError" en el SDK
-    // de Anthropic, o mensaje que menciona "timed out") de otros errores de
-    // red, para que el mensaje guardado en la Gaceta le diga al usuario
-    // exactamente qué pasó y qué hacer, en vez de un error genérico.
     const errName = err instanceof Error ? err.name : undefined;
     const errMessage = err instanceof Error ? err.message : String(err);
     const isTimeout =
@@ -461,20 +547,19 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
       /timed? ?out/i.test(errMessage);
     if (isTimeout) {
       throw new Error(
-        `El análisis con IA de la Gaceta ${gacetaNumber} no terminó a tiempo (más de 180s). Probablemente esta Gaceta trae demasiado contenido para analizarla de una sola vez. Vuelve a intentarlo con "Reintentar"; si sigue fallando, divide el PDF en partes más pequeñas y súbelas por separado.`
+        `El análisis con IA de la Gaceta ${gacetaNumber} no terminó a tiempo. Vuelve a intentarlo con "Reintentar"; si sigue fallando, divide el PDF.`
       );
     }
     throw err;
   }
 
+  const block = response.content[0];
+  const rawText = block?.type === "text" ? block.text : "";
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
-  // Si la IA se quedó sin tokens a mitad del JSON, el mensaje real del
-  // problema es "se cortó la respuesta", no "JSON inválido". Lo detectamos
-  // aparte para que el error que se guarda en la Gaceta sea entendible.
   if (response.stop_reason === "max_tokens") {
     throw new Error(
-      `La respuesta de la IA se cortó por el límite de tokens (la Gaceta ${gacetaNumber} tiene demasiado contenido para analizarla de una sola vez).`
+      `La respuesta de la IA se cortó por el límite de tokens (Gaceta ${gacetaNumber}). Reintenta; si persiste, divide el PDF.`
     );
   }
 
@@ -516,17 +601,10 @@ Si no hay nada fidedigno para una sección, devuelve un array vacío para esa se
  * 100% manual, solo por este botón.
  *
  * `maxDurationMs` solo controla cuándo dejar de EMPEZAR una Gaceta nueva —
- * no acota una Gaceta ya en curso. Por eso tiene que dejar margen real bajo
- * los 300s de `maxDuration`: una sola Gaceta puede tardar hasta ~180s solo
- * en la llamada a la IA (ver `analyzeGacetaText`), más descarga del PDF,
- * extracción de texto y varias escrituras a Prisma. Antes este default
- * estaba en 260_000 (dejando solo 40s de margen), lo que dejaba muy poco
- * espacio para ese trabajo extra y causaba que Vercel matara la función a
- * la fuerza a mitad de una Gaceta — dejándola en "processing" para siempre,
- * sin que el catch de abajo llegara a marcarla "failed". Con 60_000 el
- * margen real bajo los 300s queda en ~240s, de sobra para que la primera
- * Gaceta siempre termine (bien o mal) dentro del tiempo, y solo se intenta
- * una segunda si sobró tiempo de verdad.
+ * no acota una Gaceta ya en curso. La llamada a Haiku está acotada a ~60s
+ * (ver `analyzeGacetaText`); con budget de 60_000 para empezar Gacetas
+ * nuevas queda margen real bajo los 300s de `maxDuration` para terminar
+ * la que ya está en curso (bien o mal) sin dejarla atascada en "processing".
  */
 export async function processPendingGacetas(
   maxDurationMs = 60_000,

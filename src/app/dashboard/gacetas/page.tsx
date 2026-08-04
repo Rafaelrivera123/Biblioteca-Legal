@@ -72,10 +72,12 @@ const GacetasPage = async ({
         </div>
       </div>
       <p className="text-sm text-muted-foreground mb-6 max-w-[700px]">
-        Sube aquí los PDFs de La Gaceta a medida que salen. El sistema las
-        procesa automáticamente (lunes, miércoles y viernes) en orden de subida,
-        generando entre 1 y 5 actualizaciones por Gaceta según su importancia
-        real, sin repetir nunca la misma Gaceta dos veces.
+        Sube aquí los PDFs de La Gaceta a medida que salen. Usa{" "}
+        <span className="font-medium text-foreground">Procesar ahora</span>{" "}
+        para analizarlas (máx. 5 por click, en orden de subida). Cada una
+        genera entre 1 y 5 actualizaciones según su importancia real, y una
+        descripción corta para la tarjeta pública — sin repetir la misma
+        Gaceta dos veces.
       </p>
 
       {gacetas.length === 0 ? (
