@@ -71,7 +71,7 @@ model User {
   country          String?
   career           String?
   role             Role      @default(user)
-  // Optional so Google/Facebook/Apple users can register without a password.
+  // Optional so Google/Facebook users can register without a password.
   password         String?
   paddleCustomerId String?
   accounts         Account[]

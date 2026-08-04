@@ -29,8 +29,7 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
     return { success: false, message: "Usuario no encontrado." };
   }
 
-  // Keep the OAuth-verified email unless Apple/Google did not provide one
-  // (should not happen) — never let users steal another account's email.
+  // Keep the OAuth-verified email — never let users steal another account's email.
   const emailTaken = await prisma.user.findFirst({
     where: {
       email,
