@@ -4,6 +4,7 @@
 
 - Confirm compute autosuspend is enabled on non-prod branches.
 - After running `scripts/backfill-gaceta-pdf-to-blob.ts`, verify `pdfData` is null for all rows, then drop the column in a follow-up migration.
+- Before cancelling EdgeStore, migrate leftover avatars with `scripts/migrate-edgestore-avatars-to-blob.ts`, then confirm `SELECT COUNT(*) FROM "User" WHERE image LIKE '%edgestore%';` is `0`.
 - Monitor storage growth from article content + pgvector embeddings.
 
 ## Vercel
