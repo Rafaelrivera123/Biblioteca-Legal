@@ -2,7 +2,7 @@
 
 import CompanyCollectTemplate from "@/email-templates/company-collect-template";
 import { prisma } from "@/lib/db";
-import { resend } from "@/lib/resend";
+import { supersendtx } from "@/lib/supersendtx";
 import {
   companyContactSchema,
   CompanyContactSchemaType,
@@ -34,7 +34,7 @@ export async function sendSubscriptionReqCompany(
   const collectedAt = new Date();
 
   try {
-    await resend.emails.send({
+    await supersendtx.emails.send({
       from: `Formulario de Contacto <contacto@bibliotecalegalhn.com>`,
       to: [settings.supportEmail],
       subject: "📥 Nueva Solicitud de Interés de Empresa",

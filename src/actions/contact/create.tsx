@@ -2,7 +2,7 @@
 
 import ContactFormSubmissionTemplate from "@/email-templates/contact-form-submission";
 import { prisma } from "@/lib/db";
-import { resend } from "@/lib/resend";
+import { supersendtx } from "@/lib/supersendtx";
 import { contactFormSchema, ContactFormValues } from "@/schemas/contact";
 
 export async function createContact(data: ContactFormValues) {
@@ -32,8 +32,7 @@ export async function createContact(data: ContactFormValues) {
   const submittedAt = new Date();
 
   try {
-    // Send the email using Resend
-    await resend.emails.send({
+    await supersendtx.emails.send({
       from: `${name} <contact@bibliotecalegalhn.com>`,
       to: [settings.supportEmail],
       subject: "New Contact Form Submission",
