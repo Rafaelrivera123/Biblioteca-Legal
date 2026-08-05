@@ -31,11 +31,14 @@ type Props = {
   };
   /** When true, email came from the provider and should stay read-only. */
   emailLocked?: boolean;
+  /** When set to "subscribe", continue to Personal checkout after signup. */
+  intent?: "subscribe";
 };
 
 export default function CompleteAccountForm({
   defaultValues,
   emailLocked = true,
+  intent,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -59,7 +62,11 @@ export default function CompleteAccountForm({
 
       trackEvent("sign_up", { method: "oauth" });
       toast.success(result.message);
-      router.push("/collections");
+      router.push(
+        intent === "subscribe"
+          ? "/subscriptions?checkout=monthly"
+          : "/collections"
+      );
       router.refresh();
     });
   }

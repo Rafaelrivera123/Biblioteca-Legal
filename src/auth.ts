@@ -34,7 +34,7 @@ if (process.env.AUTH_FACEBOOK_ID && process.env.AUTH_FACEBOOK_SECRET) {
   );
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   // Keep JWT sessions (existing app) while still using the adapter to
@@ -100,12 +100,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return true;
     },
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = (user as { role?: Role }).role;
         token.accountCompleted = (
           user as { accountCompleted?: boolean }
         ).accountCompleted;
+      }
+
+      // Client/server session.update() can flip accountCompleted immediately
+      // so Edge middleware stops redirecting to /sign-up/complete.
+      if (trigger === "update" && session?.user) {
+        const next = session.user as { accountCompleted?: boolean };
+        if (typeof next.accountCompleted === "boolean") {
+          token.accountCompleted = next.accountCompleted;
+        }
       }
 
       // Refresh from DB on sign-in and while the account is still incomplete
@@ -141,8 +150,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: "/login",
-    // New OAuth users land here to confirm name + email and accept terms.
-    newUser: "/sign-up/complete",
+    // Intentionally no `newUser` page: Auth.js would ignore callbackUrl
+    // (and drop ?intent=subscribe). Middleware + signup callbackUrl send
+    // incomplete OAuth users to /sign-up/complete instead.
   },
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 });
