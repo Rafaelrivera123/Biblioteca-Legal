@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { HEAD_CODES, HEAD_CODE_SLUGS } from "@/lib/head-codes";
 import { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 import { siteAssets } from "@/helper/assets";
 import FeaturedGuides from "@/components/FeaturedGuides";
@@ -117,6 +118,20 @@ export default async function Home() {
               </Button>
             )}
           </div>
+          <nav
+            aria-label="Códigos más consultados"
+            className="mt-8 flex flex-wrap gap-2"
+          >
+            {HEAD_CODE_SLUGS.map((slug) => (
+              <Link
+                key={slug}
+                href={`/collections/${slug}`}
+                className="text-sm font-medium text-primary bg-white/90 hover:bg-white px-3 py-1.5 rounded-md transition-colors"
+              >
+                {HEAD_CODES[slug].shortLabel}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
       <ResearchTools />

@@ -19,9 +19,18 @@ interface Props {
   document: Document;
   hasFullAccess: boolean;
   isLoggedin: boolean;
+  /** SEO-aligned H1 (e.g. "Código Penal de Honduras") */
+  displayTitle?: string;
+  /** Unique crawlable intro paragraphs for head codes */
+  seoIntro?: string[];
 }
 
-const CollectionHeader = ({ document, isLoggedin }: Props) => {
+const CollectionHeader = ({
+  document,
+  isLoggedin,
+  displayTitle,
+  seoIntro,
+}: Props) => {
   const [pending, startTransition] = useTransition();
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
@@ -92,13 +101,26 @@ const CollectionHeader = ({ document, isLoggedin }: Props) => {
       {/* Header estático con título */}
       <div className="mt-28 container flex flex-col justify-center items-center gap-y-6">
         <h1 className="font-bold text-[30px] md:text-[35px] lg:text-[40px] leading-[120%] text-center">
-          {document.name}
+          {displayTitle || document.name}
         </h1>
 
         {document.short_description && (
           <p className="text-muted-foreground text-center text-sm md:text-base max-w-[700px] leading-relaxed">
             {document.short_description}
           </p>
+        )}
+
+        {seoIntro && seoIntro.length > 0 && (
+          <div className="max-w-[720px] space-y-3 text-left">
+            {seoIntro.map((paragraph, i) => (
+              <p
+                key={i}
+                className="text-muted-foreground text-sm md:text-[15px] leading-relaxed"
+              >
+                {paragraph}
+              </p>
+            ))}
+          </div>
         )}
 
         {!isScrolled && (
