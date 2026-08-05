@@ -8,22 +8,26 @@ const SITE_URL =
   "https://www.bibliotecalegalhn.com";
 const FROM = "Biblioteca Legal HN <contacto@bibliotecalegalhn.com>";
 
-/** Published SuperSend TX template alias (Bienvenido HTML). */
-const WELCOME_TEMPLATE_ALIAS = "bienvenido-v2";
+/** SuperSend TX automation trigger for the Welcome email flow. */
+const WELCOME_EVENT = "user.created";
 
-export async function sendNurtureWelcome(params: {
+/**
+ * Fire the SuperSend TX event that starts the Welcome email automation.
+ * Does not send mail directly — the dashboard automation owns the template.
+ */
+export async function triggerWelcomeAutomation(params: {
+  userId: string;
   email: string;
   firstName: string;
 }) {
-  await supersendtx.emails.send({
-    from: FROM,
-    to: [params.email],
-    template: {
-      id: WELCOME_TEMPLATE_ALIAS,
-      variables: {
-        name: params.firstName || "amigo/a",
-      },
+  await supersendtx.events.trigger({
+    name: WELCOME_EVENT,
+    userId: params.userId,
+    email: params.email,
+    data: {
+      name: params.firstName || "amigo/a",
     },
+    idempotencyKey: `${WELCOME_EVENT}:${params.userId}`,
   });
 }
 
