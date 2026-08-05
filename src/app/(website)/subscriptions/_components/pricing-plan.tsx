@@ -78,7 +78,7 @@ export default function PricingComparison({
     { name: "10 consultas al asistente legal (total)", included: true },
     { name: "Sin anuncios", included: false },
     { name: "Resúmenes IA en todos los artículos", included: false },
-    { name: "Asistente legal 20 consultas/día", included: false },
+    { name: "Chat IA y asistente legal", included: false },
     { name: "Guardar, resaltar y notas", included: false },
     { name: "Acceso multiusuario", included: false },
   ];
@@ -86,7 +86,7 @@ export default function PricingComparison({
     { name: "Acceso ilimitado al texto de las leyes", included: true },
     { name: "Actualizaciones y noticias", included: true },
     { name: "Resúmenes IA en todos los artículos", included: true },
-    { name: "Asistente legal 20 consultas/día", included: true },
+    { name: "Chat IA y asistente legal", included: true },
     { name: "Sin anuncios", included: true },
     { name: "Guardar, resaltar y notas", included: true },
     { name: "Acceso multiusuario", included: false },

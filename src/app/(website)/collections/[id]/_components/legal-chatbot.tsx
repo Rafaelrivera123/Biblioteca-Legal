@@ -22,8 +22,6 @@ interface Props {
   freeChatRemaining?: number;
 }
 
-const DAILY_LIMIT = 20;
-
 const LegalChatbot = ({
   documentName,
   documentId,
@@ -37,9 +35,8 @@ const LegalChatbot = ({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(
-    hasSubscription ? DAILY_LIMIT : initialFreeRemaining
+    hasSubscription ? null : initialFreeRemaining
   );
-  const [limitReached, setLimitReached] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [quotaExhausted, setQuotaExhausted] = useState(
     !hasSubscription && initialFreeRemaining <= 0
@@ -94,7 +91,7 @@ const LegalChatbot = ({
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || loading || limitReached || !canChat) return;
+    if (!text || loading || !canChat) return;
     const userMessage: Message = { role: "user", text };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
@@ -107,21 +104,10 @@ const LegalChatbot = ({
           message: text,
           documentName,
           documentId,
-          history: messages.slice(-8),
+          history: messages.slice(-4),
         }),
       });
       const data = await res.json();
-      if (res.status === 429 || data.limitReached) {
-        setLimitReached(true);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "model",
-            text: "Has alcanzado tu límite de 20 consultas por hoy. Vuelve mañana para seguir consultando.",
-          },
-        ]);
-        return;
-      }
       if (res.status === 401) {
         setShowSubscribeModal(true);
         setMessages((prev) => [
@@ -141,7 +127,7 @@ const LegalChatbot = ({
           ...prev,
           {
             role: "model",
-            text: `Ya usaste tus **${FREE_AI_CHAT_LIMIT} consultas IA gratis**. Con el **Plan Personal** tienes 20 consultas diarias, resúmenes en todos los artículos, marcadores y notas.`,
+            text: `Ya usaste tus **${FREE_AI_CHAT_LIMIT} consultas IA gratis**. Con el **Plan Personal** puedes hacer preguntas al chat IA y al asistente legal, además de resúmenes, marcadores y notas.`,
           },
         ]);
         setShowSubscribeModal(true);
@@ -307,11 +293,7 @@ const LegalChatbot = ({
                   )}
                 </div>
                 <div className="px-3 py-3 border-t border-gray-100 shrink-0">
-                  {limitReached ? (
-                    <p className="text-center text-[12px] text-gray-400 py-1">
-                      Límite diario alcanzado. Vuelve mañana.
-                    </p>
-                  ) : !canChat ? (
+                  {!canChat ? (
                     <div className="flex flex-col items-center gap-2 py-1">
                       <p className="text-center text-[12px] text-gray-500">
                         {isLoggedin
@@ -348,11 +330,6 @@ const LegalChatbot = ({
                         <Send className="w-4 h-4" />
                       </Button>
                     </div>
-                  )}
-                  {!limitReached && hasSubscription && remaining !== null && (
-                    <p className="text-right text-[11px] text-gray-400 mt-1">
-                      {remaining} / {DAILY_LIMIT} consultas hoy
-                    </p>
                   )}
                 </div>
               </>

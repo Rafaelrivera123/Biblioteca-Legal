@@ -19,8 +19,6 @@ interface Props {
   freeChatRemaining?: number;
 }
 
-const DAILY_LIMIT = 20;
-
 const LegalAiClient = ({
   isLoggedin,
   hasSubscription,
@@ -31,15 +29,14 @@ const LegalAiClient = ({
       role: "assistant",
       text: hasSubscription
         ? "Hola, soy tu asistente legal con acceso a toda la legislación hondureña disponible en Biblioteca Legal HN. Puedes hacerme preguntas legales o subir un documento o imagen para análisis."
-        : `Hola, soy tu asistente legal. Tienes ${freeChatRemaining} consultas IA gratis. Con el Plan Personal obtienes 20 al día y puedes subir archivos.`,
+        : `Hola, soy tu asistente legal. Tienes ${freeChatRemaining} consultas IA gratis. Con el Plan Personal puedes hacer preguntas al chat IA, subir archivos y usar el asistente legal.`,
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [remaining, setRemaining] = useState<number>(
-    hasSubscription ? DAILY_LIMIT : freeChatRemaining
+  const [remaining, setRemaining] = useState<number | null>(
+    hasSubscription ? null : freeChatRemaining
   );
-  const [limitReached, setLimitReached] = useState(false);
   const [quotaExhausted, setQuotaExhausted] = useState(
     !hasSubscription && freeChatRemaining <= 0
   );
@@ -84,7 +81,7 @@ const LegalAiClient = ({
 
   const sendMessage = async () => {
     const text = input.trim();
-    if ((!text && !file) || loading || limitReached) return;
+    if ((!text && !file) || loading) return;
 
     const userMessage: Message = {
       role: "user",
@@ -106,14 +103,14 @@ const LegalAiClient = ({
         formData.append("file", file);
         formData.append(
           "history",
-          JSON.stringify(messages.slice(-8).map((m) => ({ role: m.role, text: m.text })))
+          JSON.stringify(messages.slice(-4).map((m) => ({ role: m.role, text: m.text })))
         );
         body = formData;
       } else {
         headers["Content-Type"] = "application/json";
         body = JSON.stringify({
           message: text,
-          history: messages.slice(-8).map((m) => ({ role: m.role, text: m.text })),
+          history: messages.slice(-4).map((m) => ({ role: m.role, text: m.text })),
         });
       }
 
@@ -124,18 +121,6 @@ const LegalAiClient = ({
       });
 
       const data = await res.json();
-
-      if (res.status === 429 || data.limitReached) {
-        setLimitReached(true);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            text: "Has alcanzado tu límite de 20 consultas por hoy. Vuelve mañana para seguir consultando.",
-          },
-        ]);
-        return;
-      }
 
       if (data.freeQuotaExhausted || res.status === 403) {
         setQuotaExhausted(true);
@@ -204,7 +189,7 @@ const LegalAiClient = ({
         </p>
         <p className="text-gray-400 text-sm max-w-md mb-8">
           {isLoggedin
-            ? "Ya usaste tus consultas IA gratis. El Plan Personal te da 20 consultas al día, resúmenes y notas."
+            ? "Ya usaste tus consultas IA gratis. Con el Plan Personal puedes hacer preguntas al chat IA y al asistente legal, además de resúmenes y notas."
             : "Inicia sesión para usar consultas IA de cortesía, o activa el Plan Personal."}
         </p>
         <Button
@@ -245,11 +230,11 @@ const LegalAiClient = ({
               <span className="truncate">Legislación hondureña</span>
             </p>
           </div>
-          <div className="text-xs text-gray-400 whitespace-nowrap w-full sm:w-auto sm:ml-auto">
-            {hasSubscription
-              ? `${remaining} / ${DAILY_LIMIT} consultas hoy`
-              : `${remaining} consultas IA gratis restantes`}
-          </div>
+          {!hasSubscription && remaining !== null && (
+            <div className="text-xs text-gray-400 whitespace-nowrap w-full sm:w-auto sm:ml-auto">
+              {remaining} consultas IA gratis restantes
+            </div>
+          )}
         </div>
       </div>
 
@@ -323,46 +308,40 @@ const LegalAiClient = ({
               </motion.div>
             </AnimatePresence>
           )}
-          {limitReached ? (
-            <p className="text-center text-sm text-gray-400 py-2">
-              Límite diario alcanzado. Vuelve mañana.
-            </p>
-          ) : (
-            <div className="flex items-end gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="text-gray-400 hover:text-[#1E2A38] transition-colors p-2 shrink-0"
-                aria-label="Subir archivo"
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Pregunta sobre legislación hondureña o sube un documento..."
-                rows={1}
-                className="flex-1 resize-none text-[14px] bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-[#1E2A38]/40 transition-colors max-h-[120px] overflow-y-auto"
-                style={{ lineHeight: "1.5" }}
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={loading || (!input.trim() && !file)}
-                size="icon"
-                className="bg-[#1E2A38] hover:bg-[#1E2A38]/90 shrink-0 w-10 h-10 rounded-xl"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
+          <div className="flex items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-gray-400 hover:text-[#1E2A38] transition-colors p-2 shrink-0"
+              aria-label="Subir archivo"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Pregunta sobre legislación hondureña o sube un documento..."
+              rows={1}
+              className="flex-1 resize-none text-[14px] bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-[#1E2A38]/40 transition-colors max-h-[120px] overflow-y-auto"
+              style={{ lineHeight: "1.5" }}
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={loading || (!input.trim() && !file)}
+              size="icon"
+              className="bg-[#1E2A38] hover:bg-[#1E2A38]/90 shrink-0 w-10 h-10 rounded-xl"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

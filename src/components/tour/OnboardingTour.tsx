@@ -166,7 +166,7 @@ export default function OnboardingTour({ onboardingCompleted, isLoggedin }: Prop
       tour.addStep({
         id: "chatbot",
         title: "Asistente legal",
-        text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos. Hasta 20 consultas diarias para suscriptores.",
+        text: "Haz preguntas sobre el documento y obtén respuestas basadas en sus artículos con el asistente legal.",
         attachTo: { element: "#tour-chatbot", on: "top" },
         buttons: [
           {

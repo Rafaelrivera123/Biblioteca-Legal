@@ -1,12 +1,34 @@
 import { getQueryEmbedding } from "@/lib/embeddings";
 import { prisma } from "@/lib/db";
 
-export const DAILY_CHAT_LIMIT = 20;
 /** Lifetime free AI chats for non-subscribed logged-in users (server-tracked). */
 export { FREE_AI_CHAT_LIMIT } from "@/lib/pricing";
 export const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 export const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
 export const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
+
+/** Keep prompt size bounded so typical questions stay well under ~$0.02. */
+export const ARTICLE_EXCERPT_CHARS = 1200;
+export const CHAT_HISTORY_TURNS = 4;
+const SCOPED_ARTICLE_LIMIT = 6;
+const GLOBAL_EXACT_ARTICLE_LIMIT = 6;
+const GLOBAL_VECTOR_LIMIT_FILTERED = 6;
+const GLOBAL_VECTOR_LIMIT = 8;
+
+function excerptArticleText(content: string, summary?: string | null): string {
+  const trimmedSummary = summary?.trim();
+  if (trimmedSummary) {
+    const remaining = Math.max(200, ARTICLE_EXCERPT_CHARS - trimmedSummary.length);
+    const plain = content.trim();
+    if (!plain) return trimmedSummary;
+    const excerpt =
+      plain.length > remaining ? `${plain.slice(0, remaining).trimEnd()}…` : plain;
+    return `${trimmedSummary}\n${excerpt}`;
+  }
+  const plain = content.trim();
+  if (plain.length <= ARTICLE_EXCERPT_CHARS) return plain;
+  return `${plain.slice(0, ARTICLE_EXCERPT_CHARS).trimEnd()}…`;
+}
 
 export async function getDocumentScopedArticles(
   documentId: string,
@@ -17,18 +39,19 @@ export async function getDocumentScopedArticles(
       articleNumber: number;
       articleLabel: string | null;
       contentPlainText: string;
+      aiSummary: string | null;
     };
     const embedding = await getQueryEmbedding(query);
     const vectorStr = `[${embedding.join(",")}]`;
     const articles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText"
+      `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", a."aiSummary"
        FROM "Article" a
        JOIN "Chapter" c ON a."chapterId" = c.id
        JOIN "Section" s ON c."sectionId" = s.id
        WHERE s."documentId" = $1
        AND a.embedding IS NOT NULL
        ORDER BY a.embedding <=> $2::vector
-       LIMIT 10`,
+       LIMIT ${SCOPED_ARTICLE_LIMIT}`,
       documentId,
       vectorStr
     );
@@ -36,7 +59,7 @@ export async function getDocumentScopedArticles(
     return articles
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
-        return `Articulo ${label}: ${a.contentPlainText}`;
+        return `Articulo ${label}: ${excerptArticleText(a.contentPlainText, a.aiSummary)}`;
       })
       .join("\n\n");
   } catch (err) {
@@ -97,6 +120,7 @@ export async function getGlobalRelevantArticles(
       articleNumber: number;
       articleLabel: string | null;
       contentPlainText: string;
+      aiSummary: string | null;
       documentName: string;
       documentSlug: string;
     };
@@ -112,7 +136,7 @@ export async function getGlobalRelevantArticles(
     if (mentionedArticleNumbers.length > 0) {
       if (hasDocumentFilter) {
         exactArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", a."aiSummary", d."name" as "documentName", d."slug" as "documentSlug"
            FROM "Article" a
            JOIN "Chapter" c ON a."chapterId" = c.id
            JOIN "Section" s ON c."sectionId" = s.id
@@ -120,13 +144,13 @@ export async function getGlobalRelevantArticles(
            WHERE s."documentId" = ANY($1::text[])
            AND a."articleNumber" = ANY($2::int[])
            ORDER BY a."articleNumber"
-           LIMIT 10`,
+           LIMIT ${GLOBAL_EXACT_ARTICLE_LIMIT}`,
           detectedDocumentIds,
           mentionedArticleNumbers
         );
       } else {
         exactArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+          `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", a."aiSummary", d."name" as "documentName", d."slug" as "documentSlug"
            FROM "Article" a
            JOIN "Chapter" c ON a."chapterId" = c.id
            JOIN "Section" s ON c."sectionId" = s.id
@@ -134,7 +158,7 @@ export async function getGlobalRelevantArticles(
            WHERE a."articleNumber" = ANY($1::int[])
            AND a.embedding IS NOT NULL
            ORDER BY a.embedding <=> $2::vector
-           LIMIT 10`,
+           LIMIT ${GLOBAL_EXACT_ARTICLE_LIMIT}`,
           mentionedArticleNumbers,
           vectorStr
         );
@@ -148,7 +172,7 @@ export async function getGlobalRelevantArticles(
     let vectorArticles: ArticleRaw[];
     if (hasDocumentFilter) {
       vectorArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-        `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+        `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", a."aiSummary", d."name" as "documentName", d."slug" as "documentSlug"
          FROM "Article" a
          JOIN "Chapter" c ON a."chapterId" = c.id
          JOIN "Section" s ON c."sectionId" = s.id
@@ -156,20 +180,20 @@ export async function getGlobalRelevantArticles(
          WHERE s."documentId" = ANY($1::text[])
          AND a.embedding IS NOT NULL
          ORDER BY a.embedding <=> $2::vector
-         LIMIT 12`,
+         LIMIT ${GLOBAL_VECTOR_LIMIT_FILTERED}`,
         detectedDocumentIds,
         vectorStr
       );
     } else {
       vectorArticles = await prisma.$queryRawUnsafe<ArticleRaw[]>(
-        `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", d."name" as "documentName", d."slug" as "documentSlug"
+        `SELECT a."articleNumber", a."articleLabel", a."contentPlainText", a."aiSummary", d."name" as "documentName", d."slug" as "documentSlug"
          FROM "Article" a
          JOIN "Chapter" c ON a."chapterId" = c.id
          JOIN "Section" s ON c."sectionId" = s.id
          JOIN "Document" d ON s."documentId" = d.id
          WHERE a.embedding IS NOT NULL
          ORDER BY a.embedding <=> $1::vector
-         LIMIT 15`,
+         LIMIT ${GLOBAL_VECTOR_LIMIT}`,
         vectorStr
       );
     }
@@ -184,7 +208,7 @@ export async function getGlobalRelevantArticles(
       .map((a) => {
         const label = a.articleLabel ?? String(a.articleNumber);
         const url = `https://www.bibliotecalegalhn.com/collections/${a.documentSlug}`;
-        return `[${a.documentName}](${url}) Articulo ${label}: ${a.contentPlainText}`;
+        return `[${a.documentName}](${url}) Articulo ${label}: ${excerptArticleText(a.contentPlainText, a.aiSummary)}`;
       })
       .join("\n\n");
   } catch (err) {

@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import {
-  DAILY_CHAT_LIMIT,
+  CHAT_HISTORY_TURNS,
   FREE_AI_CHAT_LIMIT,
   fileToBase64,
   getDocumentScopedArticles,
@@ -98,17 +98,6 @@ async function handleLegalChat(req: NextRequest) {
     }
 
     const today = new Date().toISOString().split("T")[0];
-    if (hasSubscription && !isAdmin && userId) {
-      const usage = await prisma.chatUsage.findUnique({
-        where: { userId_date: { userId, date: today } },
-      });
-      if (usage && usage.count >= DAILY_CHAT_LIMIT) {
-        return NextResponse.json(
-          { error: "Límite diario alcanzado", limitReached: true },
-          { status: 429 }
-        );
-      }
-    }
 
     const relevantArticles = scoped
       ? documentId
@@ -124,7 +113,7 @@ async function handleLegalChat(req: NextRequest) {
 
     const groqMessages: object[] = [
       { role: "system", content: systemPrompt },
-      ...history.slice(-8).map((h) => ({
+      ...history.slice(-CHAT_HISTORY_TURNS).map((h) => ({
         role: h.role === "model" || h.role === "assistant" ? "assistant" : "user",
         content: h.text,
       })),
@@ -168,7 +157,7 @@ async function handleLegalChat(req: NextRequest) {
       body: JSON.stringify({
         model: file?.type.startsWith("image/") ? GROQ_VISION_MODEL : GROQ_TEXT_MODEL,
         messages: groqMessages,
-        max_tokens: scoped ? 1500 : 2000,
+        max_tokens: scoped ? 1200 : 1500,
         temperature: 0,
       }),
     });
@@ -188,7 +177,7 @@ async function handleLegalChat(req: NextRequest) {
     let remaining: number | null = null;
 
     if (isAdmin) {
-      remaining = 999;
+      remaining = null;
     } else if (usingFreeQuota && userId) {
       const updated = await prisma.user.update({
         where: { id: userId },
@@ -197,15 +186,13 @@ async function handleLegalChat(req: NextRequest) {
       });
       remaining = Math.max(0, FREE_AI_CHAT_LIMIT - updated.freeChatUsed);
     } else if (hasSubscription && userId) {
+      // Track usage for analytics only — no daily hard cap for subscribers.
       await prisma.chatUsage.upsert({
         where: { userId_date: { userId, date: today } },
         update: { count: { increment: 1 } },
         create: { userId, date: today, count: 1 },
       });
-      const updatedUsage = await prisma.chatUsage.findUnique({
-        where: { userId_date: { userId, date: today } },
-      });
-      remaining = DAILY_CHAT_LIMIT - (updatedUsage?.count ?? 1);
+      remaining = null;
     }
 
     return NextResponse.json({
