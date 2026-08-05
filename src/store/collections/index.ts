@@ -14,8 +14,11 @@ const useCollectionSearchStore = create<SearchState>((set) => ({
   category: "all",
   page: 1,
   setPage: (page) => set({ page }),
-  setQuery: (query) => set({ query }),
-  setCategory: (category) => set({ category }),
+  // Reset pagination whenever filters change so results aren't requested
+  // from a stale page (e.g. page 2 of a previous browse) that often has
+  // zero hits for the new query/category.
+  setQuery: (query) => set({ query, page: 1 }),
+  setCategory: (category) => set({ category, page: 1 }),
 }));
 
 export default useCollectionSearchStore;

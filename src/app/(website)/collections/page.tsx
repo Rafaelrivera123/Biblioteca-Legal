@@ -45,7 +45,9 @@ const Page = async () => {
     prisma.document.findMany({
       where: { published: true },
       take: LIMIT,
-      orderBy: { createdAt: "desc" },
+      // Match /api/documents default-view ordering to avoid a flash/reorder
+      // when the client query refetches after staleTime.
+      orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
       include: { categories: true },
     }),
     prisma.document.count({ where: { published: true } }),
