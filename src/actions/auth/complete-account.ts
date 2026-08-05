@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { sendNurtureWelcome } from "@/lib/nurture";
+import { triggerWelcomeAutomation } from "@/lib/welcome-automation";
 import {
   completeAccountSchema,
   CompleteAccountSchemaType,
@@ -70,12 +70,13 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
 
     if (!current.accountCompleted) {
       try {
-        await sendNurtureWelcome({
+        await triggerWelcomeAutomation({
+          userId,
           email: email || current.email,
           firstName: first_name,
         });
       } catch (emailErr) {
-        console.error("Welcome nurture email failed:", emailErr);
+        console.error("Welcome automation trigger failed:", emailErr);
       }
     }
 

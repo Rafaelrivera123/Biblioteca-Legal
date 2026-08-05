@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/db";
-import { sendNurtureWelcome } from "@/lib/nurture";
+import { triggerWelcomeAutomation } from "@/lib/welcome-automation";
 import { registrationSchema, RegistrationSchemaType } from "@/schemas/auth";
 
 export async function registeruser(
@@ -62,12 +62,13 @@ export async function registeruser(
     }
 
     try {
-      await sendNurtureWelcome({
+      await triggerWelcomeAutomation({
+        userId: newUser.id,
         email: newUser.email,
         firstName: newUser.first_name,
       });
     } catch (emailErr) {
-      console.error("Welcome nurture email failed:", emailErr);
+      console.error("Welcome automation trigger failed:", emailErr);
     }
 
     return {
