@@ -18,8 +18,6 @@ interface Props {
   freeChatRemaining?: number;
 }
 
-const DAILY_LIMIT = 20;
-
 const LegalAIChatbot = ({
   isLoggedin,
   hasSubscription,
@@ -31,9 +29,8 @@ const LegalAIChatbot = ({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(
-    hasSubscription ? DAILY_LIMIT : freeChatRemaining
+    hasSubscription ? null : freeChatRemaining
   );
-  const [limitReached, setLimitReached] = useState(false);
   const [quotaExhausted, setQuotaExhausted] = useState(
     !hasSubscription && freeChatRemaining <= 0
   );
@@ -81,7 +78,7 @@ const LegalAIChatbot = ({
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || loading || limitReached) return;
+    if (!text || loading) return;
 
     const userMessage: Message = { role: "user", text };
     setMessages((prev) => [...prev, userMessage]);
@@ -94,23 +91,11 @@ const LegalAIChatbot = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
-          history: messages.slice(-8).map((m) => ({ role: m.role, text: m.text })),
+          history: messages.slice(-4).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
 
       const data = await res.json();
-
-      if (res.status === 429 || data.limitReached) {
-        setLimitReached(true);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            text: "Has alcanzado tu límite de 20 consultas por hoy. Vuelve mañana para seguir consultando.",
-          },
-        ]);
-        return;
-      }
 
       if (data.freeQuotaExhausted || res.status === 403) {
         setQuotaExhausted(true);
@@ -303,36 +288,25 @@ const LegalAIChatbot = ({
                 </div>
 
                 <div className="px-3 py-3 border-t border-gray-100 shrink-0">
-                  {limitReached ? (
-                    <p className="text-center text-[12px] text-gray-400 py-1">
-                      Límite diario alcanzado. Vuelve mañana.
-                    </p>
-                  ) : (
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Pregunta sobre legislación hondureña..."
-                        rows={1}
-                        className="flex-1 resize-none text-[13px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-[#1E2A38]/40 transition-colors max-h-[100px] overflow-y-auto"
-                        style={{ lineHeight: "1.5" }}
-                      />
-                      <Button
-                        onClick={sendMessage}
-                        disabled={loading || !input.trim()}
-                        size="icon"
-                        className="bg-[#1E2A38] hover:bg-[#1E2A38]/90 shrink-0 w-9 h-9 rounded-xl"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                  {!limitReached && hasSubscription && remaining !== null && (
-                    <p className="text-right text-[11px] text-gray-400 mt-1">
-                      {remaining} / {DAILY_LIMIT} consultas hoy
-                    </p>
-                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Pregunta sobre legislación hondureña..."
+                      rows={1}
+                      className="flex-1 resize-none text-[13px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-[#1E2A38]/40 transition-colors max-h-[100px] overflow-y-auto"
+                      style={{ lineHeight: "1.5" }}
+                    />
+                    <Button
+                      onClick={sendMessage}
+                      disabled={loading || !input.trim()}
+                      size="icon"
+                      className="bg-[#1E2A38] hover:bg-[#1E2A38]/90 shrink-0 w-9 h-9 rounded-xl"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </>
             )}

@@ -39,8 +39,8 @@ export default async function SubscriptionSuccessPage() {
         </li>
         <li className="flex items-start gap-3 text-sm text-slate-700">
           <MessageSquare className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-          Usa el <strong className="mx-1">Asistente Legal</strong> (20 consultas
-          al día).
+          Usa el <strong className="mx-1">chat IA</strong> y el{" "}
+          <strong className="mx-1">asistente legal</strong> para hacer preguntas.
         </li>
         <li className="flex items-start gap-3 text-sm text-slate-700">
           <Highlighter className="w-4 h-4 text-primary mt-0.5 shrink-0" />
