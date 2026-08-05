@@ -1,6 +1,5 @@
 import NurtureOfferEmail from "@/email-templates/nurture-offer";
 import NurtureTipEmail from "@/email-templates/nurture-tip";
-import NurtureWelcomeEmail from "@/email-templates/nurture-welcome";
 import { prisma } from "@/lib/db";
 import { supersendtx } from "@/lib/supersendtx";
 
@@ -9,6 +8,9 @@ const SITE_URL =
   "https://www.bibliotecalegalhn.com";
 const FROM = "Biblioteca Legal HN <contacto@bibliotecalegalhn.com>";
 
+/** Published SuperSend TX template alias (Bienvenido HTML). */
+const WELCOME_TEMPLATE_ALIAS = "bienvenido-v2";
+
 export async function sendNurtureWelcome(params: {
   email: string;
   firstName: string;
@@ -16,11 +18,12 @@ export async function sendNurtureWelcome(params: {
   await supersendtx.emails.send({
     from: FROM,
     to: [params.email],
-    subject: "Tu cuenta en Biblioteca Legal HN está lista",
-    react: NurtureWelcomeEmail({
-      firstName: params.firstName || "amigo/a",
-      siteUrl: SITE_URL,
-    }),
+    template: {
+      id: WELCOME_TEMPLATE_ALIAS,
+      variables: {
+        name: params.firstName || "amigo/a",
+      },
+    },
   });
 }
 
