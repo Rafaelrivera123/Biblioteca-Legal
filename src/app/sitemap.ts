@@ -1,5 +1,6 @@
 import { getAllGuides } from "@/content/guias";
 import { prisma } from "@/lib/db";
+import { sitemapPriorityForDocument } from "@/lib/head-codes";
 import { isSubstantialLegalUpdate } from "@/lib/legal-update-quality";
 import { SITE_URL } from "@/lib/seo";
 import { MetadataRoute } from "next";
@@ -69,7 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           url: `${SITE_URL}/collections/${slug}`,
           lastModified: safeDate(doc.updatedAt),
           changeFrequency: "monthly" as const,
-          priority: 0.8,
+          priority: sitemapPriorityForDocument(doc.slug),
         };
       });
     } else {

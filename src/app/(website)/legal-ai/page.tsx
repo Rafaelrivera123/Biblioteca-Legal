@@ -67,19 +67,22 @@ const EXAMPLE_QUESTIONS = [
   },
 ];
 
-const COVERED_LAWS = [
-  "Constitución Política de Honduras",
-  "Código Penal",
-  "Código Civil",
-  "Código de Familia",
-  "Código de Trabajo",
-  "Código de Comercio",
-  "Código Tributario",
-  "Código Procesal Penal",
-  "Ley de Municipalidades",
-  "Ley General del Ambiente",
-  "Ley de Contratación del Estado",
-  "Ley Electoral y de las Organizaciones Políticas",
+const COVERED_LAWS: { name: string; slug?: string }[] = [
+  {
+    name: "Constitución de la República de Honduras",
+    slug: "constitucion-de-la-republica-de-honduras",
+  },
+  { name: "Código Penal", slug: "codigo-penal-honduras" },
+  { name: "Código Civil", slug: "codigo-civil-honduras" },
+  { name: "Código de Familia", slug: "codigo-de-familia-honduras" },
+  { name: "Código del Trabajo", slug: "codigo-del-trabajo-honduras" },
+  { name: "Código de Comercio", slug: "codigo-de-comercio-honduras" },
+  { name: "Código Tributario", slug: "codigo-tributario-honduras" },
+  { name: "Código Procesal Penal", slug: "codigo-procesal-penal-honduras" },
+  { name: "Ley de Municipalidades" },
+  { name: "Ley General del Ambiente" },
+  { name: "Ley de Contratación del Estado" },
+  { name: "Ley Electoral y de las Organizaciones Políticas" },
 ];
 
 const Page = async () => {
@@ -263,10 +266,21 @@ const Page = async () => {
             reglamentos y convenios internacionales ratificados por Honduras.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
-            {COVERED_LAWS.map((law, i) => (
-              <div key={i} className="flex items-center gap-3">
+            {COVERED_LAWS.map((law) => (
+              <div key={law.name} className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
-                <span className="text-[14px] text-[#1E2A38] font-medium">{law}</span>
+                {law.slug ? (
+                  <Link
+                    href={`/collections/${law.slug}`}
+                    className="text-[14px] text-[#1E2A38] font-medium underline-offset-2 hover:underline"
+                  >
+                    {law.name}
+                  </Link>
+                ) : (
+                  <span className="text-[14px] text-[#1E2A38] font-medium">
+                    {law.name}
+                  </span>
+                )}
               </div>
             ))}
             <div className="flex items-center gap-3">

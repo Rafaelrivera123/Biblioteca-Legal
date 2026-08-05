@@ -11,12 +11,18 @@ import CollectionHeader from "./_components/collection-header";
 import LegalChatbot from "./_components/legal-chatbot";
 import LawFaq from "./_components/law-faq";
 import { getDocumentSections } from "@/lib/document-content";
+import {
+  getHeadCode,
+  getHeadCodeDisplayTitle,
+  getRelatedGuidesForCollection,
+} from "@/lib/head-codes";
 import { getDocumentFaqs } from "@/lib/law-faqs";
 import {
   SITE_OG_IMAGE,
   buildSeoDescription,
   buildSeoTitle,
 } from "@/lib/seo";
+import CollectionSeoLinks from "./_components/collection-seo-links";
 
 async function getDocument(id: string) {
   const byCurrent = await prisma.document.findFirst({
@@ -50,9 +56,7 @@ export async function generateMetadata({
   }
   const document = result.document;
   const name = document.name.trim();
-  const nameWithHonduras = name.toLowerCase().includes("honduras")
-    ? name
-    : `${name} de Honduras`;
+  const nameWithHonduras = getHeadCodeDisplayTitle(document.slug, name);
 
   const title = buildSeoTitle(nameWithHonduras);
   const description = document.short_description
@@ -142,19 +146,45 @@ const Page = async ({ params }: { params: { id: string } }) => {
   const sections = await getDocumentSections(document.id);
 
   const name = document.name.trim();
-  const nameWithHonduras = name.toLowerCase().includes("honduras")
-    ? name
-    : `${name} de Honduras`;
+  const head = getHeadCode(document.slug);
+  const nameWithHonduras = getHeadCodeDisplayTitle(document.slug, name);
+  const relatedGuides = document.slug
+    ? getRelatedGuidesForCollection(document.slug)
+    : [];
 
   // Última actualización legal publicada relacionada con este documento,
   // usada para la pregunta "¿cuál fue la última reforma?" del FAQ.
-  const latestUpdatePost = await prisma.legalUpdatePost.findFirst({
-    where: { relatedDocumentId: document.id, status: "published" },
-    orderBy: { publishedAt: "desc" },
-    select: { title: true, slug: true, publishedAt: true },
-  });
+  const [latestUpdatePost, siblingDocs] = await Promise.all([
+    prisma.legalUpdatePost.findFirst({
+      where: { relatedDocumentId: document.id, status: "published" },
+      orderBy: { publishedAt: "desc" },
+      select: { title: true, slug: true, publishedAt: true },
+    }),
+    head
+      ? prisma.document.findMany({
+          where: {
+            published: true,
+            slug: { in: head.siblingSlugs },
+          },
+          select: { name: true, slug: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
-  const faqs = getDocumentFaqs(document, nameWithHonduras, latestUpdatePost);
+  const siblingCodes: { name: string; slug: string }[] = [];
+  for (const d of siblingDocs) {
+    if (!d.slug) continue;
+    siblingCodes.push({
+      name: getHeadCodeDisplayTitle(d.slug, d.name),
+      slug: d.slug,
+    });
+  }
+
+  const faqs = getDocumentFaqs(
+    { ...document, slug: document.slug },
+    nameWithHonduras,
+    latestUpdatePost
+  );
   const documentUrl = `https://www.bibliotecalegalhn.com/collections/${document.slug || document.id}`;
 
   return (
@@ -218,6 +248,8 @@ const Page = async ({ params }: { params: { id: string } }) => {
         document={document}
         hasFullAccess={hasSubscription}
         isLoggedin={isLoggedin}
+        displayTitle={nameWithHonduras}
+        seoIntro={head?.seoIntro}
       />
       {!hasSubscription && (
         <FreePlanMeter freeChatRemaining={isLoggedin ? freeChatRemaining : null} />
@@ -227,6 +259,10 @@ const Page = async ({ params }: { params: { id: string } }) => {
         isLoggedin={isLoggedin}
         hasSubscription={hasSubscription}
         sections={sections}
+      />
+      <CollectionSeoLinks
+        relatedGuides={relatedGuides}
+        siblingCodes={siblingCodes}
       />
       <LawFaq faqs={faqs} />
       <LegalChatbot

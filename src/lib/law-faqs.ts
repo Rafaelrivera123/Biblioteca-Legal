@@ -1,3 +1,5 @@
+import { getHeadCode } from "@/lib/head-codes";
+
 /**
  * Genera preguntas frecuentes (FAQ) para la página de detalle de una ley o
  * código, a partir de los datos que ya existen en el documento y, si
@@ -9,9 +11,8 @@
  * respaldados por nuestros propios datos (decreto, descripción, última
  * reforma registrada en la plataforma).
  *
- * Se aplica a cualquier documento (no solo a 3 leyes puntuales) porque el
- * costo de mantenimiento es cero: todo sale de datos que ya existen en
- * Prisma, no hay texto hardcodeado por ley.
+ * Los códigos cabeza (Penal, Civil, Constitución) reciben FAQs extra
+ * únicos desde `head-codes.ts` para reducir contenido templated.
  */
 
 export interface LawFaqLink {
@@ -27,6 +28,7 @@ export interface LawFaqItem {
 
 interface FaqDocument {
   name: string;
+  slug?: string | null;
   short_description?: string | null;
   law_number?: string | null;
 }
@@ -77,6 +79,11 @@ export function getDocumentFaqs(
       document.short_description?.trim() ||
       `${capitalize(el)} ${nameWithHonduras} es uno de los cuerpos legales vigentes de Honduras, disponible con su texto completo y actualizado en Biblioteca Legal HN.`,
   });
+
+  const head = getHeadCode(document.slug);
+  if (head?.extraFaqs?.length) {
+    faqs.push(...head.extraFaqs);
+  }
 
   if (document.law_number?.trim()) {
     faqs.push({
