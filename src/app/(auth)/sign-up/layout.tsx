@@ -15,7 +15,13 @@ const RegistrationLayout = async ({ children }: { children: ReactNode }) => {
     });
   }
 
-  if (!!cu) redirect("/");
+  // OAuth users land here logged-in with accountCompleted=false to finish
+  // signup. Only bounce away users who already completed their account
+  // (otherwise middleware ↔ this layout fight in an infinite redirect).
+  if (cu && cu.user.accountCompleted !== false) {
+    redirect("/");
+  }
+
   return (
     <div>
       <Navbar isLoggedin={!!cu} user={user ?? null} />

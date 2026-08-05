@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth, unstable_update } from "@/auth";
 import { prisma } from "@/lib/db";
 import { triggerWelcomeAutomation } from "@/lib/welcome-automation";
 import {
@@ -30,20 +30,24 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
     return { success: false, message: "Usuario no encontrado." };
   }
 
-  // Keep the OAuth-verified email — never let users steal another account's email.
-  const emailTaken = await prisma.user.findFirst({
-    where: {
-      email,
-      NOT: { id: userId },
-    },
-    select: { id: true },
-  });
+  // Keep the OAuth-verified email — never overwrite it from the form.
+  const resolvedEmail = current.email || email;
 
-  if (emailTaken) {
-    return {
-      success: false,
-      message: "Este correo ya está registrado en otra cuenta.",
-    };
+  if (!current.email) {
+    const emailTaken = await prisma.user.findFirst({
+      where: {
+        email: resolvedEmail,
+        NOT: { id: userId },
+      },
+      select: { id: true },
+    });
+
+    if (emailTaken) {
+      return {
+        success: false,
+        message: "Este correo ya está registrado en otra cuenta.",
+      };
+    }
   }
 
   try {
@@ -53,8 +57,7 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
         first_name,
         last_name,
         name: `${first_name} ${last_name}`.trim(),
-        // Prefer the confirmed form email; fall back to the OAuth email.
-        email: email || current.email,
+        email: resolvedEmail,
         accountCompleted: true,
         emailVerified: current.emailVerified ?? new Date(),
       },
@@ -62,17 +65,22 @@ export async function completeAccountAction(data: CompleteAccountSchemaType) {
 
     if (promotion) {
       await prisma.newsLetter.upsert({
-        where: { email },
-        create: { email },
+        where: { email: resolvedEmail },
+        create: { email: resolvedEmail },
         update: {},
       });
     }
+
+    // Refresh the JWT so Edge middleware stops treating the user as incomplete.
+    await unstable_update({
+      user: { accountCompleted: true },
+    });
 
     if (!current.accountCompleted) {
       try {
         await triggerWelcomeAutomation({
           userId,
-          email: email || current.email,
+          email: resolvedEmail,
           firstName: first_name,
         });
       } catch (emailErr) {

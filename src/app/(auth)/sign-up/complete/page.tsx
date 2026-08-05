@@ -5,11 +5,20 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import CompleteAccountForm from "./_components/complete-account-form";
 
-export default async function CompleteAccountPage() {
+export default async function CompleteAccountPage({
+  searchParams,
+}: {
+  searchParams?: { intent?: string };
+}) {
   const session = await auth();
+  const intent = searchParams?.intent === "subscribe" ? "subscribe" : undefined;
+  const completePath =
+    intent === "subscribe"
+      ? "/sign-up/complete?intent=subscribe"
+      : "/sign-up/complete";
 
   if (!session?.user?.id) {
-    redirect("/login?callbackUrl=/sign-up/complete");
+    redirect(`/login?callbackUrl=${encodeURIComponent(completePath)}`);
   }
 
   const user = await prisma.user.findUnique({
@@ -28,7 +37,9 @@ export default async function CompleteAccountPage() {
   }
 
   if (user.accountCompleted) {
-    redirect("/");
+    redirect(
+      intent === "subscribe" ? "/subscriptions?checkout=monthly" : "/collections"
+    );
   }
 
   const nameParts = (user.name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -62,6 +73,7 @@ export default async function CompleteAccountPage() {
             email: user.email,
           }}
           emailLocked={Boolean(user.email)}
+          intent={intent}
         />
       </div>
     </div>

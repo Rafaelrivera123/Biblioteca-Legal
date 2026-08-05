@@ -3,7 +3,13 @@ import { siteAssets } from "@/helper/assets";
 import { getEnabledSocialProviders } from "@/lib/social-providers";
 import RegistrationForm from "./_components/registration-form";
 
-const Page = () => {
+const Page = ({
+  searchParams,
+}: {
+  searchParams?: { intent?: string };
+}) => {
+  const intent = searchParams?.intent === "subscribe" ? "subscribe" : undefined;
+
   return (
     <div>
       <HeaderSection
@@ -18,10 +24,15 @@ const Page = () => {
             Crea una cuenta
           </h1>
           <p className="text-black font-medium text-[14px] leading-[120%] md:text-[18px]">
-            Completa el siguiente formulario para crear tu cuenta
+            {intent === "subscribe"
+              ? "Crea tu cuenta para activar el plan Personal"
+              : "Completa el siguiente formulario para crear tu cuenta"}
           </p>
         </div>
-        <RegistrationForm socialProviders={getEnabledSocialProviders()} />
+        <RegistrationForm
+          socialProviders={getEnabledSocialProviders()}
+          intent={intent}
+        />
       </div>
     </div>
   );

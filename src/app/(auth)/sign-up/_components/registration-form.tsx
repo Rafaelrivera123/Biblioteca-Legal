@@ -24,10 +24,13 @@ import { useRouter } from "next/navigation";
 
 type Props = {
   socialProviders?: Array<"google" | "facebook">;
+  /** When set to "subscribe", send the user to Personal checkout after signup. */
+  intent?: "subscribe";
 };
 
 export default function RegistrationForm({
   socialProviders = ["google", "facebook"],
+  intent,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -57,7 +60,11 @@ export default function RegistrationForm({
 
       trackEvent("sign_up", { method: "credentials" });
       toast.success("¡Cuenta creada exitosamente! Por favor inicia sesión.");
-      router.push("/login");
+      router.push(
+        intent === "subscribe"
+          ? `/login?callbackUrl=${encodeURIComponent("/subscriptions?checkout=monthly")}`
+          : "/login"
+      );
     });
   }
 
@@ -202,7 +209,11 @@ export default function RegistrationForm({
 
       <div className="max-w-[730px] mx-auto pb-10">
         <SocialAuthButtons
-          callbackUrl="/sign-up/complete"
+          callbackUrl={
+            intent === "subscribe"
+              ? "/sign-up/complete?intent=subscribe"
+              : "/sign-up/complete"
+          }
           providers={socialProviders}
         />
       </div>
