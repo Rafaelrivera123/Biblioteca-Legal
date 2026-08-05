@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { triggerWelcomeAutomation } from "@/lib/nurture";
+import { triggerWelcomeAutomation } from "@/lib/welcome-automation";
 import {
   completeAccountSchema,
   CompleteAccountSchemaType,
