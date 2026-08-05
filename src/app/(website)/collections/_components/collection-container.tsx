@@ -20,10 +20,23 @@ const CollectionContainer = ({ initialData }: Props) => {
 
   const { data, isLoading, isError, error } = useQuery<DocumentsApiResponse>({
     queryKey: ["documents", searchQuery, page, category],
-    queryFn: () =>
-      fetch(
-        `/api/documents?search=${searchQuery}&category=${category}&limit=12&page=${page}`
-      ).then((res) => res.json()),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        search: searchQuery,
+        category: category || "all",
+        limit: "12",
+        page: String(page),
+      });
+      const res = await fetch(`/api/documents?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error("No se pudieron cargar los documentos");
+      }
+      const json = (await res.json()) as DocumentsApiResponse;
+      if (!json.success) {
+        throw new Error(json.message || "No se pudieron cargar los documentos");
+      }
+      return json;
+    },
     initialData: isDefaultView ? initialData : undefined,
     staleTime: 60_000,
   });
