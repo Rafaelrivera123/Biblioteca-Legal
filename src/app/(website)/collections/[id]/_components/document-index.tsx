@@ -98,35 +98,36 @@ const DocumentIndex = ({ sections, onNavigate }: Props) => {
   };
 
   return (
-    <div
+    <nav
       ref={indexRef}
-      className="max-h-[calc(100vh-100px)] overflow-y-auto pb-10 rounded-xl border border-primary/20 bg-primary shadow-md"
+      aria-label="Índice del documento"
+      className="max-h-[calc(100vh-100px)] overflow-y-auto rounded-xl border border-black/10 bg-white/95 backdrop-blur-sm shadow-sm"
     >
-      <div className="px-4 py-3 border-b border-white/20 sticky top-0 bg-primary z-10">
-        <p className="text-[11px] font-semibold text-white/70 uppercase tracking-widest">
+      <div className="px-4 py-3 border-b border-black/10 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
           Índice
         </p>
       </div>
-      <div className="space-y-0.5 p-2">
+      <div className="space-y-0.5 p-2 pb-4">
         {sections.map((section) => {
           const isExpanded = expandedSections.has(section.id);
           return (
             <div key={section.id}>
               <button
                 onClick={() => toggleSection(section.id)}
-                className="w-full flex items-center gap-1.5 px-2 py-2 rounded-md text-left hover:bg-white/10 transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-2 rounded-md text-left hover:bg-primary/5 transition-colors"
               >
                 {isExpanded ? (
-                  <ChevronDown size={13} className="text-white/60 shrink-0" />
+                  <ChevronDown size={13} className="text-muted-foreground shrink-0" />
                 ) : (
-                  <ChevronRight size={13} className="text-white/60 shrink-0" />
+                  <ChevronRight size={13} className="text-muted-foreground shrink-0" />
                 )}
-                <span className="text-[12px] font-semibold text-white leading-tight">
+                <span className="text-[12px] font-semibold text-primary leading-tight">
                   {section.title}
                 </span>
               </button>
               {isExpanded && (
-                <div className="ml-4 mt-0.5 space-y-0.5">
+                <div className="ml-2 mt-0.5 space-y-0.5 border-l border-black/10 pl-2">
                   {section.chapters.map((chapter) => {
                     const isActive = activeId === `chapter-${chapter.id}`;
                     return (
@@ -135,10 +136,10 @@ const DocumentIndex = ({ sections, onNavigate }: Props) => {
                         data-chapter-id={chapter.id}
                         onClick={() => scrollToChapter(chapter.id)}
                         className={cn(
-                          "w-full text-left px-2 py-1.5 rounded-md transition-all duration-200",
+                          "w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-200 border-l-2 -ml-px",
                           isActive
-                            ? "bg-white text-primary font-semibold text-[13px] shadow-sm"
-                            : "text-white/70 text-[12px] hover:bg-white/10 hover:text-white"
+                            ? "border-primary bg-primary/10 text-primary font-semibold text-[13px]"
+                            : "border-transparent text-muted-foreground text-[12px] hover:bg-primary/5 hover:text-primary"
                         )}
                       >
                         {chapter.title}
@@ -151,7 +152,7 @@ const DocumentIndex = ({ sections, onNavigate }: Props) => {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 };
 

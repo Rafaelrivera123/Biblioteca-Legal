@@ -109,9 +109,6 @@ const ArticleContainer = ({
       </Sheet>
 
       <div className="flex gap-8 items-start relative">
-        <div className="hidden lg:block w-[260px] shrink-0 self-start sticky top-[80px]">
-          <DocumentIndex sections={sections} />
-        </div>
         <div className="flex-1 min-w-0">
           <div className="space-y-[100px] mb-[100px]">
             {sections.map((section) => (
@@ -140,6 +137,10 @@ const ArticleContainer = ({
               </div>
             ))}
           </div>
+        </div>
+        {/* Índice on the right so the floating AI chat overlays nav, not the article */}
+        <div className="hidden lg:block w-[260px] shrink-0 self-start sticky top-[80px]">
+          <DocumentIndex sections={sections} />
         </div>
       </div>
     </div>
