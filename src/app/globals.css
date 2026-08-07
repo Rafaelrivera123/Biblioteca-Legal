@@ -224,12 +224,22 @@ html.cookie-banner-visible .fab-offset {
   opacity: 0.42 !important;
 }
 
-.blhn-sketch-arrow {
+#blhn-sketch-arrow-layer {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
   pointer-events: none !important;
-  z-index: 2147483000 !important;
+  z-index: 2147483646 !important;
+  overflow: visible !important;
+}
+
+.shepherd-element.blhn-tour-step,
+.shepherd-element.blhn-tour-step .shepherd-content {
+  overflow: visible !important;
+}
+
+.blhn-inline-sketch-arrow {
+  pointer-events: none !important;
   overflow: visible !important;
 }

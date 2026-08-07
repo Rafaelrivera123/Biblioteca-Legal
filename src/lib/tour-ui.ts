@@ -1,9 +1,11 @@
 /**
- * Shared Shepherd tour chrome: light elegant card + hand-drawn curved arrow.
+ * Tour chrome: light tip card + sketch arrow that ALWAYS tracks the active step.
  *
- * Arrow strategy: poll for `.shepherd-element.shepherd-enabled` + `.shepherd-target`
- * while a tour is active. This survives Shepherd's attachTo resolution quirks and
- * page navigations inside the guest tour.
+ * Strategy (bulletproof):
+ * 1. Start a MutationObserver + interval as soon as the tour is bound (don't wait for events).
+ * 2. Find the visible `.shepherd-element` and its `.shepherd-target` (or [class*=shepherd-target]).
+ * 3. Draw a full-viewport SVG arrow above everything (z-index max).
+ * 4. Also pin a sketch arrow on the tip card edge facing the target (survives overlay quirks).
  */
 
 export const TOUR_STEP_CLASS = "blhn-tour-step";
@@ -14,7 +16,7 @@ export const shepherdTourOptions = {
     cancelIcon: { enabled: true },
     scrollTo: { behavior: "smooth" as const, block: "center" as const },
     classes: TOUR_STEP_CLASS,
-    modalOverlayOpeningPadding: 16,
+    modalOverlayOpeningPadding: 18,
     modalOverlayOpeningRadius: 14,
     arrow: false,
   },
@@ -22,213 +24,288 @@ export const shepherdTourOptions = {
 
 type Point = { x: number; y: number };
 
-const ARROW_ID = "blhn-sketch-arrow";
-const ARROW_COLOR = "#1E2A38";
+const LAYER_ID = "blhn-sketch-arrow-layer";
+const INLINE_CLASS = "blhn-inline-sketch-arrow";
+const COLOR = "#1E2A38";
 
-function edgePoint(rect: DOMRect, toward: Point, inset = 0): Point {
+function edgePoint(rect: DOMRect, toward: Point, pad = 0): Point {
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   const dx = toward.x - cx;
   const dy = toward.y - cy;
-
-  if (Math.abs(dx) > Math.abs(dy)) {
-    const x = (dx > 0 ? rect.right : rect.left) - Math.sign(dx || 1) * inset;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const x = (dx >= 0 ? rect.right : rect.left) + (dx >= 0 ? pad : -pad);
     const t = dx === 0 ? 0 : (x - cx) / dx;
     return { x, y: cy + dy * t };
   }
-  const y = (dy > 0 ? rect.bottom : rect.top) - Math.sign(dy || 1) * inset;
+  const y = (dy >= 0 ? rect.bottom : rect.top) + (dy >= 0 ? pad : -pad);
   const t = dy === 0 ? 0 : (y - cy) / dy;
   return { x: cx + dx * t, y };
 }
 
-function arrowHead(tip: Point, from: Point, size = 18): string {
+function headPath(tip: Point, from: Point, size = 20): string {
   const angle = Math.atan2(tip.y - from.y, tip.x - from.x);
-  const spread = Math.PI / 4.5;
-  const a1 = angle + Math.PI - spread;
-  const a2 = angle + Math.PI + spread;
+  const spread = Math.PI / 4.2;
   const p1 = {
-    x: tip.x + Math.cos(a1) * size,
-    y: tip.y + Math.sin(a1) * size,
+    x: tip.x + Math.cos(angle + Math.PI - spread) * size,
+    y: tip.y + Math.sin(angle + Math.PI - spread) * size,
   };
   const p2 = {
-    x: tip.x + Math.cos(a2) * size,
-    y: tip.y + Math.sin(a2) * size,
+    x: tip.x + Math.cos(angle + Math.PI + spread) * size,
+    y: tip.y + Math.sin(angle + Math.PI + spread) * size,
   };
   return `M ${p1.x} ${p1.y} L ${tip.x} ${tip.y} M ${p2.x} ${p2.y} L ${tip.x} ${tip.y}`;
 }
 
-function ensureSvg(): SVGSVGElement {
-  let svg = document.getElementById(ARROW_ID) as unknown as SVGSVGElement | null;
-  if (svg) return svg;
+/** Hand-drawn curve path in local 0..100 space, pointing right. */
+function sketchGlyph(rotateDeg: number): string {
+  return `
+    <svg viewBox="0 0 120 80" width="96" height="64" style="transform:rotate(${rotateDeg}deg);transform-origin:center;overflow:visible" aria-hidden="true">
+      <path d="M 8 62 C 28 58, 48 30, 78 22 C 90 18, 100 20, 108 24"
+        fill="none" stroke="${COLOR}" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M 92 10 L 112 22 M 96 36 L 112 22"
+        fill="none" stroke="${COLOR}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
+}
 
-  svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.id = ARROW_ID;
-  svg.setAttribute("class", "blhn-sketch-arrow");
-  svg.setAttribute("aria-hidden", "true");
-  Object.assign(svg.style, {
+function findTip(): HTMLElement | null {
+  const nodes = Array.from(
+    document.querySelectorAll<HTMLElement>(".shepherd-element")
+  );
+  for (const el of nodes) {
+    if (el.hidden) continue;
+    const style = window.getComputedStyle(el);
+    if (style.visibility === "hidden" || style.display === "none") continue;
+    if (style.opacity === "0") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) continue;
+    return el;
+  }
+  return null;
+}
+
+function findTarget(tip: HTMLElement): Element | null {
+  const candidates = [
+    ...document.querySelectorAll(".shepherd-target"),
+    ...document.querySelectorAll("[class*='shepherd-target']"),
+  ];
+  for (const el of candidates) {
+    if (el === tip || tip.contains(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    return el;
+  }
+  return null;
+}
+
+function ensureLayer(): SVGSVGElement {
+  let layer = document.getElementById(LAYER_ID) as unknown as SVGSVGElement | null;
+  if (layer) return layer;
+  layer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  layer.id = LAYER_ID;
+  layer.setAttribute("aria-hidden", "true");
+  Object.assign(layer.style, {
     position: "fixed",
-    left: "0",
-    top: "0",
+    left: "0px",
+    top: "0px",
     width: "100vw",
     height: "100vh",
-    pointerEvents: "none",
-    zIndex: "2147483000",
+    margin: "0",
+    padding: "0",
     overflow: "visible",
+    pointerEvents: "none",
+    zIndex: "2147483646",
   });
-  document.body.appendChild(svg);
-  return svg;
+  document.documentElement.appendChild(layer);
+  return layer;
 }
 
-function removeSvg() {
-  document.getElementById(ARROW_ID)?.remove();
+function clearLayer() {
+  document.getElementById(LAYER_ID)?.remove();
+  document.querySelectorAll(`.${INLINE_CLASS}`).forEach((n) => n.remove());
 }
 
-function drawArrow(tipEl: HTMLElement, targetEl: Element) {
-  const tipRect = tipEl.getBoundingClientRect();
-  const targetRect = targetEl.getBoundingClientRect();
-  if (tipRect.width < 2 || targetRect.width < 2) {
-    removeSvg();
-    return;
-  }
-
-  const tipCenter: Point = {
+function drawViewportArrow(tip: HTMLElement, target: Element) {
+  const tipRect = tip.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const tipCenter = {
     x: tipRect.left + tipRect.width / 2,
     y: tipRect.top + tipRect.height / 2,
   };
-  const targetCenter: Point = {
+  const targetCenter = {
     x: targetRect.left + targetRect.width / 2,
     y: targetRect.top + targetRect.height / 2,
   };
 
-  // Pull start/end slightly off each box so the curve is readable
-  const start = edgePoint(tipRect, targetCenter, 2);
-  let end = edgePoint(targetRect, tipCenter, -8);
+  const start = edgePoint(tipRect, targetCenter, 4);
+  let end = edgePoint(targetRect, tipCenter, 10);
 
-  const outX = end.x - targetCenter.x;
-  const outY = end.y - targetCenter.y;
-  const outLen = Math.hypot(outX, outY) || 1;
-  end = {
-    x: end.x + (outX / outLen) * 12,
-    y: end.y + (outY / outLen) * 12,
-  };
+  // Push tip of arrow just outside the highlighted element
+  const ox = end.x - targetCenter.x;
+  const oy = end.y - targetCenter.y;
+  const ol = Math.hypot(ox, oy) || 1;
+  end = { x: end.x + (ox / ol) * 10, y: end.y + (oy / ol) * 10 };
 
   let dx = end.x - start.x;
   let dy = end.y - start.y;
   let len = Math.hypot(dx, dy) || 1;
 
-  // If FloatingUI parked the tip almost on top of the target, nudge the start
-  // outward so we still get a visible sketch curve.
-  if (len < 40) {
+  // Always force a readable curve, even when tip is very close
+  if (len < 48) {
     const nx = -dy / len;
     const ny = dx / len;
-    start.x -= nx * 36 + dx * 0.15;
-    start.y -= ny * 36 + dy * 0.15;
+    start.x -= nx * 40;
+    start.y -= ny * 40;
     dx = end.x - start.x;
     dy = end.y - start.y;
     len = Math.hypot(dx, dy) || 1;
   }
 
-  const bend = Math.max(28, Math.min(72, len * 0.35));
+  const bend = Math.max(32, Math.min(80, len * 0.38));
   const nx = -dy / len;
   const ny = dx / len;
   const side = tipCenter.x <= targetCenter.x ? 1 : -1;
-  const c1: Point = {
-    x: start.x + dx * 0.3 + nx * bend * side,
-    y: start.y + dy * 0.3 + ny * bend * side,
+  const c1 = {
+    x: start.x + dx * 0.28 + nx * bend * side,
+    y: start.y + dy * 0.28 + ny * bend * side,
   };
-  const c2: Point = {
-    x: start.x + dx * 0.7 + nx * bend * 0.35 * side,
-    y: start.y + dy * 0.7 + ny * bend * 0.35 * side,
+  const c2 = {
+    x: start.x + dx * 0.72 + nx * bend * 0.3 * side,
+    y: start.y + dy * 0.72 + ny * bend * 0.3 * side,
   };
 
-  const curve = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
-  const head = arrowHead(end, c2, 18);
-  const svg = ensureSvg();
-
-  svg.innerHTML = `
-    <defs>
-      <filter id="blhn-arrow-soft" x="-40%" y="-40%" width="180%" height="180%">
-        <feDropShadow dx="0" dy="1" stdDeviation="1.6" flood-color="#1E2A38" flood-opacity="0.25"/>
-      </filter>
-    </defs>
-    <path d="${curve}" fill="none" stroke="${ARROW_COLOR}" stroke-width="3"
-      stroke-linecap="round" stroke-linejoin="round" filter="url(#blhn-arrow-soft)" />
-    <path d="${head}" fill="none" stroke="${ARROW_COLOR}" stroke-width="3"
-      stroke-linecap="round" stroke-linejoin="round" filter="url(#blhn-arrow-soft)" />
+  const layer = ensureLayer();
+  layer.innerHTML = `
+    <path d="M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}"
+      fill="none" stroke="${COLOR}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${headPath(end, c2, 20)}"
+      fill="none" stroke="${COLOR}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
   `;
 }
 
-function findActivePair(): { tip: HTMLElement; target: Element } | null {
-  const tip = document.querySelector(
-    ".shepherd-element.shepherd-enabled"
-  ) as HTMLElement | null;
-  if (!tip) return null;
+function drawInlineArrow(tip: HTMLElement, target: Element) {
+  tip.style.overflow = "visible";
+  const content = tip.querySelector(".shepherd-content") as HTMLElement | null;
+  if (content) content.style.overflow = "visible";
 
-  // Centered steps (welcome/finish) have no target — hide arrow
-  if (tip.classList.contains("shepherd-centered")) {
-    return null;
+  let holder = tip.querySelector(`.${INLINE_CLASS}`) as HTMLElement | null;
+  if (!holder) {
+    holder = document.createElement("div");
+    holder.className = INLINE_CLASS;
+    tip.appendChild(holder);
   }
 
-  const target =
-    document.querySelector(".shepherd-enabled.shepherd-target") ||
-    document.querySelector(".shepherd-target");
+  const tipRect = tip.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const dx =
+    targetRect.left +
+    targetRect.width / 2 -
+    (tipRect.left + tipRect.width / 2);
+  const dy =
+    targetRect.top +
+    targetRect.height / 2 -
+    (tipRect.top + tipRect.height / 2);
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
-  if (!target || tip.contains(target)) return null;
-  return { tip, target };
+  // Place glyph on the tip edge facing the target
+  const reach = Math.max(tipRect.width, tipRect.height) * 0.5 + 12;
+  holder.innerHTML = sketchGlyph(0);
+  Object.assign(holder.style, {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: "96px",
+    height: "64px",
+    margin: "0",
+    transform: `translate(-50%, -50%) rotate(${angle}deg) translateX(${reach}px)`,
+    pointerEvents: "none",
+    zIndex: "5",
+    overflow: "visible",
+  });
+}
+
+function syncArrow() {
+  const tip = findTip();
+  if (!tip) {
+    clearLayer();
+    return;
+  }
+
+  // Centered welcome/finish steps: no target arrow
+  if (
+    tip.classList.contains("shepherd-centered") ||
+    tip.querySelector(".shepherd-centered")
+  ) {
+    clearLayer();
+    return;
+  }
+
+  const target = findTarget(tip);
+  if (!target) {
+    clearLayer();
+    return;
+  }
+
+  drawViewportArrow(tip, target);
+  drawInlineArrow(tip, target);
 }
 
 /**
- * Keep a sketch arrow synced to the active Shepherd step for the life of a tour.
+ * Bind arrow sync for the lifetime of a Shepherd tour.
+ * Starts immediately — does not depend on tour events firing.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function bindSketchArrowToTour(tour: any) {
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let running = false;
+export function bindSketchArrowToTour(_tour: any) {
+  let stopped = false;
+  let interval: ReturnType<typeof setInterval> | null = null;
 
   const tick = () => {
-    const pair = findActivePair();
-    if (pair) drawArrow(pair.tip, pair.target);
-    else removeSvg();
+    if (stopped) return;
+    try {
+      syncArrow();
+    } catch {
+      /* ignore draw errors */
+    }
   };
 
-  const start = () => {
-    if (running) return;
-    running = true;
-    tick();
-    timer = setInterval(tick, 120);
-    window.addEventListener("resize", tick);
-    window.addEventListener("scroll", tick, true);
-  };
+  // Kick off right away and keep polling while tour UI exists
+  tick();
+  interval = setInterval(tick, 100);
+  window.addEventListener("resize", tick);
+  window.addEventListener("scroll", tick, true);
+
+  const observer = new MutationObserver(tick);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class", "style", "hidden"],
+  });
 
   const stop = () => {
-    running = false;
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
-    }
+    if (stopped) return;
+    stopped = true;
+    if (interval) clearInterval(interval);
+    interval = null;
     window.removeEventListener("resize", tick);
     window.removeEventListener("scroll", tick, true);
-    removeSvg();
+    observer.disconnect();
+    clearLayer();
   };
 
-  tour.on("start", start);
-  tour.on("show", () => {
-    start();
-    // FloatingUI settles after show
-    window.setTimeout(tick, 40);
-    window.setTimeout(tick, 160);
-    window.setTimeout(tick, 400);
-  });
-  tour.on("complete", stop);
-  tour.on("cancel", stop);
+  // Also stop when tour ends if events work
+  try {
+    _tour?.on?.("complete", stop);
+    _tour?.on?.("cancel", stop);
+  } catch {
+    /* ignore */
+  }
 
-  // If tour was already started before bind (unlikely), start anyway on next show
   return stop;
 }
 
-/**
- * Kept for call-site compatibility. Arrow is owned by the tour watcher now.
- */
+/** No-op wrapper kept so call sites stay stable. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withSketchArrow(step: Record<string, any>) {
   return step;
