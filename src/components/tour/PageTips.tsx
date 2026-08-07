@@ -8,6 +8,7 @@ import {
   resetTipsState,
   resolvePageTipKey,
 } from "@/lib/onboarding-tips";
+import { prepareTipViewport, type TipPlacement } from "@/lib/tour-scroll";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -111,7 +112,9 @@ export default function PageTips({ userId, hasSubscription }: Props) {
         useModalOverlay: true,
         defaultStepOptions: {
           cancelIcon: { enabled: true },
-          scrollTo: { behavior: "smooth", block: "center" },
+          // Placement-aware scroll runs in beforeShowPromise instead of
+          // centering tall targets (which flips top tips to the bottom).
+          scrollTo: false,
           classes: "blhn-tour-step",
           modalOverlayOpeningPadding: 8,
           modalOverlayOpeningRadius: 8,
@@ -128,13 +131,20 @@ export default function PageTips({ userId, hasSubscription }: Props) {
       tour.on("complete", onDone);
       tour.on("cancel", onDone);
 
+      const placement = (tip.attachOn ?? "bottom") as TipPlacement;
+      const attachSelector = tip.attachTo;
+
       tour.addStep({
         id: tip.id,
         title: tip.title,
         text: tip.text(hasSubscription),
         attachTo: {
-          element: tip.attachTo,
-          on: tip.attachOn ?? "bottom",
+          element: attachSelector,
+          on: placement,
+        },
+        beforeShowPromise: async () => {
+          const target = document.querySelector(attachSelector);
+          if (target) await prepareTipViewport(target, placement);
         },
         buttons: [
           {

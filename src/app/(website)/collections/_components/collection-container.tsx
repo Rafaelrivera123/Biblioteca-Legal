@@ -89,7 +89,7 @@ const CollectionContainer = ({ initialData }: Props) => {
     content = (
       <div
         id="tour-collections-grid"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10 scroll-mt-[220px]"
       >
         {data?.data?.map((item) => (
           <DocumentCard key={item.id} document={item} />

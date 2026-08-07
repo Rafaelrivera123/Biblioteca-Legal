@@ -4,6 +4,7 @@ import {
   DEMO_DOCUMENT_SLUG,
   GUEST_TOUR_EVENT,
 } from "@/lib/guest-tour";
+import { prepareTipViewport, type TipPlacement } from "@/lib/tour-scroll";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -75,7 +76,8 @@ export default function GuestTour() {
         useModalOverlay: true,
         defaultStepOptions: {
           cancelIcon: { enabled: true },
-          scrollTo: { behavior: "smooth", block: "center" },
+          // Placement-aware scroll in beforeShowPromise (avoids flip on tall targets).
+          scrollTo: false,
           classes: "blhn-tour-step",
           modalOverlayOpeningPadding: 8,
           modalOverlayOpeningRadius: 8,
@@ -98,6 +100,29 @@ export default function GuestTour() {
       tour.on("complete", finish);
       tour.on("cancel", finish);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const addStep = (options: Record<string, any>) => {
+        const attach = options.attachTo as
+          | { element?: string; on?: TipPlacement }
+          | undefined;
+        const selector =
+          typeof attach?.element === "string" ? attach.element : null;
+        const placement = (attach?.on ?? "bottom") as TipPlacement;
+        const prior = options.beforeShowPromise as
+          | (() => Promise<void>)
+          | undefined;
+
+        tour.addStep({
+          ...options,
+          beforeShowPromise: async () => {
+            if (prior) await prior();
+            if (!selector) return;
+            const target = document.querySelector(selector);
+            if (target) await prepareTipViewport(target, placement);
+          },
+        });
+      };
+
       const nextBtn = {
         text: "Siguiente",
         classes: "blhn-btn-primary",
@@ -113,7 +138,7 @@ export default function GuestTour() {
         },
       };
 
-      tour.addStep({
+      addStep({
         id: "welcome",
         title: "Bienvenido a Biblioteca Legal HN",
         text: "Te mostramos todo lo que puedes hacer aquí: leer leyes gratis, buscar artículos, usar IA y, si te suscribes, resaltar, guardar y anotar. Puedes cerrar el tour cuando quieras.",
@@ -136,7 +161,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "global-search",
         title: "Buscador de artículos",
         text: "Busca en toda la legislación por número de artículo, nombre de la ley o en lenguaje natural. La IA te ayuda a encontrar el texto relevante. Disponible sin cuenta.",
@@ -158,7 +183,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "global-chat",
         title: "Chat IA global",
         text: "Pregunta sobre cualquier ley hondureña. Con cuenta gratis tienes 10 consultas de IA; con el Plan Personal son ilimitadas y puedes adjuntar archivos.",
@@ -176,7 +201,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "collections",
         title: "Colección de leyes",
         text: "Aquí está la biblioteca completa: códigos, leyes y reglamentos de Honduras. Puedes leer el texto completo gratis, sin crear cuenta.",
@@ -205,7 +230,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "article-tools",
         title: "Resalta, guarda o comenta",
         text: "En cada artículo puedes resaltar con color, guardar un marcador o dejar una nota privada. Es del Plan Personal. Con cuenta, todo queda en Mi Biblioteca.",
@@ -223,7 +248,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "ai-summary",
         title: "Resumen en lenguaje claro",
         text: "Cada artículo puede incluir un resumen IA que explica el texto sin jerga. Los primeros 20 artículos de cada documento son gratis; con el plan ves todos.",
@@ -240,7 +265,7 @@ export default function GuestTour() {
         buttons: [backBtn, nextBtn],
       });
 
-      tour.addStep({
+      addStep({
         id: "doc-chatbot",
         title: "Asistente de este documento",
         text: "Haz preguntas solo sobre esta ley. El asistente responde con base en sus artículos. Ideal para estudiar o preparar un caso.",
@@ -262,7 +287,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "actualizaciones",
         title: "Actualizaciones legales",
         text: "Reformas, leyes nuevas y derogaciones explicadas en lenguaje claro, con enlace a La Gaceta. Así te enteras de cambios sin leer el PDF completo.",
@@ -291,7 +316,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "gacetas",
         title: "Gacetas oficiales",
         text: "Consulta las Gacetas Oficiales publicadas. Complementa las actualizaciones cuando necesitas el documento oficial.",
@@ -320,7 +345,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "guias",
         title: "Guías prácticas",
         text: "Guías que explican temas legales de forma práctica: ideales para estudiantes, ciudadanos y profesionales que quieren orientación clara.",
@@ -345,7 +370,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "subscriptions",
         title: "Gratis vs Plan Personal",
         text: "Gratis: leer leyes, buscar, 20 resúmenes IA por documento y 10 chats. Plan Personal: resúmenes ilimitados, chat ilimitado, resaltar/guardar/notas y sin anuncios.",
@@ -363,7 +388,7 @@ export default function GuestTour() {
         ],
       });
 
-      tour.addStep({
+      addStep({
         id: "finish",
         title: "Crea tu cuenta gratis",
         text: "Con una cuenta usas el cupo de IA, guardas documentos y, si te suscribes, desbloqueas resaltar, marcadores y notas en Mi Biblioteca. ¿Listo para empezar?",
