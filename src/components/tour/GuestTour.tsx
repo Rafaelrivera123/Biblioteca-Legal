@@ -215,7 +215,7 @@ export default function GuestTour() {
         id: "article-tools",
         title: "Resalta, guarda o comenta",
         text: tipText("En cada artículo puedes resaltar con color, guardar un marcador o dejar una nota privada. Es del Plan Personal. Con cuenta, todo queda en Mi Biblioteca."),
-        attachTo: { element: "#tour-article-tools", on: "bottom" },
+        attachTo: { element: "#tour-article-tools", on: "left" },
         buttons: [
           {
             text: "Anterior",
