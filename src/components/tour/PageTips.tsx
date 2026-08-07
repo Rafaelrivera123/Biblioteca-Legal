@@ -48,13 +48,23 @@ export default function PageTips({ userId, hasSubscription }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const tipsParam = searchParams.get("tips");
+  const tourParam = searchParams.get("tour");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tourRef = useRef<any>(null);
   const runIdRef = useRef(0);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  /** Skip one effect run after clearing ?tips=1 so the tip does not remount. */
+  const skipNextRunRef = useRef(false);
 
   useEffect(() => {
-    const force =
-      searchParams.get("tips") === "1" || searchParams.get("tour") === "1";
+    if (skipNextRunRef.current) {
+      skipNextRunRef.current = false;
+      return;
+    }
+
+    const force = tipsParam === "1" || tourParam === "1";
     const pageKey = resolvePageTipKey(pathname);
     if (!pageKey) return;
 
@@ -64,18 +74,21 @@ export default function PageTips({ userId, hasSubscription }: Props) {
     let delayTimer: ReturnType<typeof setTimeout> | undefined;
 
     const countVisit = () => {
-      if (counted || force) return;
+      if (counted) return;
       counted = true;
+      // Always count — including force replay — so clearing ?tips=1 cannot
+      // immediately start the same tip again.
       incrementPageVisits(userId, pageKey);
     };
 
     const clearForceParams = () => {
       if (!force) return;
+      skipNextRunRef.current = true;
       const url = new URL(window.location.href);
       url.searchParams.delete("tips");
       url.searchParams.delete("tour");
       const search = url.searchParams.toString();
-      router.replace(url.pathname + (search ? `?${search}` : ""));
+      routerRef.current.replace(url.pathname + (search ? `?${search}` : ""));
     };
 
     const start = async () => {
@@ -96,6 +109,13 @@ export default function PageTips({ userId, hasSubscription }: Props) {
       });
       if (cancelled || runId !== runIdRef.current) return;
 
+      const placement = (tip.attachOn ?? "bottom") as TipPlacement;
+      const attachSelector = tip.attachTo;
+
+      // Scroll to final position BEFORE creating/showing the tip (instant).
+      await prepareTipViewport(el, placement, "instant");
+      if (cancelled || runId !== runIdRef.current) return;
+
       const Shepherd = (await import("shepherd.js")).default;
       if (cancelled || runId !== runIdRef.current) return;
 
@@ -112,8 +132,6 @@ export default function PageTips({ userId, hasSubscription }: Props) {
         useModalOverlay: true,
         defaultStepOptions: {
           cancelIcon: { enabled: true },
-          // Placement-aware scroll runs in beforeShowPromise instead of
-          // centering tall targets (which flips top tips to the bottom).
           scrollTo: false,
           classes: "blhn-tour-step",
           modalOverlayOpeningPadding: 8,
@@ -131,9 +149,6 @@ export default function PageTips({ userId, hasSubscription }: Props) {
       tour.on("complete", onDone);
       tour.on("cancel", onDone);
 
-      const placement = (tip.attachOn ?? "bottom") as TipPlacement;
-      const attachSelector = tip.attachTo;
-
       tour.addStep({
         id: tip.id,
         title: tip.title,
@@ -142,10 +157,8 @@ export default function PageTips({ userId, hasSubscription }: Props) {
           element: attachSelector,
           on: placement,
         },
-        beforeShowPromise: async () => {
-          const target = document.querySelector(attachSelector);
-          if (target) await prepareTipViewport(target, placement);
-        },
+        // Viewport already prepared; keep false so Shepherd never re-scrolls.
+        scrollTo: false,
         buttons: [
           {
             text: "Entendido",
@@ -166,7 +179,6 @@ export default function PageTips({ userId, hasSubscription }: Props) {
       cancelled = true;
       if (delayTimer) clearTimeout(delayTimer);
       if (tourRef.current) {
-        // Navigating away after the tip was shown still counts as a visit.
         countVisit();
         try {
           tourRef.current.off("complete");
@@ -178,7 +190,7 @@ export default function PageTips({ userId, hasSubscription }: Props) {
         tourRef.current = null;
       }
     };
-  }, [pathname, userId, hasSubscription, searchParams, router]);
+  }, [pathname, userId, hasSubscription, tipsParam, tourParam]);
 
   return null;
 }

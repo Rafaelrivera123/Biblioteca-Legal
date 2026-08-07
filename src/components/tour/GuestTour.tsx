@@ -118,7 +118,7 @@ export default function GuestTour() {
             if (prior) await prior();
             if (!selector) return;
             const target = document.querySelector(selector);
-            if (target) await prepareTipViewport(target, placement);
+            if (target) await prepareTipViewport(target, placement, "instant");
           },
         });
       };
@@ -194,7 +194,7 @@ export default function GuestTour() {
             text: "Siguiente",
             classes: "blhn-btn-primary",
             async action() {
-              await goTo(nav, "/collections", "#tour-collections-grid");
+              await goTo(nav, "/collections", "#tour-collections-tip-target");
               tour.next();
             },
           },
@@ -205,7 +205,7 @@ export default function GuestTour() {
         id: "collections",
         title: "Colección de leyes",
         text: "Aquí está la biblioteca completa: códigos, leyes y reglamentos de Honduras. Puedes leer el texto completo gratis, sin crear cuenta.",
-        attachTo: { element: "#tour-collections-grid", on: "top" },
+        attachTo: { element: "#tour-collections-tip-target", on: "top" },
         buttons: [
           {
             text: "Anterior",
@@ -240,7 +240,7 @@ export default function GuestTour() {
             text: "Anterior",
             classes: "blhn-btn-secondary",
             async action() {
-              await goTo(nav, "/collections", "#tour-collections-grid");
+              await goTo(nav, "/collections", "#tour-collections-tip-target");
               tour.back();
             },
           },

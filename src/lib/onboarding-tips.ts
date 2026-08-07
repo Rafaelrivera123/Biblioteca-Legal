@@ -69,7 +69,9 @@ export const PAGE_TIP_CONFIGS: PageTipConfig[] = [
     tips: [
       {
         id: "collections",
-        attachTo: "#tour-collections-grid",
+        // First card (not the full tall grid) so top placement has stable space
+        // and Floating UI does not flip the tip to the bottom after scroll.
+        attachTo: "#tour-collections-tip-target",
         attachOn: "top",
         title: "Colección de leyes",
         text: () =>
