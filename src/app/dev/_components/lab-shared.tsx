@@ -577,7 +577,7 @@ export function FreePositionStage({
           }}
         >
           <iframe
-            ref={iframeRef}
+            ref={iframeRef as RefObject<HTMLIFrameElement>}
             src={pageSrc}
             title="Página real"
             className="absolute inset-0 h-full w-full border-0 bg-white"
