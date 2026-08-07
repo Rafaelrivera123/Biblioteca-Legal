@@ -4,22 +4,23 @@ export type TipPlacement = "top" | "bottom" | "left" | "right";
 const TIP_VIEWPORT_GAP = 220;
 
 function tipGap(): number {
-  // Keep room for the tip without pushing short mobile viewports too far.
   return Math.min(
     TIP_VIEWPORT_GAP,
     Math.max(150, Math.round(window.innerHeight * 0.32))
   );
 }
 
+type ScrollBehaviorOption = "instant" | "smooth";
+
 /**
  * Scroll so the tip's preferred side has room in the viewport.
- * Avoids Shepherd's default `block: "center"` on tall targets (e.g. collections
- * grid), which pins the top to the viewport edge and forces Floating UI flip
- * from `top` → `bottom`.
+ * Prefer `instant` so Shepherd never shows during a smooth-scroll race
+ * (tip appears → moves/hides → reappears).
  */
 export function scrollForTip(
   element: Element,
-  placement: TipPlacement = "bottom"
+  placement: TipPlacement = "bottom",
+  behavior: ScrollBehaviorOption = "instant"
 ): void {
   const rect = element.getBoundingClientRect();
   const gap = tipGap();
@@ -43,7 +44,10 @@ export function scrollForTip(
   }
 
   if (Math.abs(delta) < 2) return;
-  window.scrollBy({ top: delta, behavior: "smooth" });
+  window.scrollBy({
+    top: delta,
+    behavior: behavior === "smooth" ? "smooth" : "auto",
+  });
 }
 
 function waitForScrollSettled(timeoutMs = 700): Promise<void> {
@@ -72,11 +76,19 @@ function waitForScrollSettled(timeoutMs = 700): Promise<void> {
   });
 }
 
-/** Scroll first, then resolve so Shepherd can show the tip in the final place. */
+/** Position the viewport, then resolve. Instant by default (no flicker). */
 export async function prepareTipViewport(
   element: Element,
-  placement: TipPlacement = "bottom"
+  placement: TipPlacement = "bottom",
+  behavior: ScrollBehaviorOption = "instant"
 ): Promise<void> {
-  scrollForTip(element, placement);
-  await waitForScrollSettled();
+  scrollForTip(element, placement, behavior);
+  if (behavior === "smooth") {
+    await waitForScrollSettled();
+    return;
+  }
+  // Instant scroll still needs a frame for layout/Floating UI to read geometry.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
 }

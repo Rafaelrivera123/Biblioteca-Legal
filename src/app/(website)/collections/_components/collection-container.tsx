@@ -89,10 +89,16 @@ const CollectionContainer = ({ initialData }: Props) => {
     content = (
       <div
         id="tour-collections-grid"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10 scroll-mt-[220px]"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[30px] mt-10"
       >
-        {data?.data?.map((item) => (
-          <DocumentCard key={item.id} document={item} />
+        {data?.data?.map((item, index) => (
+          <div
+            key={item.id}
+            id={index === 0 ? "tour-collections-tip-target" : undefined}
+            className={index === 0 ? "scroll-mt-[220px]" : undefined}
+          >
+            <DocumentCard document={item} />
+          </div>
         ))}
       </div>
     );
