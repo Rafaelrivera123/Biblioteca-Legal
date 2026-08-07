@@ -303,7 +303,6 @@ export default function GuestTour() {
   const tipX = layout?.tip.x ?? 50;
   const tipY = layout?.tip.y ?? 45;
 
-  const isWelcome = step.id === "welcome";
   const isFinish = step.id === "finish";
   const primaryLabel =
     step.primaryLabel ??
