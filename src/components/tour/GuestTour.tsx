@@ -4,8 +4,16 @@ import {
   DEMO_DOCUMENT_SLUG,
   GUEST_TOUR_EVENT,
 } from "@/lib/guest-tour";
+import {
+  bindSketchArrowToTour,
+  shepherdTourOptions,
+} from "@/lib/tour-ui";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
+
+function tipText(body: string) {
+  return `<span class="blhn-tip-kicker">Recorrido</span><p>${body}</p>`;
+}
 
 function waitForElement(
   selector: string,
@@ -71,22 +79,15 @@ export default function GuestTour() {
       const Shepherd = (await import("shepherd.js")).default;
       const nav = routerRef.current;
 
-      const tour = new Shepherd.Tour({
-        useModalOverlay: true,
-        defaultStepOptions: {
-          cancelIcon: { enabled: true },
-          scrollTo: { behavior: "smooth", block: "center" },
-          classes: "blhn-tour-step",
-          modalOverlayOpeningPadding: 8,
-          modalOverlayOpeningRadius: 8,
-        },
-      });
+      const tour = new Shepherd.Tour(shepherdTourOptions);
 
       tourRef.current = tour;
+      const clearArrow = bindSketchArrowToTour(tour);
 
       const finish = () => {
         runningRef.current = false;
         tourRef.current = null;
+        clearArrow();
         if (new URL(window.location.href).searchParams.get("tour") === "guest") {
           const url = new URL(window.location.href);
           url.searchParams.delete("tour");
@@ -116,7 +117,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "welcome",
         title: "Bienvenido a Biblioteca Legal HN",
-        text: "Te mostramos todo lo que puedes hacer aquí: leer leyes gratis, buscar artículos, usar IA y, si te suscribes, resaltar, guardar y anotar. Puedes cerrar el tour cuando quieras.",
+        text: tipText("Te mostramos todo lo que puedes hacer aquí: leer leyes gratis, buscar artículos, usar IA y, si te suscribes, resaltar, guardar y anotar. Puedes cerrar el tour cuando quieras."),
         buttons: [
           {
             text: "Comenzar",
@@ -139,7 +140,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "global-search",
         title: "Buscador de artículos",
-        text: "Busca en toda la legislación por número de artículo, nombre de la ley o en lenguaje natural. La IA te ayuda a encontrar el texto relevante. Disponible sin cuenta.",
+        text: tipText("Busca en toda la legislación por número de artículo, nombre de la ley o en lenguaje natural. La IA te ayuda a encontrar el texto relevante. Disponible sin cuenta."),
         attachTo: { element: "#tour-global-search", on: "top" },
         buttons: [
           backBtn,
@@ -161,7 +162,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "global-chat",
         title: "Chat IA global",
-        text: "Pregunta sobre cualquier ley hondureña. Con cuenta gratis tienes 10 consultas de IA; con el Plan Personal son ilimitadas y puedes adjuntar archivos.",
+        text: tipText("Pregunta sobre cualquier ley hondureña. Con cuenta gratis tienes 10 consultas de IA; con el Plan Personal son ilimitadas y puedes adjuntar archivos."),
         attachTo: { element: "#tour-global-chat", on: "left" },
         buttons: [
           backBtn,
@@ -179,7 +180,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "collections",
         title: "Colección de leyes",
-        text: "Aquí está la biblioteca completa: códigos, leyes y reglamentos de Honduras. Puedes leer el texto completo gratis, sin crear cuenta.",
+        text: tipText("Aquí está la biblioteca completa: códigos, leyes y reglamentos de Honduras. Puedes leer el texto completo gratis, sin crear cuenta."),
         attachTo: { element: "#tour-collections-grid", on: "top" },
         buttons: [
           {
@@ -208,7 +209,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "article-tools",
         title: "Resalta, guarda o comenta",
-        text: "En cada artículo puedes resaltar con color, guardar un marcador o dejar una nota privada. Es del Plan Personal. Con cuenta, todo queda en Mi Biblioteca.",
+        text: tipText("En cada artículo puedes resaltar con color, guardar un marcador o dejar una nota privada. Es del Plan Personal. Con cuenta, todo queda en Mi Biblioteca."),
         attachTo: { element: "#tour-article-tools", on: "bottom" },
         buttons: [
           {
@@ -226,7 +227,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "ai-summary",
         title: "Resumen en lenguaje claro",
-        text: "Cada artículo puede incluir un resumen IA que explica el texto sin jerga. Los primeros 20 artículos de cada documento son gratis; con el plan ves todos.",
+        text: tipText("Cada artículo puede incluir un resumen IA que explica el texto sin jerga. Los primeros 20 artículos de cada documento son gratis; con el plan ves todos."),
         attachTo: { element: "#tour-ai-summary", on: "bottom" },
         beforeShowPromise: async () => {
           const el = await waitForElement("#tour-ai-summary", 4000);
@@ -243,7 +244,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "doc-chatbot",
         title: "Asistente de este documento",
-        text: "Haz preguntas solo sobre esta ley. El asistente responde con base en sus artículos. Ideal para estudiar o preparar un caso.",
+        text: tipText("Haz preguntas solo sobre esta ley. El asistente responde con base en sus artículos. Ideal para estudiar o preparar un caso."),
         attachTo: { element: "#tour-chatbot", on: "top" },
         buttons: [
           backBtn,
@@ -265,7 +266,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "actualizaciones",
         title: "Actualizaciones legales",
-        text: "Reformas, leyes nuevas y derogaciones explicadas en lenguaje claro, con enlace a La Gaceta. Así te enteras de cambios sin leer el PDF completo.",
+        text: tipText("Reformas, leyes nuevas y derogaciones explicadas en lenguaje claro, con enlace a La Gaceta. Así te enteras de cambios sin leer el PDF completo."),
         attachTo: { element: "#tour-actualizaciones-page", on: "top" },
         buttons: [
           {
@@ -294,7 +295,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "gacetas",
         title: "Gacetas oficiales",
-        text: "Consulta las Gacetas Oficiales publicadas. Complementa las actualizaciones cuando necesitas el documento oficial.",
+        text: tipText("Consulta las Gacetas Oficiales publicadas. Complementa las actualizaciones cuando necesitas el documento oficial."),
         attachTo: { element: "#tour-gacetas-page", on: "top" },
         buttons: [
           {
@@ -323,7 +324,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "guias",
         title: "Guías prácticas",
-        text: "Guías que explican temas legales de forma práctica: ideales para estudiantes, ciudadanos y profesionales que quieren orientación clara.",
+        text: tipText("Guías que explican temas legales de forma práctica: ideales para estudiantes, ciudadanos y profesionales que quieren orientación clara."),
         attachTo: { element: "#tour-guias-page", on: "top" },
         buttons: [
           {
@@ -348,7 +349,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "subscriptions",
         title: "Gratis vs Plan Personal",
-        text: "Gratis: leer leyes, buscar, 20 resúmenes IA por documento y 10 chats. Plan Personal: resúmenes ilimitados, chat ilimitado, resaltar/guardar/notas y sin anuncios.",
+        text: tipText("Gratis: leer leyes, buscar, 20 resúmenes IA por documento y 10 chats. Plan Personal: resúmenes ilimitados, chat ilimitado, resaltar/guardar/notas y sin anuncios."),
         attachTo: { element: "#tour-subscriptions-page", on: "top" },
         buttons: [
           {
@@ -366,7 +367,7 @@ export default function GuestTour() {
       tour.addStep({
         id: "finish",
         title: "Crea tu cuenta gratis",
-        text: "Con una cuenta usas el cupo de IA, guardas documentos y, si te suscribes, desbloqueas resaltar, marcadores y notas en Mi Biblioteca. ¿Listo para empezar?",
+        text: tipText("Con una cuenta usas el cupo de IA, guardas documentos y, si te suscribes, desbloqueas resaltar, marcadores y notas en Mi Biblioteca. ¿Listo para empezar?"),
         buttons: [
           backBtn,
           {

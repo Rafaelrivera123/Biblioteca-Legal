@@ -8,6 +8,10 @@ import {
   resetTipsState,
   resolvePageTipKey,
 } from "@/lib/onboarding-tips";
+import {
+  bindSketchArrowToTour,
+  shepherdTourOptions,
+} from "@/lib/tour-ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -50,6 +54,7 @@ export default function PageTips({ userId, hasSubscription }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tourRef = useRef<any>(null);
   const runIdRef = useRef(0);
+  const arrowCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const force =
@@ -106,32 +111,28 @@ export default function PageTips({ userId, hasSubscription }: Props) {
         }
         tourRef.current = null;
       }
+      arrowCleanupRef.current?.();
+      arrowCleanupRef.current = null;
 
-      const tour = new Shepherd.Tour({
-        useModalOverlay: true,
-        defaultStepOptions: {
-          cancelIcon: { enabled: true },
-          scrollTo: { behavior: "smooth", block: "center" },
-          classes: "blhn-tour-step",
-          modalOverlayOpeningPadding: 8,
-          modalOverlayOpeningRadius: 8,
-        },
-      });
-
+      const tour = new Shepherd.Tour(shepherdTourOptions);
       tourRef.current = tour;
+      arrowCleanupRef.current = bindSketchArrowToTour(tour);
 
       const onDone = () => {
         countVisit();
         clearForceParams();
+        arrowCleanupRef.current?.();
+        arrowCleanupRef.current = null;
       };
 
       tour.on("complete", onDone);
       tour.on("cancel", onDone);
 
+      const body = tip.text(hasSubscription);
       tour.addStep({
         id: tip.id,
         title: tip.title,
-        text: tip.text(hasSubscription),
+        text: `<span class="blhn-tip-kicker">Guía rápida</span><p>${body}</p>`,
         attachTo: {
           element: tip.attachTo,
           on: tip.attachOn ?? "bottom",
@@ -155,8 +156,9 @@ export default function PageTips({ userId, hasSubscription }: Props) {
     return () => {
       cancelled = true;
       if (delayTimer) clearTimeout(delayTimer);
+      arrowCleanupRef.current?.();
+      arrowCleanupRef.current = null;
       if (tourRef.current) {
-        // Navigating away after the tip was shown still counts as a visit.
         countVisit();
         try {
           tourRef.current.off("complete");
