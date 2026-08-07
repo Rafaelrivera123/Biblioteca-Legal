@@ -166,6 +166,7 @@ const LegalAIChatbot = ({
       <AnimatePresence>
         {!isOpen && (
           <motion.button
+            id="tour-global-chat"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}

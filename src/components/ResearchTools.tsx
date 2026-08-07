@@ -34,7 +34,7 @@ export default function ResearchTools() {
           las leyes y códigos vigentes de Honduras publicados en la
           plataforma.
         </p>
-        <div className="relative mx-auto max-w-3xl">
+        <div id="tour-global-search" className="relative mx-auto max-w-3xl">
           <div className="relative z-10 rounded-xl border border-black/10 bg-slate-50 p-6 shadow-xl">
             <div className="mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               {FEATURES.map(({ icon: Icon, label }) => (

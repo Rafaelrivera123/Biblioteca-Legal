@@ -1,11 +1,7 @@
-import HighlightContainer from "./_components/highlights-container";
+import { redirect } from "next/navigation";
 
 const Page = () => {
-  return (
-    <div>
-      <HighlightContainer />
-    </div>
-  );
+  redirect("/mi-biblioteca/destacados");
 };
 
 export default Page;
