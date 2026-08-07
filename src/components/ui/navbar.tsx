@@ -73,9 +73,9 @@ const Navbar = ({ isLoggedin, user }: Props) => {
       tourId: "tour-mi-biblioteca",
       authOnly: true,
     },
-    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: undefined, authOnly: false },
-    { id: 5, href: "/actualizaciones", linkText: "Actualizaciones", tourId: undefined, authOnly: false },
-    { id: 6, href: "/guias", linkText: "Guías", tourId: undefined, authOnly: false },
+    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: "tour-nav-gacetas", authOnly: false },
+    { id: 5, href: "/actualizaciones", linkText: "Actualizaciones", tourId: "tour-nav-actualizaciones", authOnly: false },
+    { id: 6, href: "/guias", linkText: "Guías", tourId: "tour-nav-guias", authOnly: false },
     { id: 7, href: "/subscriptions", linkText: "Suscripciones", tourId: "tour-subscriptions", authOnly: false },
   ];
 

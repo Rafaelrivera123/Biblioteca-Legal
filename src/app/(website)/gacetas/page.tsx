@@ -122,7 +122,7 @@ const GacetasPage = async () => {
         description="Consulta y descarga los PDFs originales de La Gaceta de la República de Honduras"
       />
 
-      <div className="container max-w-[1100px] py-12">
+      <div id="tour-gacetas-page" className="container max-w-[1100px] py-12">
         <p className="text-muted-foreground text-base leading-relaxed max-w-[750px] mb-10">
           La Gaceta es el diario oficial de la República de Honduras: ahí se publican los
           decretos, leyes, reglamentos y acuerdos que entran en vigencia en el país. En

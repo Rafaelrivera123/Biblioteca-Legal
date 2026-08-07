@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import Footer from "@/components/ui/footer";
 import Navbar from "@/components/ui/navbar";
 import CookieBanner from "@/components/shared/cookie-banner";
+import GuestTour from "@/components/tour/GuestTour";
 import PageTips from "@/components/tour/PageTips";
 import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
@@ -52,12 +53,16 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       <main>{children}</main>
       <Footer />
       <CookieBanner />
-      {cu?.user?.id && (
+      {cu?.user?.id ? (
         <Suspense fallback={null}>
           <PageTips
             userId={cu.user.id}
             hasSubscription={hasSubscription}
           />
+        </Suspense>
+      ) : (
+        <Suspense fallback={null}>
+          <GuestTour />
         </Suspense>
       )}
       <NextTopLoader showSpinner={false} color="#FFFFFF" />

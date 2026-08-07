@@ -42,7 +42,7 @@ const Page = async ({
         : null;
 
   return (
-    <div>
+    <div id="tour-subscriptions-page">
       <HeaderSection
         imageUrl={siteAssets.subscriptionPage}
         title="Nuestros Planes"
