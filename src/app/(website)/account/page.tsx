@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import CancelSubscriptionContainer from "./_components/cancel-subscription/cancel-subscription-container";
+import ResetTipsCard from "./_components/reset-tips-card";
 const ChangePasswordForm = dynamic(
   () => import("./_components/password-reset/password-reset-form"),
   {
@@ -36,6 +37,8 @@ const Page = async () => {
   return (
     <div className="space-y-20 mb-20">
       <ProfileForm user={user} />
+
+      <ResetTipsCard userId={user.id} />
 
       <ChangePasswordForm />
 
