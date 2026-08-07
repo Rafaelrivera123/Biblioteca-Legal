@@ -19,6 +19,7 @@ import FramerDropdown from "./framer-dropdown";
 interface Props {
   isLoggedin: boolean;
   user: User | null;
+  hasSubscription?: boolean;
 }
 
 function getUserInitials(user: User | null) {
@@ -56,7 +57,7 @@ function UserAvatar({
   );
 }
 
-const Navbar = ({ isLoggedin, user }: Props) => {
+const Navbar = ({ isLoggedin, user, hasSubscription = false }: Props) => {
   const [isPending, startTransition] = useTransition();
   const [scrolling, setScrolling] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -64,22 +65,34 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const pathname = usePathname();
 
   const menus = [
-    { id: 1, href: "/", linkText: "Inicio", tourId: undefined as string | undefined, authOnly: false },
-    { id: 2, href: "/collections", linkText: "Colección", tourId: undefined, authOnly: false },
+    { id: 1, href: "/", linkText: "Inicio", tourId: undefined as string | undefined, authOnly: false, hideWhenSubscribed: false },
+    { id: 2, href: "/collections", linkText: "Colección", tourId: undefined, authOnly: false, hideWhenSubscribed: false },
     {
       id: 3,
       href: "/mi-biblioteca",
       linkText: "Mi Biblioteca",
       tourId: "tour-mi-biblioteca",
       authOnly: true,
+      hideWhenSubscribed: false,
     },
-    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: "tour-nav-gacetas", authOnly: false },
-    { id: 5, href: "/actualizaciones", linkText: "Actualizaciones", tourId: "tour-nav-actualizaciones", authOnly: false },
-    { id: 6, href: "/guias", linkText: "Guías", tourId: "tour-nav-guias", authOnly: false },
-    { id: 7, href: "/subscriptions", linkText: "Suscripciones", tourId: "tour-subscriptions", authOnly: false },
+    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: "tour-nav-gacetas", authOnly: false, hideWhenSubscribed: false },
+    { id: 5, href: "/actualizaciones", linkText: "Actualizaciones", tourId: "tour-nav-actualizaciones", authOnly: false, hideWhenSubscribed: false },
+    { id: 6, href: "/guias", linkText: "Guías", tourId: "tour-nav-guias", authOnly: false, hideWhenSubscribed: false },
+    {
+      id: 7,
+      href: "/subscriptions",
+      linkText: "Suscríbete",
+      tourId: "tour-subscriptions",
+      authOnly: false,
+      hideWhenSubscribed: true,
+    },
   ];
 
-  const visibleMenus = menus.filter((menu) => !menu.authOnly || isLoggedin);
+  const visibleMenus = menus.filter(
+    (menu) =>
+      (!menu.authOnly || isLoggedin) &&
+      !(menu.hideWhenSubscribed && hasSubscription)
+  );
 
   useEffect(() => {
     const handleScroll = () => {

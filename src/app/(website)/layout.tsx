@@ -49,7 +49,11 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <Navbar isLoggedin={!!cu} user={user ?? null} />
+      <Navbar
+        isLoggedin={!!cu}
+        user={user ?? null}
+        hasSubscription={hasSubscription}
+      />
       <main>{children}</main>
       <Footer />
       <CookieBanner />
