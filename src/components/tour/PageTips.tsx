@@ -11,6 +11,7 @@ import {
 import {
   bindSketchArrowToTour,
   shepherdTourOptions,
+  withSketchArrow,
 } from "@/lib/tour-ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -129,24 +130,26 @@ export default function PageTips({ userId, hasSubscription }: Props) {
       tour.on("cancel", onDone);
 
       const body = tip.text(hasSubscription);
-      tour.addStep({
-        id: tip.id,
-        title: tip.title,
-        text: `<span class="blhn-tip-kicker">Guía rápida</span><p>${body}</p>`,
-        attachTo: {
-          element: tip.attachTo,
-          on: tip.attachOn ?? "bottom",
-        },
-        buttons: [
-          {
-            text: "Entendido",
-            classes: "blhn-btn-primary",
-            action() {
-              tour.complete();
-            },
+      tour.addStep(
+        withSketchArrow({
+          id: tip.id,
+          title: tip.title,
+          text: `<span class="blhn-tip-kicker">Guía rápida</span><p>${body}</p>`,
+          attachTo: {
+            element: tip.attachTo,
+            on: tip.attachOn ?? "bottom",
           },
-        ],
-      });
+          buttons: [
+            {
+              text: "Entendido",
+              classes: "blhn-btn-primary",
+              action() {
+                tour.complete();
+              },
+            },
+          ],
+        })
+      );
 
       tour.start();
     };

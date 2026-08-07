@@ -205,7 +205,71 @@ function waitForTipElement(timeout = 1200): Promise<HTMLElement | null> {
   });
 }
 
-/** Attach sketch arrow lifecycle to a Shepherd tour instance. */
+type StepLike = {
+  options?: { attachTo?: unknown };
+  getElement?: () => HTMLElement | null | undefined;
+};
+
+async function showArrowForStepInstance(
+  step: StepLike | null | undefined,
+  onCleanup: (fn: (() => void) | null) => void
+) {
+  onCleanup(null);
+
+  const attach = step?.options?.attachTo;
+  const target = resolveTarget(attach);
+  if (!target) return;
+
+  // Prefer Shepherd's own tip element when available
+  let tipEl =
+    (typeof step?.getElement === "function"
+      ? step.getElement()
+      : null) ?? null;
+
+  if (!tipEl) tipEl = await waitForTipElement();
+  if (!tipEl) return;
+
+  onCleanup(mountSketchArrow(target, tipEl));
+}
+
+/**
+ * Wrap a Shepherd step so a sketch arrow is drawn whenever that step is shown.
+ * Prefer this over tour-level listeners — `when.show` is the reliable Shepherd hook.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withSketchArrow(step: Record<string, any>) {
+  const prevWhen = step.when ?? {};
+  const prevShow = prevWhen.show;
+  const prevHide = prevWhen.hide;
+  let cleanup: (() => void) | null = null;
+
+  const setCleanup = (fn: (() => void) | null) => {
+    cleanup?.();
+    cleanup = fn;
+  };
+
+  return {
+    ...step,
+    when: {
+      ...prevWhen,
+      // Shepherd binds `this` to the Step instance
+      async show(this: StepLike, ...args: unknown[]) {
+        if (typeof prevShow === "function") {
+          await prevShow.apply(this, args);
+        }
+        await showArrowForStepInstance(this, setCleanup);
+      },
+      hide(this: StepLike, ...args: unknown[]) {
+        setCleanup(null);
+        if (typeof prevHide === "function") {
+          prevHide.apply(this, args);
+        }
+      },
+    },
+  };
+}
+
+/** Attach sketch arrow lifecycle to a Shepherd tour instance (fallback). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function bindSketchArrowToTour(tour: any) {
   let cleanup: (() => void) | null = null;
@@ -216,29 +280,24 @@ export function bindSketchArrowToTour(tour: any) {
     cleanup = null;
   };
 
-  const showArrowForStep = async (step: unknown) => {
-    const myGen = ++generation;
-    clear();
-
-    const attach =
-      step && typeof step === "object" && "options" in step
-        ? (step as { options?: { attachTo?: unknown } }).options?.attachTo
-        : null;
-
-    const target = resolveTarget(attach);
-    if (!target) return;
-
-    const tipEl = await waitForTipElement();
-    if (myGen !== generation || !tipEl) return;
-
-    cleanup = mountSketchArrow(target, tipEl);
+  const setCleanup = (fn: (() => void) | null) => {
+    cleanup?.();
+    cleanup = fn;
   };
 
-  // Shepherd Tour emits "show" with { step } in recent versions; also try getCurrentStep.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tour.on("show", (event?: any) => {
-    const step = event?.step ?? tour.getCurrentStep?.();
-    void showArrowForStep(step);
+    const myGen = ++generation;
+    const step = (event?.step ?? tour.getCurrentStep?.()) as StepLike | undefined;
+    void (async () => {
+      await showArrowForStepInstance(step, (fn) => {
+        if (myGen !== generation) {
+          fn?.();
+          return;
+        }
+        setCleanup(fn);
+      });
+    })();
   });
 
   tour.on("hide", clear);
