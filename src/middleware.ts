@@ -1,6 +1,9 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "./auth.config";
+import { ensureAuthUrl } from "./lib/ensure-auth-url";
+
+ensureAuthUrl();
 
 // Use the Edge-safe config only — never import `./auth` here (that pulls Prisma).
 const { auth } = NextAuth(authConfig);
@@ -60,8 +63,8 @@ export const config = {
   matcher: [
     /*
      * Account-completion gate + admin route protection.
-     * Skip static assets and payment webhooks.
+     * Skip static assets, payment webhooks, and local /dev labs.
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/webhook|api/gacetas/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/webhook|api/gacetas/upload|dev(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

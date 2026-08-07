@@ -1,5 +1,8 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@prisma/client";
+import { ensureAuthUrl } from "./lib/ensure-auth-url";
+
+ensureAuthUrl();
 
 /**
  * Edge-compatible Auth.js config (no Prisma / Node-only imports).

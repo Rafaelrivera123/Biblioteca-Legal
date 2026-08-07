@@ -1,5 +1,6 @@
 import { getUserByEmail, getUserById } from "@/helper/user";
 import { prisma } from "@/lib/db";
+import { ensureAuthUrl } from "@/lib/ensure-auth-url";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -9,6 +10,8 @@ import Credentials from "next-auth/providers/credentials";
 import Facebook from "next-auth/providers/facebook";
 import Google from "next-auth/providers/google";
 import { authConfig } from "./auth.config";
+
+ensureAuthUrl();
 
 function splitFullName(fullName?: string | null) {
   const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
