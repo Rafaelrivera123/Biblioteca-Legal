@@ -113,8 +113,6 @@ export function mountSketchArrow(
     };
 
     // Control points for a soft S-curve (hand-drawn feel)
-    const midX = (start.x + tipPoint.x) / 2;
-    const midY = (start.y + tipPoint.y) / 2;
     const dx = tipPoint.x - start.x;
     const dy = tipPoint.y - start.y;
     const len = Math.hypot(dx, dy) || 1;
