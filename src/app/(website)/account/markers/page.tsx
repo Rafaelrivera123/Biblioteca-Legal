@@ -1,11 +1,7 @@
-import BookmarkContainer from "./_components/bookmark-container";
+import { redirect } from "next/navigation";
 
 const Page = () => {
-  return (
-    <div>
-      <BookmarkContainer />
-    </div>
-  );
+  redirect("/mi-biblioteca/marcadores");
 };
 
 export default Page;

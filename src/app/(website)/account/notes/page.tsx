@@ -1,11 +1,7 @@
-import NotesContainer from "./_components/notes-container";
+import { redirect } from "next/navigation";
 
 const Page = () => {
-  return (
-    <div>
-      <NotesContainer />
-    </div>
-  );
+  redirect("/mi-biblioteca/notas");
 };
 
 export default Page;

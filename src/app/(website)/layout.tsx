@@ -2,19 +2,24 @@ import { auth } from "@/auth";
 import Footer from "@/components/ui/footer";
 import Navbar from "@/components/ui/navbar";
 import CookieBanner from "@/components/shared/cookie-banner";
+import GuestTour from "@/components/tour/GuestTour";
+import PageTips from "@/components/tour/PageTips";
+import { isSubscribed } from "@/helper/subscription";
 import { prisma } from "@/lib/db";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import NextTopLoader from "nextjs-toploader";
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;
+  let hasSubscription = false;
   if (cu?.user?.id) {
     user = await prisma.user.findUnique({
       where: { id: cu.user.id },
     });
+    hasSubscription = user?.role === "admin" || (await isSubscribed());
   }
 
   const structuredData = {
@@ -48,6 +53,18 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       <main>{children}</main>
       <Footer />
       <CookieBanner />
+      {cu?.user?.id ? (
+        <Suspense fallback={null}>
+          <PageTips
+            userId={cu.user.id}
+            hasSubscription={hasSubscription}
+          />
+        </Suspense>
+      ) : (
+        <Suspense fallback={null}>
+          <GuestTour />
+        </Suspense>
+      )}
       <NextTopLoader showSpinner={false} color="#FFFFFF" />
       <GoogleAnalytics gaId={process.env.GOOGLE_ANALYTICS_ID!} />
     </div>

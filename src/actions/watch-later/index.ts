@@ -37,6 +37,7 @@ export async function watchLater(documentId: string) {
     });
 
     revalidatePath("/account/documents");
+    revalidatePath("/mi-biblioteca/documentos");
 
     return {
       success: true,
@@ -85,6 +86,7 @@ export async function removeWatchLater(documentId: string) {
     });
 
     revalidatePath("/account/documents");
+    revalidatePath("/mi-biblioteca/documentos");
 
     return {
       success: true,

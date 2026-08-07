@@ -64,13 +64,22 @@ const Navbar = ({ isLoggedin, user }: Props) => {
   const pathname = usePathname();
 
   const menus = [
-    { id: 1, href: "/", linkText: "Inicio", tourId: undefined },
-    { id: 2, href: "/collections", linkText: "Colección", tourId: undefined },
-    { id: 3, href: "/gacetas", linkText: "Gacetas", tourId: undefined },
-    { id: 4, href: "/actualizaciones", linkText: "Actualizaciones", tourId: undefined },
-    { id: 5, href: "/guias", linkText: "Guías", tourId: undefined },
-    { id: 6, href: "/subscriptions", linkText: "Suscripciones", tourId: "tour-subscriptions" },
+    { id: 1, href: "/", linkText: "Inicio", tourId: undefined as string | undefined, authOnly: false },
+    { id: 2, href: "/collections", linkText: "Colección", tourId: undefined, authOnly: false },
+    {
+      id: 3,
+      href: "/mi-biblioteca",
+      linkText: "Mi Biblioteca",
+      tourId: "tour-mi-biblioteca",
+      authOnly: true,
+    },
+    { id: 4, href: "/gacetas", linkText: "Gacetas", tourId: "tour-nav-gacetas", authOnly: false },
+    { id: 5, href: "/actualizaciones", linkText: "Actualizaciones", tourId: "tour-nav-actualizaciones", authOnly: false },
+    { id: 6, href: "/guias", linkText: "Guías", tourId: "tour-nav-guias", authOnly: false },
+    { id: 7, href: "/subscriptions", linkText: "Suscripciones", tourId: "tour-subscriptions", authOnly: false },
   ];
+
+  const visibleMenus = menus.filter((menu) => !menu.authOnly || isLoggedin);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -104,6 +113,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
           ? "text-primary"
           : pathname.startsWith("/collections/") ||
               pathname.startsWith("/account") ||
+              pathname.startsWith("/mi-biblioteca") ||
               pathname.startsWith("/actualizaciones") ||
               pathname.startsWith("/guias")
             ? "text-black"
@@ -125,7 +135,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
             </Link>
           </div>
           <div className="hidden md:flex items-center md:gap-x-5 lg:gap-x-10">
-            {menus.map((menu) => {
+            {visibleMenus.map((menu) => {
               const isActive =
                 menu.href === "/"
                   ? pathname === "/"
@@ -212,7 +222,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
               <SheetContent side="top" className="bg-white text-primary">
                 <div className="flex flex-col items-center gap-y-6 mt-6 pb-4">
                   <div className="flex flex-col items-center gap-y-5 w-full">
-                    {menus.map((menu) => {
+                    {visibleMenus.map((menu) => {
                       const isActive =
                         menu.href === "/"
                           ? pathname === "/"
@@ -222,6 +232,7 @@ const Navbar = ({ isLoggedin, user }: Props) => {
                       <Link
                         key={menu.id}
                         href={menu.href}
+                        id={menu.tourId}
                         className={cn(
                           "min-h-11 flex items-center justify-center w-full text-base",
                           isActive ? "font-semibold" : "font-light"

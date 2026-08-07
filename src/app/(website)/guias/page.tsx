@@ -26,7 +26,10 @@ export default function GuiasPage() {
   const categories = getGuideCategories();
 
   return (
-    <div className="container max-w-[950px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4">
+    <div
+      id="tour-guias-page"
+      className="container max-w-[950px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4"
+    >
       <div className="text-center mb-10 sm:mb-12">
         <h1 className="font-bold text-[26px] sm:text-[30px] md:text-[40px] leading-[120%] mb-4 text-primary">
           Guías legales de Honduras

@@ -58,7 +58,10 @@ async function getPublishedUpdates() {
 const ActualizacionesPage = async () => {
   const posts = await getPublishedUpdates();
   return (
-    <div className="container max-w-[900px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4">
+    <div
+      id="tour-actualizaciones-page"
+      className="container max-w-[900px] mt-24 sm:mt-28 mb-16 sm:mb-20 px-4"
+    >
       <div className="text-center mb-8 sm:mb-12">
         <h1 className="font-bold text-[26px] sm:text-[30px] md:text-[40px] leading-[120%] mb-4">
           Actualizaciones Legales de Honduras

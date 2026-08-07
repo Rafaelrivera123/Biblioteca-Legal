@@ -11,6 +11,7 @@ import PlatformStats from "@/components/PlatformStats";
 import ResearchTools from "@/components/ResearchTools";
 import CTA from "@/components/shared/sections/cta";
 import LegalAIChatbot from "@/components/LegalAIChatbot";
+import StartTourButton from "@/components/tour/StartTourButton";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
@@ -112,11 +113,7 @@ export default async function Home() {
                 {isLoggedin ? "Ver Plan Personal" : "Crear cuenta gratis"}
               </Link>
             </Button>
-            {!isLoggedin && (
-              <Button size="lg" asChild>
-                <Link href="/login">Iniciar sesión</Link>
-              </Button>
-            )}
+            {!isLoggedin && <StartTourButton />}
           </div>
           <nav
             aria-label="Códigos más consultados"
