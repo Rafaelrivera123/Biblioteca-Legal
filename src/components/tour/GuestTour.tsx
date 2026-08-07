@@ -1,12 +1,18 @@
 "use client";
 
 import {
-  DEMO_DOCUMENT_SLUG,
-  GUEST_TOUR_EVENT,
-} from "@/lib/guest-tour";
-import { prepareTipViewport, type TipPlacement } from "@/lib/tour-scroll";
+  GUEST_TOUR_STEPS,
+  type GuestTourStep,
+  type TourLayout,
+} from "@/lib/guest-tour-blueprint";
+import { GUEST_TOUR_EVENT } from "@/lib/guest-tour";
+import { TourArrow, pctToPx } from "@/components/tour/TourArrow";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+function wait(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 function waitForElement(
   selector: string,
@@ -35,394 +41,235 @@ function waitForElement(
   });
 }
 
-async function goTo(
-  router: ReturnType<typeof useRouter>,
-  path: string,
-  selector: string
-) {
-  router.push(path);
-  await waitForElement(selector);
-  await new Promise((r) => setTimeout(r, 450));
+function waitForScrollSettled(timeoutMs = 800): Promise<void> {
+  return new Promise((resolve) => {
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("scrollend", onScrollEnd);
+      if (idle) clearTimeout(idle);
+      resolve();
+    };
+    const onScrollEnd = () => done();
+    const onScroll = () => {
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(done, 140);
+    };
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("scrollend", onScrollEnd, { once: true });
+    idle = setTimeout(done, timeoutMs);
+  });
+}
+
+function TipCard({
+  title,
+  body,
+  kicker,
+  width,
+  height,
+  onClose,
+  onBack,
+  onPrimary,
+  primaryLabel,
+  showBack,
+  secondaryLabel,
+  onSecondary,
+}: {
+  title: string;
+  body: string;
+  kicker?: string;
+  width: number;
+  height: number;
+  onClose: () => void;
+  onBack?: () => void;
+  onPrimary: () => void;
+  primaryLabel: string;
+  showBack: boolean;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  const scale = width / 300;
+  const fontTitle = Math.max(12, Math.min(22, 16 * scale));
+  const fontBody = Math.max(11, Math.min(18, 13 * scale));
+  const fontSmall = Math.max(9, Math.min(14, 11 * scale));
+
+  return (
+    <div
+      className="select-none rounded-[18px] border border-[#1E2A38]/10 bg-[#fbfaf7] p-4 shadow-[0_18px_40px_rgba(30,42,56,0.18)]"
+      style={{ width, minHeight: height }}
+      role="dialog"
+      aria-label={title}
+    >
+      <div className="mb-1 flex items-center gap-2">
+        <span
+          className="font-semibold uppercase tracking-wide text-[#8a6d12]"
+          style={{ fontSize: fontSmall }}
+        >
+          Recorrido
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto rounded-full bg-[#1E2A38]/5 px-2 py-0.5 text-[#1E2A38]/50 hover:bg-[#1E2A38]/10"
+          style={{ fontSize: fontSmall }}
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </div>
+      <h3
+        className="font-semibold tracking-tight text-[#1E2A38]"
+        style={{ fontSize: fontTitle }}
+      >
+        {title}
+      </h3>
+      {kicker && (
+        <span
+          className="mt-1 inline-block rounded-full bg-[#D4AF37]/20 px-2 py-0.5 font-semibold uppercase tracking-wide text-[#8a6d12]"
+          style={{ fontSize: fontSmall }}
+        >
+          {kicker}
+        </span>
+      )}
+      <p
+        className="mt-2 leading-relaxed text-[#4b5563]"
+        style={{ fontSize: fontBody }}
+      >
+        {body}
+      </p>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {showBack && onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full border border-[#1E2A38]/20 px-3 py-1 text-[#1E2A38]"
+            style={{ fontSize: fontSmall }}
+          >
+            Anterior
+          </button>
+        )}
+        {secondaryLabel && onSecondary && (
+          <button
+            type="button"
+            onClick={onSecondary}
+            className="rounded-full border border-[#1E2A38]/20 px-3 py-1 text-[#1E2A38]"
+            style={{ fontSize: fontSmall }}
+          >
+            {secondaryLabel}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onPrimary}
+          className="rounded-full bg-[#1E2A38] px-3 py-1 text-white"
+          style={{ fontSize: fontSmall }}
+        >
+          {primaryLabel}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function GuestTour() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tourRef = useRef<any>(null);
-  const runningRef = useRef(false);
-  const autoStartedRef = useRef(false);
   const routerRef = useRef(router);
   routerRef.current = router;
 
+  const [active, setActive] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [vw, setVw] = useState(0);
+  const [vh, setVh] = useState(0);
+  const runId = useRef(0);
+  const autoStartedRef = useRef(false);
+
+  const step: GuestTourStep | undefined = GUEST_TOUR_STEPS[index];
+
   useEffect(() => {
-    const startTour = async () => {
-      if (runningRef.current) return;
-      runningRef.current = true;
-
-      if (tourRef.current) {
-        try {
-          tourRef.current.cancel();
-        } catch {
-          /* ignore */
-        }
-        tourRef.current = null;
-      }
-
-      const Shepherd = (await import("shepherd.js")).default;
-      const nav = routerRef.current;
-
-      const tour = new Shepherd.Tour({
-        useModalOverlay: true,
-        defaultStepOptions: {
-          cancelIcon: { enabled: true },
-          // Placement-aware scroll in beforeShowPromise (avoids flip on tall targets).
-          scrollTo: false,
-          classes: "blhn-tour-step",
-          modalOverlayOpeningPadding: 8,
-          modalOverlayOpeningRadius: 8,
-        },
-      });
-
-      tourRef.current = tour;
-
-      const finish = () => {
-        runningRef.current = false;
-        tourRef.current = null;
-        if (new URL(window.location.href).searchParams.get("tour") === "guest") {
-          const url = new URL(window.location.href);
-          url.searchParams.delete("tour");
-          const search = url.searchParams.toString();
-          nav.replace(url.pathname + (search ? `?${search}` : ""));
-        }
-      };
-
-      tour.on("complete", finish);
-      tour.on("cancel", finish);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const addStep = (options: Record<string, any>) => {
-        const attach = options.attachTo as
-          | { element?: string; on?: TipPlacement }
-          | undefined;
-        const selector =
-          typeof attach?.element === "string" ? attach.element : null;
-        const placement = (attach?.on ?? "bottom") as TipPlacement;
-        const prior = options.beforeShowPromise as
-          | (() => Promise<void>)
-          | undefined;
-
-        tour.addStep({
-          ...options,
-          beforeShowPromise: async () => {
-            if (prior) await prior();
-            if (!selector) return;
-            const target = document.querySelector(selector);
-            if (target) await prepareTipViewport(target, placement, "instant");
-          },
-        });
-      };
-
-      const nextBtn = {
-        text: "Siguiente",
-        classes: "blhn-btn-primary",
-        action() {
-          tour.next();
-        },
-      };
-      const backBtn = {
-        text: "Anterior",
-        classes: "blhn-btn-secondary",
-        action() {
-          tour.back();
-        },
-      };
-
-      addStep({
-        id: "welcome",
-        title: "Bienvenido a Biblioteca Legal HN",
-        text: "Te mostramos todo lo que puedes hacer aquí: leer leyes gratis, buscar artículos, usar IA y, si te suscribes, resaltar, guardar y anotar. Puedes cerrar el tour cuando quieras.",
-        buttons: [
-          {
-            text: "Comenzar",
-            classes: "blhn-btn-primary",
-            async action() {
-              if (window.location.pathname !== "/") {
-                await goTo(nav, "/", "#tour-global-search");
-              }
-              document
-                .querySelector("#tour-global-search")
-                ?.scrollIntoView({ behavior: "smooth", block: "center" });
-              await waitForElement("#tour-global-search");
-              await new Promise((r) => setTimeout(r, 400));
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "global-search",
-        title: "Buscador de artículos",
-        text: "Busca en toda la legislación por número de artículo, nombre de la ley o en lenguaje natural. La IA te ayuda a encontrar el texto relevante. Disponible sin cuenta.",
-        attachTo: { element: "#tour-global-search", on: "top" },
-        buttons: [
-          backBtn,
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await waitForElement("#tour-global-chat");
-              document
-                .querySelector("#tour-global-chat")
-                ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-              await new Promise((r) => setTimeout(r, 300));
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "global-chat",
-        title: "Chat IA global",
-        text: "Pregunta sobre cualquier ley hondureña. Con cuenta gratis tienes 10 consultas de IA; con el Plan Personal son ilimitadas y puedes adjuntar archivos.",
-        attachTo: { element: "#tour-global-chat", on: "left" },
-        buttons: [
-          backBtn,
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(nav, "/collections", "#tour-collections-tip-target");
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "collections",
-        title: "Colección de leyes",
-        text: "Aquí está la biblioteca completa: códigos, leyes y reglamentos de Honduras. Puedes leer el texto completo gratis, sin crear cuenta.",
-        attachTo: { element: "#tour-collections-tip-target", on: "top" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(nav, "/", "#tour-global-chat");
-              tour.back();
-            },
-          },
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(
-                nav,
-                `/collections/${DEMO_DOCUMENT_SLUG}`,
-                "#tour-article-tools"
-              );
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "article-tools",
-        title: "Resalta, guarda o comenta",
-        text: "En cada artículo puedes resaltar con color, guardar un marcador o dejar una nota privada. Es del Plan Personal. Con cuenta, todo queda en Mi Biblioteca.",
-        attachTo: { element: "#tour-article-tools", on: "bottom" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(nav, "/collections", "#tour-collections-tip-target");
-              tour.back();
-            },
-          },
-          nextBtn,
-        ],
-      });
-
-      addStep({
-        id: "ai-summary",
-        title: "Resumen en lenguaje claro",
-        text: "Cada artículo puede incluir un resumen IA que explica el texto sin jerga. Los primeros 20 artículos de cada documento son gratis; con el plan ves todos.",
-        attachTo: { element: "#tour-ai-summary", on: "bottom" },
-        beforeShowPromise: async () => {
-          const el = await waitForElement("#tour-ai-summary", 4000);
-          if (!el) {
-            // Primer artículo sin resumen: saltar este paso
-            setTimeout(() => {
-              if (tour.isActive()) tour.next();
-            }, 0);
-          }
-        },
-        buttons: [backBtn, nextBtn],
-      });
-
-      addStep({
-        id: "doc-chatbot",
-        title: "Asistente de este documento",
-        text: "Haz preguntas solo sobre esta ley. El asistente responde con base en sus artículos. Ideal para estudiar o preparar un caso.",
-        attachTo: { element: "#tour-chatbot", on: "top" },
-        buttons: [
-          backBtn,
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(
-                nav,
-                "/actualizaciones",
-                "#tour-actualizaciones-page"
-              );
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "actualizaciones",
-        title: "Actualizaciones legales",
-        text: "Reformas, leyes nuevas y derogaciones explicadas en lenguaje claro, con enlace a La Gaceta. Así te enteras de cambios sin leer el PDF completo.",
-        attachTo: { element: "#tour-actualizaciones-page", on: "top" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(
-                nav,
-                `/collections/${DEMO_DOCUMENT_SLUG}`,
-                "#tour-chatbot"
-              );
-              tour.back();
-            },
-          },
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(nav, "/gacetas", "#tour-gacetas-page");
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "gacetas",
-        title: "Gacetas oficiales",
-        text: "Consulta las Gacetas Oficiales publicadas. Complementa las actualizaciones cuando necesitas el documento oficial.",
-        attachTo: { element: "#tour-gacetas-page", on: "top" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(
-                nav,
-                "/actualizaciones",
-                "#tour-actualizaciones-page"
-              );
-              tour.back();
-            },
-          },
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(nav, "/guias", "#tour-guias-page");
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "guias",
-        title: "Guías prácticas",
-        text: "Guías que explican temas legales de forma práctica: ideales para estudiantes, ciudadanos y profesionales que quieren orientación clara.",
-        attachTo: { element: "#tour-guias-page", on: "top" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(nav, "/gacetas", "#tour-gacetas-page");
-              tour.back();
-            },
-          },
-          {
-            text: "Siguiente",
-            classes: "blhn-btn-primary",
-            async action() {
-              await goTo(nav, "/subscriptions", "#tour-subscriptions-page");
-              tour.next();
-            },
-          },
-        ],
-      });
-
-      addStep({
-        id: "subscriptions",
-        title: "Gratis vs Plan Personal",
-        text: "Gratis: leer leyes, buscar, 20 resúmenes IA por documento y 10 chats. Plan Personal: resúmenes ilimitados, chat ilimitado, resaltar/guardar/notas y sin anuncios.",
-        attachTo: { element: "#tour-subscriptions-page", on: "top" },
-        buttons: [
-          {
-            text: "Anterior",
-            classes: "blhn-btn-secondary",
-            async action() {
-              await goTo(nav, "/guias", "#tour-guias-page");
-              tour.back();
-            },
-          },
-          nextBtn,
-        ],
-      });
-
-      addStep({
-        id: "finish",
-        title: "Crea tu cuenta gratis",
-        text: "Con una cuenta usas el cupo de IA, guardas documentos y, si te suscribes, desbloqueas resaltar, marcadores y notas en Mi Biblioteca. ¿Listo para empezar?",
-        buttons: [
-          backBtn,
-          {
-            text: "Crear cuenta",
-            classes: "blhn-btn-primary",
-            action() {
-              tour.complete();
-              nav.push("/sign-up");
-            },
-          },
-          {
-            text: "Cerrar",
-            classes: "blhn-btn-secondary",
-            action() {
-              tour.complete();
-            },
-          },
-        ],
-      });
-
-      if (window.location.pathname !== "/") {
-        await goTo(nav, "/", "#tour-global-search");
-      }
-
-      tour.start();
+    const measure = () => {
+      setVw(window.innerWidth);
+      setVh(window.innerHeight);
     };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
-    const onEvent = () => {
-      void startTour();
-    };
+  const finish = useCallback(() => {
+    runId.current += 1;
+    setActive(false);
+    setVisible(false);
+    setIndex(0);
+    if (new URL(window.location.href).searchParams.get("tour") === "guest") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tour");
+      const search = url.searchParams.toString();
+      routerRef.current.replace(url.pathname + (search ? `?${search}` : ""));
+    }
+  }, []);
 
+  const prepareStep = useCallback(async (stepIndex: number) => {
+    const id = ++runId.current;
+    setVisible(false);
+    setIndex(stepIndex);
+
+    const s = GUEST_TOUR_STEPS[stepIndex];
+    if (!s) return;
+
+    // Navigate if needed
+    if (s.path && window.location.pathname !== s.path) {
+      routerRef.current.push(s.path);
+      if (s.target) {
+        await waitForElement(s.target);
+      } else {
+        await wait(500);
+      }
+      if (id !== runId.current) return;
+      await wait(200);
+      if (id !== runId.current) return;
+    } else if (s.target) {
+      await waitForElement(s.target, 6000);
+      if (id !== runId.current) return;
+    }
+
+    // ALWAYS scroll first, then show tip
+    if (s.target) {
+      const el = document.querySelector(s.target);
+      if (!el && s.id === "ai-summary") {
+        // Skip if resumen missing on first article
+        if (id !== runId.current) return;
+        await prepareStep(stepIndex + 1);
+        return;
+      }
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      await waitForScrollSettled();
+      if (id !== runId.current) return;
+      await wait(120);
+    }
+
+    if (id !== runId.current) return;
+    setVisible(true);
+  }, []);
+
+  const startTour = useCallback(() => {
+    if (
+      typeof window !== "undefined" &&
+      (window.self !== window.top ||
+        new URLSearchParams(window.location.search).has("blhn_lab"))
+    ) {
+      return;
+    }
+    setActive(true);
+    void prepareStep(0);
+  }, [prepareStep]);
+
+  useEffect(() => {
+    const onEvent = () => startTour();
     window.addEventListener(GUEST_TOUR_EVENT, onEvent);
 
     if (
@@ -430,27 +277,92 @@ export default function GuestTour() {
       searchParams.get("tour") === "guest"
     ) {
       autoStartedRef.current = true;
-      void startTour();
+      startTour();
     }
 
     return () => {
       window.removeEventListener(GUEST_TOUR_EVENT, onEvent);
     };
-  }, [searchParams]);
+  }, [searchParams, startTour]);
 
   useEffect(() => {
     return () => {
-      if (tourRef.current) {
-        try {
-          tourRef.current.cancel();
-        } catch {
-          /* ignore */
-        }
-        tourRef.current = null;
-      }
-      runningRef.current = false;
+      runId.current += 1;
     };
   }, []);
 
-  return null;
+  if (!active || !step || !visible) {
+    return null;
+  }
+
+  const layout: TourLayout | undefined = step.layout;
+  const showArrow =
+    !!layout && layout.flecha !== "ninguna" && vw > 0 && vh > 0;
+  const tipW = layout?.tipSize.w ?? 300;
+  const tipH = layout?.tipSize.h ?? 210;
+  const tipX = layout?.tip.x ?? 50;
+  const tipY = layout?.tip.y ?? 45;
+
+  const isWelcome = step.id === "welcome";
+  const isFinish = step.id === "finish";
+  const primaryLabel =
+    step.primaryLabel ??
+    (index < GUEST_TOUR_STEPS.length - 1 ? "Siguiente" : "Cerrar");
+
+  const goNext = () => {
+    if (isFinish) {
+      finish();
+      routerRef.current.push("/sign-up");
+      return;
+    }
+    if (index >= GUEST_TOUR_STEPS.length - 1) {
+      finish();
+      return;
+    }
+    void prepareStep(index + 1);
+  };
+
+  const goBack = () => {
+    if (index <= 0) return;
+    void prepareStep(index - 1);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999]">
+      <div className="absolute inset-0 bg-black/35" aria-hidden />
+
+      {showArrow && layout && (
+        <TourArrow
+          start={pctToPx(layout.base, vw, vh)}
+          mid={pctToPx(layout.mid, vw, vh)}
+          end={pctToPx(layout.pin, vw, vh)}
+          weight={layout.flecha === "ninguna" ? "sm" : layout.flecha}
+        />
+      )}
+
+      <div
+        className="pointer-events-auto absolute z-[10001]"
+        style={{
+          left: `${tipX}%`,
+          top: `${tipY}%`,
+          transform: "translate(-50%, -50%)",
+        }}
+      >
+        <TipCard
+          title={step.title}
+          body={step.text}
+          kicker="Recorrido"
+          width={tipW}
+          height={tipH}
+          onClose={finish}
+          showBack={index > 0}
+          onBack={goBack}
+          onPrimary={goNext}
+          primaryLabel={primaryLabel}
+          secondaryLabel={isFinish ? step.secondaryLabel : undefined}
+          onSecondary={isFinish ? finish : undefined}
+        />
+      </div>
+    </div>
+  );
 }
