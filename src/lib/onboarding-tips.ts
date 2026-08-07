@@ -90,7 +90,7 @@ export const PAGE_TIP_CONFIGS: PageTipConfig[] = [
       {
         id: "article-tools",
         attachTo: "#tour-article-tools",
-        attachOn: "bottom",
+        attachOn: "left",
         title: "Resalta, guarda o comenta",
         text: (hasSubscription) =>
           hasSubscription
