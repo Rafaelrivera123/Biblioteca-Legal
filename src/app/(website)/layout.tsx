@@ -11,6 +11,9 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import NextTopLoader from "nextjs-toploader";
 import { ReactNode, Suspense } from "react";
 
+/** Temporarily off — logged-in page tips are broken; flip to true when fixed. */
+const PAGE_TIPS_ENABLED = false;
+
 const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
   const cu = await auth();
   let user;
@@ -58,12 +61,14 @@ const WebsiteLayout = async ({ children }: { children: ReactNode }) => {
       <Footer />
       <CookieBanner />
       {cu?.user?.id ? (
-        <Suspense fallback={null}>
-          <PageTips
-            userId={cu.user.id}
-            hasSubscription={hasSubscription}
-          />
-        </Suspense>
+        PAGE_TIPS_ENABLED ? (
+          <Suspense fallback={null}>
+            <PageTips
+              userId={cu.user.id}
+              hasSubscription={hasSubscription}
+            />
+          </Suspense>
+        ) : null
       ) : (
         <Suspense fallback={null}>
           <GuestTour />
